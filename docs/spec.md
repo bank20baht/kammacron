@@ -60,6 +60,7 @@ kammacron คือตัวที่ปล่อยรันข้ามคื�
 **ในขอบเขต**
 
 - Kanban: โปรเจกต์, การ์ด, แท็ก, คอมเมนต์, flag `human`, `waits_on`, priority และ archive
+- รูปในการ์ดและคอมเมนต์: อัปโหลด, วาง (paste) หรือลากมาวาง แล้วแสดงใน markdown และ worker เห็นรูปด้วย
 - REST API พร้อม MCP ที่สร้างจาก API อัตโนมัติ ตรวจสิทธิ์ด้วย bearer token
 - ตัวตั้งเวลาต่อโปรเจกต์, pre-check, ปุ่ม Pause ทั้งระบบ และปุ่ม "รันตอนนี้"
 - Worker: worktree ต่อโปรเจกต์, `claude -p` หนึ่งครั้งต่อการ์ด และอ่าน stream-json เป็น event สด
@@ -81,10 +82,11 @@ kammacron คือตัวที่ปล่อยรันข้ามคื�
 
 ทุกอย่างรันใน Bun process เดียว ช่องทางเดียวที่แก้ข้อมูลคือ service layer ของ server เอง ทำให้ live update ใช้ `changed()` ได้โดยไม่ต้องพึ่ง LISTEN
 
-- **Elysia server** bind `127.0.0.1:7420` (เปลี่ยนได้ด้วย `--host`/`--port` หรือ env) เสิร์ฟ 4 ส่วน:
+- **Elysia server** bind `127.0.0.1:7420` (เปลี่ยนได้ด้วย `--host`/`--port` หรือ env) เสิร์ฟ 5 ส่วน:
   - `/api/*` REST + OpenAPI
   - `/mcp` MCP แบบ streamable HTTP
   - `/live/*` SSE ของ `@20baht/live`
+  - `/files/:id` ไฟล์แนบ (ต้องผ่าน auth ดูหัวข้อไฟล์แนบ)
   - ไฟล์ static ของ Angular
 - **Service layer** เป็นที่เดียวที่เขียน DB ทุกการเขียนเรียก `changed(topic)` เสมอ ทั้ง REST, MCP และ worker ใช้ชุดเดียวกัน
 - **Scheduler** เป็น loop ใน process เดียวกัน (tick ทุก 30 วินาที) ดู `next_run_at` ของแต่ละโปรเจกต์ แล้วส่งงานเข้าคิว worker
@@ -103,7 +105,7 @@ kammacron คือตัวที่ปล่อยรันข้ามคื�
 
 ## Data model
 
-มี 7 ตาราง ทุกตารางมี `created_at` และ `updated_at` id ของการ์ดเป็นเลขรันต่อเนื่อง (`#12`) ให้คนและ Claude อ้างถึงได้ง่าย
+มี 8 ตาราง ทุกตารางมี `created_at` และ `updated_at` id ของการ์ดเป็นเลขรันต่อเนื่อง (`#12`) ให้คนและ Claude อ้างถึงได้ง่าย
 
 | ตาราง                | คอลัมน์หลัก                                                                                                                                                                                                                                                                                                                                                      |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -114,12 +116,41 @@ kammacron คือตัวที่ปล่อยรันข้ามคื�
 | `comments`           | `id`, `card_id`, `author` (`user` / `claude-worker` / `mcp`), `run_id?`, `body`                                                                                                                                                                                                                                                                               |
 | `runs`               | `id`, `project_id`, `card_id`, `status` (running/verifying/succeeded/review/failed/stopped/stale/reverted), `started_at`, `ended_at`, `num_turns`, `cost_usd`, `usage` (jsonb), `session_id`, `commits[]`, `pushed_to?`, `revert_commit?`, `exit_code`, `error?`, `log_path`                                                                                  |
 | `run_events`         | `id`, `run_id`, `seq`, `type` (assistant/tool_use/tool_result/system/result), `summary` (ตัดให้สั้น), `data` (jsonb ตัดที่ 8 KB)                                                                                                                                                                                                                                     |
+| `attachments`        | `id` (uuid), `card_id?`, `sha256`, `mime`, `size`, `filename`, `uploaded_by` (`user` / `mcp`)                                                                                                                                                                                                                                                                 |
 
 รอบที่ pre-check ไม่เจอการ์ดจะไม่สร้างแถวใน `runs` แต่จะอัปเดต `projects.last_checked_at` และ `last_check_result` แทน หน้าเว็บจะได้แสดงว่า "เช็กล่าสุด 09:30 — ไม่มีการ์ด" ให้เห็นว่าระบบยังทำงานอยู่
 
 คอลัมน์ของ auto-revert คือ `projects.verify_command?` (ว่างเท่ากับปิด), ค่า `verifying` และ `reverted` ใน `runs.status` และ `runs.revert_commit?`
 
 คำถามที่ยังเปิดอยู่: จะใช้ `@20baht/runs` เก็บตาราง `runs` แทนการเขียนตารางเองดีไหม (ดูหัวข้อไลบรารี 20baht)
+
+## ไฟล์แนบ
+
+บัคส่วนใหญ่มาพร้อมภาพหน้าจอ รูปจึงต้องใช้ได้ทั้งคนและ Claude ตั้งแต่เฟสแรก
+
+**ที่เก็บ**
+
+- ตัวไฟล์อยู่ที่ `~/.kammacron/files/<sha256>.<ext>` ไม่เก็บใน PGlite จะได้ไม่ทำให้ DB บวมและ backup ช้า ตั้งชื่อตาม hash ไฟล์ซ้ำจึงเก็บแค่ชุดเดียว
+- metadata อยู่ในตาราง `attachments` markdown อ้างถึงด้วย `![](/files/<id>)`
+- การ์ดอ้างถึงไฟล์ผ่าน `card_id` ตั้งค่าตอนบันทึกการ์ดหรือคอมเมนต์ที่มีลิงก์ `/files/<id>` ไฟล์ที่ไม่มีการ์ดไหนอ้างถึงเกิน 1 วันจะถูกลบ (กรณีวางรูปแล้วไม่ได้บันทึก)
+
+**อัปโหลด**
+
+- หน้าเว็บ: `POST /api/files` แบบ multipart ใน editor ของการ์ดและคอมเมนต์ วางหรือลากรูปมาวางแล้วระบบใส่ `![](/files/<id>)` ให้เอง
+- MCP: `POST /api/files:base64` รับ JSON `{ filename, mime, data }` เพราะ MCP ส่ง multipart ไม่สะดวก
+
+**ความปลอดภัย**
+
+- `/files/:id` ต้องผ่าน auth เหมือน `/api` (session cookie หรือ bearer)
+- รับเฉพาะ `image/png`, `image/jpeg`, `image/gif` และ `image/webp` ตรวจจาก magic bytes ไม่เชื่อ `Content-Type` ที่ส่งมา ไม่รับ SVG เพราะรัน script ได้
+- ส่งกลับด้วย `Content-Type` ที่ตรวจไว้, `X-Content-Type-Options: nosniff` และ `Content-Security-Policy: sandbox`
+- จำกัดไฟล์ละ 10 MB
+
+**ให้ worker เห็นรูป**
+
+- ก่อน spawn `claude -p` โปรแกรม copy รูปของการ์ดใบนั้นไปที่ `<worktree>/.kammacron/attachments/` (อยู่ใน `.git/info/exclude` จึงไม่ถูก commit และ `git clean -fd` ไม่ลบ) แล้วเขียน path ลงใน prompt
+- Claude ใช้ tool `Read` เปิดรูปเองได้ เพราะ `Read` อ่านรูปได้อยู่แล้ว ไม่ต้องขยายสิทธิ์อ่านออกนอก worktree
+- `GET /cards/{id}` ส่งรายการไฟล์แนบ (id, ชื่อ, mime, ขนาด) กลับไปด้วย
 
 ## วงจรชีวิตของการ์ด
 
@@ -174,7 +205,7 @@ stateDiagram-v2
 
 **Worktree**
 
-- สร้างครั้งแรกที่ `<repo>/.worktrees/claude` แบบ detached และใส่ `.worktrees/` ลง `.git/info/exclude` ให้เอง
+- สร้างครั้งแรกที่ `<repo>/.worktrees/claude` แบบ detached และใส่ `.worktrees/` กับ `.kammacron/` ลง `.git/info/exclude` ให้เอง
 - copy ไฟล์ใน `copy_files` (ค่าเริ่มต้น `.mcp.json`, `.claude/settings.local.json`) แล้วรัน `setup_command` ครั้งเดียว
 - ก่อนทำการ์ดทุกใบ: `git fetch origin` → `git checkout -B claude/<card-id> origin/<default>` → `git clean -fd` (ไม่ลบไฟล์ที่ ignore เช่น `node_modules`) ถ้าการ์ดถูกส่งกลับและมี branch เดิม ให้ checkout branch นั้นแทน
 - ถ้าไฟล์ lock ของ dependency เปลี่ยนจากรอบก่อน ให้รัน `setup_command` ซ้ำ
@@ -192,7 +223,7 @@ claude -p "<prompt>" \
 
 - env มี `CLAUDE_CODE_OAUTH_TOKEN` และ PATH ที่บันทึกไว้
 - `--mcp-config` มี kammacron (URL + token) รวมกับ MCP ของโปรเจกต์ที่เปิดใช้ใน `enabled_mcp_servers`
-- prompt ประกอบด้วย เนื้อหาการ์ด, คอมเมนต์ทั้งหมด, สรุป run ก่อนหน้าของการ์ดใบนี้ และชื่อ default branch
+- prompt ประกอบด้วย เนื้อหาการ์ด, คอมเมนต์ทั้งหมด, path ของรูปที่แนบ (ดูหัวข้อไฟล์แนบ), สรุป run ก่อนหน้าของการ์ดใบนี้ และชื่อ default branch
 
 **ดูสดและหยุด**
 
@@ -264,7 +295,8 @@ MCP สร้างจาก OpenAPI ของ `/api` ด้วย `@20baht/elys
 | ---------------------------------------------------------- | --------------------------- |
 | ดูโปรเจกต์                                                   | `GET /projects`             |
 | ค้นการ์ด (project, status, tag, ข้อความ)                      | `GET /cards`                |
-| การ์ดพร้อมคอมเมนต์, `waits_on`, run ล่าสุด                      | `GET /cards/{id}`           |
+| การ์ดพร้อมคอมเมนต์, `waits_on`, run ล่าสุด, ไฟล์แนบ              | `GET /cards/{id}`           |
+| อัปโหลดรูป (JSON base64) ได้ id ไปใส่ใน markdown               | `POST /files:base64`        |
 | สร้างหลายใบพร้อมอ้าง `waits_on` ในชุดเดียวกัน (ด้วย `ref` ชั่วคราว) | `POST /cards:batch`         |
 | แก้ title, body, tags, `human`, priority, `waits_on`        | `PATCH /cards/{id}`         |
 | ย้ายสถานะ (ไป review ต้องมี reason)                           | `POST /cards/{id}/move`     |
@@ -276,12 +308,12 @@ MCP สร้างจาก OpenAPI ของ `/api` ด้วย `@20baht/elys
 
 ใช้ Angular + `@20baht/ui` + `@20baht/angular` + `@20baht/ngx-eden` ตามที่ `20baht create` สร้างให้ build เป็นไฟล์ static แล้วใส่ไว้ใน package เดียวกับ server มี 4 หน้า และมีแถบบนสุดที่แสดงสถานะระบบทุกหน้า: ทำงานอยู่หรือ pause, run ที่กำลังทำ และจำนวนการ์ดใน review
 
-| หน้า          | มีอะไร                                                                                                                                     |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Board        | เลือกโปรเจกต์หรือดูรวม 4 คอลัมน์ ลากย้ายได้ อัปเดตสด การ์ดมีป้ายแท็ก, `human`, "รอ #12" และ "กำลังทำ" กดแล้วเปิด dialog แก้ไข, คอมเมนต์, ดู run และปุ่ม review |
-| Review inbox | การ์ด `review` จากทุกโปรเจกต์ แสดงเหตุผล, branch, diff stat และปุ่ม Approve / ส่งกลับ / รับไปทำเอง                                                 |
-| Runs         | `<baht-table>` + `@20baht/table-query` ค้นหา กรอง แบ่งหน้า หน้ารายละเอียด run แสดง event สดและปุ่ม Stop                                          |
-| Settings     | token ของ Claude, คำสั่ง `claude mcp add`, rotate token, Pause, path และเวอร์ชันของ `claude`/`git` ที่หาเจอ, allowed hosts และตั้งค่าโปรเจกต์       |
+| หน้า          | มีอะไร                                                                                                                                                                                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Board        | เลือกโปรเจกต์หรือดูรวม 4 คอลัมน์ ลากย้ายได้ อัปเดตสด การ์ดมีป้ายแท็ก, `human`, "รอ #12" และ "กำลังทำ" กดแล้วเปิด dialog แก้ไข, คอมเมนต์, ดู run และปุ่ม review editor ของ body และคอมเมนต์รับรูปด้วยการวางหรือลากมาวาง และ markdown แสดงรูปในหน้า |
+| Review inbox | การ์ด `review` จากทุกโปรเจกต์ แสดงเหตุผล, branch, diff stat และปุ่ม Approve / ส่งกลับ / รับไปทำเอง                                                                                                                             |
+| Runs         | `<baht-table>` + `@20baht/table-query` ค้นหา กรอง แบ่งหน้า หน้ารายละเอียด run แสดง event สดและปุ่ม Stop                                                                                                                      |
+| Settings     | token ของ Claude, คำสั่ง `claude mcp add`, rotate token, Pause, path และเวอร์ชันของ `claude`/`git` ที่หาเจอ, allowed hosts และตั้งค่าโปรเจกต์                                                                                   |
 
 ตั้งค่าโปรเจกต์เป็นฟอร์ม `<baht-*>` ธรรมดา ตอนผูก repo ให้ตรวจทันทีว่า path เป็น git repo, มี `origin` และหา default branch เจอ ผลตรวจแสดงเป็น checklist ในหน้า เพื่อให้รู้ตั้งแต่ตั้งค่าว่าพร้อมรันหรือยัง
 
@@ -316,7 +348,7 @@ kammacron open
 - บน Linux ให้บอกผู้ใช้ให้รัน `loginctl enable-linger` ถ้าอยากให้รันต่อหลัง logout
 - Windows เฟสแรกรัน `start` เอง หรือตั้ง Task Scheduler ตามคู่มือ
 
-ข้อมูลอยู่ที่ `~/.kammacron/` แบ่งเป็น `db/` (PGlite), `logs/` (log ของ server และ run), `mcp/` (ไฟล์ `--mcp-config` ต่อโปรเจกต์) และ `secrets.json` ส่วน binary ที่ compile แล้วเก็บไว้เป็นทางเลือกในเฟสหลัง
+ข้อมูลอยู่ที่ `~/.kammacron/` แบ่งเป็น `db/` (PGlite), `logs/` (log ของ server และ run), `files/` (ไฟล์แนบ), `mcp/` (ไฟล์ `--mcp-config` ต่อโปรเจกต์) และ `secrets.json` ส่วน binary ที่ compile แล้วเก็บไว้เป็นทางเลือกในเฟสหลัง
 
 ## เฟสการทำ
 
@@ -324,12 +356,13 @@ kammacron open
 
 **เฟส 0 — ทดลองก่อน (spike)**
 
-- ทำตามรายการในหัวข้อความเสี่ยง ข้อ S1–S7 ให้เสร็จก่อนเขียนโค้ดจริง แต่ละข้อเป็นสคริปต์เล็กๆ ที่ตอบใช่/ไม่ใช่
+- ทำตามรายการในหัวข้อความเสี่ยง ข้อ S1–S8 ให้เสร็จก่อนเขียนโค้ดจริง แต่ละข้อเป็นสคริปต์เล็กๆ ที่ตอบใช่/ไม่ใช่
 
 **เฟส 1 — ใช้แทนระบบเดิม**
 
 - โครง `20baht create` + PGlite + drizzle + migration
 - API ของโปรเจกต์, การ์ด, คอมเมนต์ และ `waits_on` พร้อม MCP ที่สร้างจาก API และ bearer token
+- ไฟล์แนบ: อัปโหลดจากหน้าเว็บและ MCP, แสดงใน markdown, copy เข้า worktree ให้ worker และลบไฟล์ที่ไม่มีใครอ้างถึง
 - Scheduler, pre-check, worktree, worker, stream-json → `run_events` และการเก็บกวาด stale
 - Auto-revert: รัน `verify_command` หลัง push และ revert เมื่อไม่ผ่าน
 - หน้าเว็บ: Board (ลากย้าย + dialog), Review inbox, Runs แบบรายการธรรมดา + หน้าดูสด และ Settings
@@ -355,15 +388,16 @@ kammacron open
 
 ความเสี่ยงใหญ่สุดคือ S1 เพราะกำหนดว่าไลบรารี Postgres ทั้ง 4 ตัวใช้ได้จริงหรือเปล่า ควรทำเป็นอย่างแรก
 
-| #   | ความเสี่ยง                                                                                                               | ทดลองยังไง                                                                                                                                     | ทางสำรอง                                                                                                             |
-| --- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| S1  | ไลบรารี 20baht ที่เป็น Postgres อาจผูกกับ driver `pg` หรือต้องใช้หลาย connection ในขณะที่ PGlite มี connection เดียว                | รัน `table-query`, `runs`, `live` (โหมด `changed()`) และ `definitions/pg` บน `drizzle-orm/pglite` ใน Bun ดูเรื่อง transaction ซ้อนและการเขียนพร้อมกัน | เพิ่ม adapter ในไลบรารี หรือใช้ `pglite-socket` ให้ไลบรารีต่อแบบ `pg` ปกติ                                                    |
-| S2  | PGlite เปิด data dir ได้ทีละ process และอาจเสียหายถ้า process ตายกลางคัน                                                     | kill -9 ระหว่างเขียนซ้ำหลายรอบ แล้วเปิดใหม่                                                                                                         | backup อัตโนมัติรายวัน (`dumpDataDir`) ทุกคำสั่ง CLI ผ่าน API ไม่แตะ DB ตรง                                                   |
-| S3  | allowlist/denylist ของ Bash จับตาม prefix อาจถูกหลบด้วยคำสั่งต่อกัน (`&&`, `;`) หรือสลับลำดับ flag                               | เขียน prompt ที่พยายาม force push, `--no-verify` และ push ไป branch อื่นใน repo ทดสอบ                                                              | เพิ่ม hook `PreToolUse` ตรวจคำสั่ง git เต็มบรรทัด และตรวจ ref ที่ถูก push หลังจบ run                                           |
-| S4  | MCP ของโปรเจกต์ในโหมด headless ต้องการการอนุมัติ และ worktree ไม่มีไฟล์ที่ไม่ได้ commit                                            | รัน `claude -p` ใน worktree ด้วย `--mcp-config` คู่กับ `--strict-mcp-config` แล้วดูว่า server ขึ้นครบ                                                   | สร้างไฟล์ MCP รวมเองจาก `.mcp.json` และรายการที่เปิดไว้                                                                    |
-| S5  | token หมดอายุหรือโควต้าหมด แล้ว worker วนล้มทุกรอบ                                                                           | ดู error จริงใน stream-json ตอนใช้ token ผิดและตอนโดน rate limit                                                                                  | แยกประเภท error ถ้าเป็น auth ให้ pause ทั้งระบบและแจ้งเตือน ถ้าเป็น rate limit ให้เลื่อน `next_run_at` และคืนการ์ดโดยไม่นับเป็น stale |
-| S6  | `.worktrees/` ใน repo ถูก tsc, test runner หรือ file watcher ของคุณหยิบไปด้วย และ hook อย่าง husky อาจอ้าง path ผิดใน worktree | สร้าง worktree ใน repo ที่ใช้จริง แล้วรัน dev server, test และ pre-push จาก repo หลัก                                                                 | ย้าย worktree ไป `~/.kammacron/worktrees/` เป็นตัวเลือกต่อโปรเจกต์                                                         |
-| S7  | service ของ launchd/systemd ไม่ได้ PATH เดียวกับ shell (เช่น bun จาก mise/asdf, claude จาก `~/.local/bin`)                  | ติดตั้ง service แล้วรีบูต ดูว่า Settings หา `claude`/`git` เจอ และ pre-push รันผ่าน                                                                     | ให้แก้ PATH ได้ใน Settings แล้วเขียน service file ใหม่                                                                     |
+| #   | ความเสี่ยง                                                                                                                                | ทดลองยังไง                                                                                                                                     | ทางสำรอง                                                                                                             |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| S1  | ไลบรารี 20baht ที่เป็น Postgres อาจผูกกับ driver `pg` หรือต้องใช้หลาย connection ในขณะที่ PGlite มี connection เดียว                                 | รัน `table-query`, `runs`, `live` (โหมด `changed()`) และ `definitions/pg` บน `drizzle-orm/pglite` ใน Bun ดูเรื่อง transaction ซ้อนและการเขียนพร้อมกัน | เพิ่ม adapter ในไลบรารี หรือใช้ `pglite-socket` ให้ไลบรารีต่อแบบ `pg` ปกติ                                                    |
+| S2  | PGlite เปิด data dir ได้ทีละ process และอาจเสียหายถ้า process ตายกลางคัน                                                                      | kill -9 ระหว่างเขียนซ้ำหลายรอบ แล้วเปิดใหม่                                                                                                         | backup อัตโนมัติรายวัน (`dumpDataDir`) ทุกคำสั่ง CLI ผ่าน API ไม่แตะ DB ตรง                                                   |
+| S3  | allowlist/denylist ของ Bash จับตาม prefix อาจถูกหลบด้วยคำสั่งต่อกัน (`&&`, `;`) หรือสลับลำดับ flag                                                | เขียน prompt ที่พยายาม force push, `--no-verify` และ push ไป branch อื่นใน repo ทดสอบ                                                              | เพิ่ม hook `PreToolUse` ตรวจคำสั่ง git เต็มบรรทัด และตรวจ ref ที่ถูก push หลังจบ run                                           |
+| S4  | MCP ของโปรเจกต์ในโหมด headless ต้องการการอนุมัติ และ worktree ไม่มีไฟล์ที่ไม่ได้ commit                                                             | รัน `claude -p` ใน worktree ด้วย `--mcp-config` คู่กับ `--strict-mcp-config` แล้วดูว่า server ขึ้นครบ                                                   | สร้างไฟล์ MCP รวมเองจาก `.mcp.json` และรายการที่เปิดไว้                                                                    |
+| S5  | token หมดอายุหรือโควต้าหมด แล้ว worker วนล้มทุกรอบ                                                                                            | ดู error จริงใน stream-json ตอนใช้ token ผิดและตอนโดน rate limit                                                                                  | แยกประเภท error ถ้าเป็น auth ให้ pause ทั้งระบบและแจ้งเตือน ถ้าเป็น rate limit ให้เลื่อน `next_run_at` และคืนการ์ดโดยไม่นับเป็น stale |
+| S6  | `.worktrees/` ใน repo ถูก tsc, test runner หรือ file watcher ของคุณหยิบไปด้วย และ hook อย่าง husky อาจอ้าง path ผิดใน worktree                  | สร้าง worktree ใน repo ที่ใช้จริง แล้วรัน dev server, test และ pre-push จาก repo หลัก                                                                 | ย้าย worktree ไป `~/.kammacron/worktrees/` เป็นตัวเลือกต่อโปรเจกต์                                                         |
+| S7  | service ของ launchd/systemd ไม่ได้ PATH เดียวกับ shell (เช่น bun จาก mise/asdf, claude จาก `~/.local/bin`)                                   | ติดตั้ง service แล้วรีบูต ดูว่า Settings หา `claude`/`git` เจอ และ pre-push รันผ่าน                                                                     | ให้แก้ PATH ได้ใน Settings แล้วเขียน service file ใหม่                                                                     |
+| S8  | รูปอาจไปไม่ถึง Claude: `@20baht/elysia-openapi-mcp` อาจสร้าง tool จาก endpoint base64 ไม่ได้ หรือ `claude -p` เปิดรูปใน worktree ด้วย `Read` ไม่ได้ | สร้าง endpoint `files:base64` แล้วเรียกผ่าน MCP จาก Claude Code จริง และรัน `claude -p` ที่สั่งให้อธิบายรูปใน `.kammacron/attachments/`                    | เขียน tool อัปโหลดเองแยกจากที่ไลบรารีสร้าง หรือส่งรูปเป็น content block ผ่าน `--input-format stream-json`                       |
 
 ความเสี่ยงที่ไม่ต้องทดลองแต่ต้องเฝ้าดู: พอ Claude push เองได้ คุณภาพของ `main` ขึ้นอยู่กับ pre-push ทั้งหมด ถ้า repo ไหน pre-push บาง ควรปิด worker ไว้ก่อน หน้า Settings ควรแสดงคำเตือนถ้าตรวจไม่พบ pre-push hook
 

@@ -5,6 +5,7 @@ export const NAV: ShellNavItem[] = [
   { key: 'board', label: 'Board', href: '/board', icon: 'columns' },
   { key: 'review', label: 'Review', href: '/review', icon: 'file-check' },
   { key: 'runs', label: 'Runs', href: '/runs', icon: 'play' },
+  { key: 'calendar', label: 'Calendar', href: '/calendar', icon: 'calendar' },
   { key: 'stats', label: 'Stats', href: '/stats', icon: 'chart' },
   { key: 'settings', label: 'Settings', href: '/settings', icon: 'settings' },
 ]

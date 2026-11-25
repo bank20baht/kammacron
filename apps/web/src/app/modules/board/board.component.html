@@ -73,84 +73,68 @@
         <baht-button variant="primary" (click)="go('/welcome')">Get started</baht-button>
       </baht-empty-state>
     } @else {
-      <div class="columns">
-        @for (status of columns; track status) {
-          <section
-            class="column"
-            [attr.data-status]="status"
-            (dragover)="$event.preventDefault()"
-            (drop)="drop($event, status, null)"
-          >
-            <header>
-              <span>{{ label[status] }}</span>
-              <baht-badge tone="outline" [label]="'' + byColumn()[status].length"></baht-badge>
-            </header>
-            @for (card of byColumn()[status]; track card.id) {
-              <article
-                class="tile"
-                [class.selected]="openCard() === card.id"
-                draggable="true"
-                tabindex="0"
-                (dragstart)="dragStart(card.id)"
-                (dragover)="$event.preventDefault()"
-                (drop)="drop($event, status, card.id)"
-                (click)="open(card.id)"
-                (keydown.enter)="open(card.id)"
-              >
-                <div class="meta">
-                  <span class="num">#{{ card.id }}</span>
-                  @if (!slug()) {
-                    <span class="muted">{{ projectName()(card.project_id) }}</span>
-                  }
-                  @if (card.priority !== 0) {
-                    <baht-badge tone="mono" [label]="'P' + card.priority"></baht-badge>
-                  }
-                </div>
-                <div class="title">{{ card.title }}</div>
-                <div class="badges">
-                  @if (card.status === 'doing' && card.claimed_by_run) {
-                    <baht-badge tone="info" busy label="Claude is working"></baht-badge>
-                  }
-                  @if (card.human) {
-                    <baht-badge tone="info" label="Human"></baht-badge>
-                  } @else if (card.tags.includes(claude)) {
-                    <baht-badge tone="neutral" label="Claude"></baht-badge>
-                  }
-                  @for (tag of card.tags; track tag) {
-                    @if (tag !== claude) {
-                      <baht-badge tone="mono" [label]="tag"></baht-badge>
-                    }
-                  }
-                </div>
-                @if (card.status === 'review') {
-                  <div class="review-row">
-                    <span class="reason">{{ card.review_reason }}</span>
-                    <baht-button
-                      size="sm"
-                      variant="primary"
-                      (click)="open(card.id); $event.stopPropagation()"
-                      >Review</baht-button
-                    >
-                  </div>
+      <app-kanban
+        label="Cards"
+        [columns]="kanbanColumns"
+        [lanes]="byColumn()"
+        [selected]="openCard()"
+        (move)="move($event)"
+        (opened)="open($event)"
+      >
+        <ng-template kanbanTile let-item>
+          @if (cardOf()(item); as card) {
+            <div class="meta">
+              <span class="num">#{{ card.id }}</span>
+              @if (!slug()) {
+                <span class="muted">{{ projectName()(card.project_id) }}</span>
+              }
+              @if (card.priority !== 0) {
+                <baht-badge tone="mono" [label]="'P' + card.priority"></baht-badge>
+              }
+            </div>
+            <div class="title">{{ card.title }}</div>
+            <div class="badges">
+              @if (card.status === 'doing' && card.claimed_by_run) {
+                <baht-badge tone="info" busy label="Claude is working"></baht-badge>
+              }
+              @if (card.human) {
+                <baht-badge tone="info" label="Human"></baht-badge>
+              } @else if (card.tags.includes(claude)) {
+                <baht-badge tone="neutral" label="Claude"></baht-badge>
+              }
+              @for (tag of card.tags; track tag) {
+                @if (tag !== claude) {
+                  <baht-badge tone="mono" [label]="tag"></baht-badge>
                 }
-              </article>
-            } @empty {
-              <p class="empty">Drop a card here</p>
-            }
-            @if (status === 'todo' && project()) {
-              <div class="quick">
-                <baht-form
-                  #qa="bahtForm"
-                  [form]="quickAddForm"
-                  submit-on-enter
-                  [busy]="busy()"
-                  (bahtSubmit)="quickAdd(qa.element)"
-                ></baht-form>
+              }
+            </div>
+            @if (card.status === 'review') {
+              <div class="review-row">
+                <span class="reason">{{ card.review_reason }}</span>
+                <baht-button
+                  size="sm"
+                  variant="primary"
+                  (click)="open(card.id); $event.stopPropagation()"
+                  >Review</baht-button
+                >
               </div>
             }
-          </section>
-        }
-      </div>
+          }
+        </ng-template>
+        <ng-template kanbanFooter let-column>
+          @if (column.key === 'todo' && project()) {
+            <div class="quick">
+              <baht-form
+                #qa="bahtForm"
+                [form]="quickAddForm"
+                submit-on-enter
+                [busy]="busy()"
+                (bahtSubmit)="quickAdd(qa.element)"
+              ></baht-form>
+            </div>
+          }
+        </ng-template>
+      </app-kanban>
     }
   </div>
 

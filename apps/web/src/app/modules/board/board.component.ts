@@ -11,15 +11,36 @@ import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { newCardForm, quickAddForm, REGISTRY } from '../../shared/forms'
 import { STATUS_LABEL, type CardStatus } from '../../shared/tones'
+import {
+  KanbanComponent,
+  KanbanFooterDirective,
+  KanbanTileDirective,
+  type KanbanColumn,
+  type KanbanMove,
+} from '../../shared/kanban/kanban.component'
 import { CardDialogComponent } from './card-dialog.component'
 
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
 const CLAUDE = 'claude'
+const ACCENT: Record<CardStatus, string> = {
+  todo: 'var(--baht-color-border-strong)',
+  doing: 'var(--baht-color-primary)',
+  review: 'var(--baht-color-warning)',
+  done: 'var(--baht-color-success)',
+}
+const isStatus = (value: string): value is CardStatus => COLUMNS.some((c) => c === value)
 
-/** Four columns, live; drag a card to move it, open it in the drawer, add one in To do. */
+/** Four columns, live; drag a card (or Alt+arrows) to move it, open it in the drawer, add one in To do. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, CardDialogComponent, RouterLink],
+  imports: [
+    BAHT_UI,
+    CardDialogComponent,
+    RouterLink,
+    KanbanComponent,
+    KanbanTileDirective,
+    KanbanFooterDirective,
+  ],
   selector: 'web-board',
   styleUrl: './board.component.css',
   templateUrl: './board.component.html',
@@ -48,8 +69,11 @@ export class BoardComponent {
     })
   })
 
-  protected readonly columns = COLUMNS
-  protected readonly label = STATUS_LABEL
+  protected readonly kanbanColumns: KanbanColumn[] = COLUMNS.map((key) => ({
+    key,
+    label: STATUS_LABEL[key],
+    accent: ACCENT[key],
+  }))
   protected readonly ago = ago
   protected readonly claude = CLAUDE
   protected readonly openCard = computed(() => {
@@ -76,6 +100,12 @@ export class BoardComponent {
     for (const status of COLUMNS)
       groups[status].sort((a, b) => a.position - b.position || a.id - b.id)
     return groups
+  })
+
+  /** The card a tile draws (the kanban hands back items as it got them, untyped). */
+  protected readonly cardOf = computed(() => {
+    const byId = new Map((this.cards().data ?? []).map((c) => [c.id, c]))
+    return (item: { id: number }) => byId.get(item.id)
   })
 
   protected readonly projectName = computed(() => {
@@ -114,8 +144,6 @@ export class BoardComponent {
         : f,
     ),
   }))
-
-  private dragged: number | null = null
 
   protected navigate(event: Event): void {
     const { href } = (event as CustomEvent<{ href?: string }>).detail
@@ -209,17 +237,10 @@ export class BoardComponent {
     }
   }
 
-  protected dragStart(id: number): void {
-    this.dragged = id
-  }
-
-  /** Dropped on a column, or before one of its cards: the move shows at once, the server confirms. */
-  protected async drop(event: DragEvent, status: CardStatus, before: number | null): Promise<void> {
-    event.preventDefault()
-    event.stopPropagation()
-    const id = this.dragged
-    this.dragged = null
-    if (id === null) return
+  /** Moved to a column, or before one of its cards: the move shows at once, the server confirms. */
+  protected async move({ id, to, before }: KanbanMove): Promise<void> {
+    if (!isStatus(to)) return
+    const status = to
     const column = this.byColumn()[status].filter((c) => c.id !== id)
     const at = before === null ? column.length : column.findIndex((c) => c.id === before)
     const prev = column[at - 1]?.position

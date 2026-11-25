@@ -43,6 +43,12 @@ export const routes: Routes = [
         loadComponent: () => import('./modules/runs/run.component').then((m) => m.RunComponent),
       },
       {
+        path: 'calendar',
+        title: 'Calendar · kammacron',
+        loadComponent: () =>
+          import('./modules/calendar/calendar.component').then((m) => m.CalendarComponent),
+      },
+      {
         path: 'stats',
         title: 'Stats · kammacron',
         loadComponent: () =>

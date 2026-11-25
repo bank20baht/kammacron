@@ -4,6 +4,7 @@ import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 
 import { cards, projects, runs, schedules } from '../db/schema'
 import { addAlert } from '../services/alerts'
+import { HOUSEKEEPING_MINUTES } from '../services/calendar'
 import { purgeOrphans } from '../services/attachments'
 import { purgeOAuth } from '../services/oauth-storage'
 import { addComment, createCards, moveCard, pickableCards } from '../services/cards'
@@ -20,6 +21,8 @@ export type SchedulerStatus = {
   running: { run_id: number; project_id: number; card_id: number }[]
   queued: number[]
   last_tick: string | null
+  /** When the daily housekeeping (old run events, orphan files, OAuth rows) last ran. */
+  housekeeping_at: string | null
 }
 
 /**
@@ -225,7 +228,9 @@ export const createScheduler = (env: WorkerEnv) => {
   }
 
   /** Once a day: old run events and orphan files go. */
+  let housekept: Date | null = null
   const housekeeping = async () => {
+    housekept = new Date()
     const settings = await getSettings(env.db)
     await pruneRunEvents(env.db, settings.run_log_retention_days)
     await purgeOrphans(env.db, join(env.dataDir, 'files'))
@@ -244,7 +249,7 @@ export const createScheduler = (env: WorkerEnv) => {
       timer = setInterval(() => void tick(), TICK_MS)
       housekeepingTimer = setInterval(
         () => void housekeeping().catch(() => undefined),
-        24 * 60 * 60_000,
+        HOUSEKEEPING_MINUTES * 60_000,
       )
       void tick()
       void housekeeping().catch(() => undefined)
@@ -279,7 +284,12 @@ export const createScheduler = (env: WorkerEnv) => {
         .select({ run_id: runs.id, project_id: runs.project_id, card_id: runs.card_id })
         .from(runs)
         .where(inArray(runs.status, ['running', 'verifying']))
-      return { running, queued: [...queue], last_tick: lastTick?.toISOString() ?? null }
+      return {
+        running,
+        queued: [...queue],
+        last_tick: lastTick?.toISOString() ?? null,
+        housekeeping_at: housekept?.toISOString() ?? null,
+      }
     },
   }
 }

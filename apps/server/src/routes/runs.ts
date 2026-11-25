@@ -6,6 +6,7 @@ import { Elysia, t } from 'elysia'
 import type { AppContext } from '../context'
 import { cards, projects, RUN_STATUSES, runs, schedules } from '../db/schema'
 import { listAlerts, markAlertsRead } from '../services/alerts'
+import { listCronJobs, runsBetween } from '../services/calendar'
 import { getCard, moveCard, updateCard } from '../services/cards'
 import { conflict, notFound } from '../services/errors'
 import { getProject, updateProject } from '../services/projects'
@@ -249,6 +250,36 @@ export const runRoutes = (ctx: AppContext) =>
       {
         body: t.Object({ ids: t.Array(t.Integer()) }),
         detail: { operationId: 'read_alerts', summary: 'Mark alerts read' },
+      },
+    )
+    .get(
+      '/calendar',
+      async ({ query, status }) => {
+        const from = new Date(query.from)
+        const to = new Date(query.to)
+        if (!(from < to) || to.getTime() - from.getTime() > 62 * 86_400_000)
+          return status(400, {
+            code: 'BAD_RANGE',
+            message: 'from must come before to, at most 62 days apart',
+          })
+        const loop = ctx.scheduler ? await ctx.scheduler.status() : null
+        return {
+          jobs: await listCronJobs(ctx.db, loop),
+          runs: await runsBetween(ctx.db, from, to),
+        }
+      },
+      {
+        query: t.Object({
+          from: t.String({ format: 'date-time', description: 'Start of the range (ISO instant)' }),
+          to: t.String({ format: 'date-time', description: 'End of the range, excluded' }),
+        }),
+        live: liveRoute(ctx.live, { topics: () => ['projects', 'schedules', 'runs', 'settings'] }),
+        detail: {
+          operationId: 'get_calendar',
+          summary:
+            'The cron jobs (worker rounds, schedules, housekeeping) with their next run, and the runs in a range',
+          mcp: true,
+        },
       },
     )
     .get(

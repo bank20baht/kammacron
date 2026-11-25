@@ -66,7 +66,13 @@ const NewCard = t.Object({
 
 export const cardRoutes = (ctx: AppContext) =>
   new Elysia()
-    .use(idempotency({ store: pgStore({ db: ctx.db, table: idempotencyKeys }) }))
+    .use(
+      idempotency({
+        store: pgStore({ db: ctx.db, table: idempotencyKeys }),
+        // one person per install: the web app, the API token and MCP all act as the owner
+        scope: () => 'owner',
+      }),
+    )
     .use(liveMacro(ctx.live))
     .get('/cards', ({ query }) => listCards(ctx.db, query), {
       query: t.Object({

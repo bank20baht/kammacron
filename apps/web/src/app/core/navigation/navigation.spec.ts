@@ -20,8 +20,15 @@ describe('currentKey', () => {
 })
 
 describe('NAV', () => {
-  it('is the four pages of the spec and stats, each at its own path', () => {
-    expect(NAV.map((item) => item.key)).toEqual(['board', 'review', 'runs', 'stats', 'settings'])
+  it('is the four pages of the spec, the calendar and stats, each at its own path', () => {
+    expect(NAV.map((item) => item.key)).toEqual([
+      'board',
+      'review',
+      'runs',
+      'calendar',
+      'stats',
+      'settings',
+    ])
     for (const item of NAV) expect(item.href).toBe(`/${item.key}`)
   })
 })

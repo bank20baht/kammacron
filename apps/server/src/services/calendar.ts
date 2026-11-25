@@ -1,0 +1,144 @@
+import { and, asc, eq, gte, lt } from 'drizzle-orm'
+
+import type { Db } from '../db'
+import { cards, projects, runs, schedules } from '../db/schema'
+import { getSettings } from './settings'
+
+/** How often the housekeeping runs, from the process start. */
+export const HOUSEKEEPING_MINUTES = 24 * 60
+
+/** What the worker loop says of itself; null where it does not run. */
+type LoopStatus = { housekeeping_at: string | null } | null
+
+/** What runs on its own: a project's worker round, a project's schedule, the daily housekeeping. */
+type CronKind = 'worker' | 'schedule' | 'housekeeping'
+
+export type CronJob = {
+  /** `worker:<project>`, `schedule:<id>`, `housekeeping`. */
+  key: string
+  kind: CronKind
+  name: string
+  project_id: number | null
+  project_name: string | null
+  project_slug: string | null
+  /** The shell command of a schedule; null for the others. */
+  command: string | null
+  every_minutes: number
+  /** When it runs next; null when it is off or the time is not known yet. */
+  next_at: string | null
+  last_at: string | null
+  /** `no cards`, `ran 2 cards`, `exit 1`… */
+  last_result: string | null
+  /** Why it does not run now (`worker off`, `paused: rate limit`); null when it runs. */
+  off: string | null
+}
+
+type ProjectRow = typeof projects.$inferSelect
+
+const iso = (d: Date | null) => d?.toISOString() ?? null
+
+/** Why a project's round does not run now, or null. */
+const projectOff = (project: ProjectRow, allPaused: boolean, hasWorker: boolean): string | null => {
+  if (!hasWorker) return 'worker not running in this process'
+  if (allPaused) return 'all work paused'
+  if (project.archived) return 'project archived'
+  if (!project.worker_enabled) return 'worker off'
+  if (project.paused_reason) return `paused: ${project.paused_reason}`
+  if (!project.repo_path) return 'no repo path'
+  return null
+}
+
+type ScheduleRow = typeof schedules.$inferSelect
+
+const workerJob = (p: ProjectRow, off: string | null): CronJob => ({
+  key: `worker:${String(p.id)}`,
+  kind: 'worker',
+  name: 'Worker round',
+  project_id: p.id,
+  project_name: p.name,
+  project_slug: p.slug,
+  command: null,
+  every_minutes: p.interval_minutes,
+  next_at: off ? null : (iso(p.next_run_at) ?? new Date().toISOString()),
+  last_at: iso(p.last_checked_at),
+  last_result: p.last_check_result,
+  off,
+})
+
+const scheduleJob = (s: ScheduleRow, p: ProjectRow, off: string | null): CronJob => ({
+  key: `schedule:${String(s.id)}`,
+  kind: 'schedule',
+  name: s.name,
+  project_id: p.id,
+  project_name: p.name,
+  project_slug: p.slug,
+  command: s.command,
+  every_minutes: s.interval_minutes,
+  next_at: off ? null : (iso(s.next_run_at) ?? new Date().toISOString()),
+  last_at: iso(s.last_run_at),
+  last_result: s.last_exit_code === null ? null : `exit ${String(s.last_exit_code)}`,
+  off,
+})
+
+const housekeepingJob = (status: LoopStatus, retentionDays: number): CronJob => {
+  const last = status?.housekeeping_at ? new Date(status.housekeeping_at) : null
+  return {
+    key: 'housekeeping',
+    kind: 'housekeeping',
+    name: 'Housekeeping',
+    project_id: null,
+    project_name: null,
+    project_slug: null,
+    command: null,
+    every_minutes: HOUSEKEEPING_MINUTES,
+    next_at: last ? new Date(last.getTime() + HOUSEKEEPING_MINUTES * 60_000).toISOString() : null,
+    last_at: iso(last),
+    last_result: last
+      ? `old run events (over ${String(retentionDays)} days) and orphan files removed`
+      : null,
+    off: status === null ? 'worker not running in this process' : null,
+  }
+}
+
+/**
+ * Every job that runs on a timer, with its interval and its next and last time. A schedule
+ * runs inside its project's round, so it is off whenever the round is.
+ */
+export const listCronJobs = async (db: Db, status: LoopStatus): Promise<CronJob[]> => {
+  const settings = await getSettings(db)
+  const live = (await db.select().from(projects).orderBy(asc(projects.id))).filter(
+    (p) => !p.archived,
+  )
+  const byId = new Map(live.map((p) => [p.id, p]))
+  const offOf = (p: ProjectRow) => projectOff(p, settings.paused, status !== null)
+  const scheduleJobs = (await db.select().from(schedules).orderBy(asc(schedules.id))).flatMap(
+    (s) => {
+      const p = byId.get(s.project_id)
+      if (!p) return []
+      return [scheduleJob(s, p, s.enabled ? offOf(p) : 'schedule off')]
+    },
+  )
+  return [
+    ...live.map((p) => workerJob(p, offOf(p))),
+    ...scheduleJobs,
+    housekeepingJob(status, settings.run_log_retention_days),
+  ]
+}
+
+/** The runs that started between two instants (from included, to excluded), oldest first. */
+export const runsBetween = (db: Db, from: Date, to: Date) =>
+  db
+    .select({
+      id: runs.id,
+      card_id: runs.card_id,
+      card_title: cards.title,
+      project_id: runs.project_id,
+      status: runs.status,
+      started_at: runs.started_at,
+      ended_at: runs.ended_at,
+    })
+    .from(runs)
+    .innerJoin(cards, eq(cards.id, runs.card_id))
+    .where(and(gte(runs.started_at, from), lt(runs.started_at, to)))
+    .orderBy(asc(runs.started_at))
+    .limit(1000)

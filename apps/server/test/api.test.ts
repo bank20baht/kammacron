@@ -239,3 +239,44 @@ describe('runs search', () => {
     expect(bad.status).toBe(400)
   })
 })
+
+describe('calendar', () => {
+  test('the cron jobs with why each is off, and the runs in the range', async () => {
+    await t.json('PATCH', `/api/projects/${String(projectId)}`, {
+      worker_enabled: true,
+      interval_minutes: 60,
+    })
+    await t.json('POST', `/api/projects/${String(projectId)}/schedules`, {
+      name: 'nightly tests',
+      command: 'bun test',
+      interval_minutes: 1440,
+    })
+    const [card] = await create([{ project_id: projectId, title: 'login bug' }])
+    const { createRun } = await import('../src/services/runs')
+    await createRun(t.ctx.db, {
+      project_id: projectId,
+      card_id: must(card).id,
+      base_sha: null,
+      log_path: null,
+    })
+    const from = new Date(Date.now() - 86_400_000).toISOString()
+    const to = new Date(Date.now() + 86_400_000).toISOString()
+    const cal = await t.json<{
+      jobs: { key: string; kind: string; every_minutes: number; off: string | null }[]
+      runs: { card_title: string }[]
+    }>('GET', `/api/calendar?from=${from}&to=${to}`)
+    expect(cal.jobs.map((j) => [j.kind, j.every_minutes])).toEqual([
+      ['worker', 60],
+      ['schedule', 1440],
+      ['housekeeping', 1440],
+    ])
+    // no worker loop in tests, and no repo path: nothing runs, and each says why
+    expect(cal.jobs.every((j) => j.off !== null)).toBe(true)
+    expect(cal.runs.map((r) => r.card_title)).toEqual(['login bug'])
+
+    const later = new Date(Date.now() + 2 * 86_400_000).toISOString()
+    const none = await t.json<{ runs: unknown[] }>('GET', `/api/calendar?from=${to}&to=${later}`)
+    expect(none.runs).toEqual([])
+    expect((await t.call('GET', `/api/calendar?from=${to}&to=${from}`)).status).toBe(400)
+  })
+})

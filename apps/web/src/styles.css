@@ -8,11 +8,59 @@ body {
   font-family: var(--baht-font-family);
 }
 
-/* A light header band (the shell's documented white-header tokens), so the page, not the
-   frame, carries the colour; it follows the theme. */
+/*
+ * The colours, with the library's own tokens only (so every element follows): konmek's light
+ * cloud palette, and a dark one with a blue cast and three clear layers (page, column or panel,
+ * card) instead of three near-blacks.
+ */
+html:not([data-baht-theme='dark']) {
+  --baht-primary: #2449c4;
+  --baht-accent: #c45c35;
+  --baht-base-100: #ffffff; /* surfaces: cards, tiles, panels */
+  --baht-base-200: #ffffff; /* the page */
+  --baht-base-300: #f2f5fb; /* sunken: board columns, selected rows */
+  --baht-row-alt: #f8fafd;
+  --baht-color-border: #d7e2f4;
+  --baht-color-border-strong: #b5c8e5;
+  --baht-color-divider: #e6edf8;
+  --baht-color-text: #15203b;
+  --baht-color-text-muted: #5b6980;
+}
+
+html[data-baht-theme='dark'] {
+  --baht-base-200: #0d1017; /* the page */
+  --baht-base-300: #141922; /* sunken: board columns */
+  --baht-base-100: #1b212d; /* surfaces: cards, tiles, panels */
+  --baht-row-alt: #181e29;
+  --baht-color-surface-alt: #222938;
+  --baht-color-border: #2a3243;
+  --baht-color-border-strong: #3d485e;
+  --baht-color-divider: #232a38;
+  --baht-color-text-muted: #9aa6bb;
+}
+
+/* The shell: a header band on the surface colour, with a hairline under it; the current link
+   tinted with the primary, links with rounded corners (konmek's frame). */
 html {
   --baht-shell-header-bg: var(--baht-color-surface);
   --baht-shell-header-ink: var(--baht-color-text);
+}
+.baht-shell .baht-shell-header {
+  border-bottom: var(--baht-border-default);
+}
+.baht-shell .baht-shell-link {
+  margin-inline: var(--baht-space-3);
+  border-radius: var(--baht-radius-md);
+}
+.baht-shell .baht-shell-link--on {
+  --baht-shell-link-bar-inset: var(--baht-radius-md);
+  background: var(--baht-color-primary-tint);
+  color: var(--baht-color-primary);
+}
+.baht-table th {
+  font-size: var(--baht-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* The width every routed page keeps to inside the shell. */

@@ -43,6 +43,7 @@ describe('mcp', () => {
       'add_comment',
       'archive_card',
       'create_cards',
+      'get_calendar',
       'get_card',
       'get_run',
       'list_cards',

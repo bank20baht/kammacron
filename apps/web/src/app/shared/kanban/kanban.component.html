@@ -1,0 +1,41 @@
+<div class="columns" role="group" [attr.aria-label]="label()">
+  @for (column of columns(); track column.key) {
+    <section
+      class="column"
+      [attr.data-column]="column.key"
+      [style.--app-kanban-accent]="column.accent ?? null"
+      [attr.aria-label]="column.label"
+      (dragover)="$event.preventDefault()"
+      (drop)="drop($event, column.key, null)"
+    >
+      <header>
+        <span>{{ column.label }}</span>
+        <baht-badge tone="outline" [label]="'' + (lanes()[column.key]?.length ?? 0)"></baht-badge>
+      </header>
+      @for (item of lanes()[column.key] ?? []; track item.id) {
+        <article
+          class="tile"
+          draggable="true"
+          tabindex="0"
+          [attr.data-item]="item.id"
+          [attr.aria-keyshortcuts]="'Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown'"
+          [class.selected]="selected() === item.id"
+          (dragstart)="dragStart($event, item.id)"
+          (dragover)="$event.preventDefault()"
+          (drop)="drop($event, column.key, item.id)"
+          (click)="opened.emit(item.id)"
+          (keydown)="key($event, column.key, item.id)"
+        >
+          @if (tile(); as t) {
+            <ng-container *ngTemplateOutlet="t.template; context: { $implicit: item }" />
+          }
+        </article>
+      } @empty {
+        <p class="empty">{{ emptyText() }}</p>
+      }
+      @if (footer(); as f) {
+        <ng-container *ngTemplateOutlet="f.template; context: { $implicit: column }" />
+      }
+    </section>
+  }
+</div>

@@ -20,7 +20,8 @@ describe('currentKey', () => {
 })
 
 describe('NAV', () => {
-  it('starts with Home at the root', () => {
-    expect(NAV[0]).toEqual({ key: '', label: 'Home', href: '/' })
+  it('is the four pages of the spec and stats, each at its own path', () => {
+    expect(NAV.map((item) => item.key)).toEqual(['board', 'review', 'runs', 'stats', 'settings'])
+    for (const item of NAV) expect(item.href).toBe(`/${item.key}`)
   })
 })

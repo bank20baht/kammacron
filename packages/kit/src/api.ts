@@ -1,14 +1,15 @@
-import { Injectable, InjectionToken, inject, isDevMode } from '@angular/core'
+import { Injectable, InjectionToken, inject } from '@angular/core'
 import { createEden } from '@20baht/ngx-eden'
 import type { App } from 'server'
 
 /**
- * Where the API lives. In dev the Angular servers run on :4200 and up and Elysia on :3001;
- * deployed, one web server serves the apps and proxies `/api` on the same origin.
+ * Where the API lives: always the page's own origin. kammacron serves the web app itself, and in
+ * dev `ng serve` proxies `/api`, `/live`, `/files` and `/mcp` to it (`apps/web/proxy.conf.json`),
+ * so the session cookie (SameSite=Strict) and the Host/Origin checks see one origin.
  */
 export const API_BASE = new InjectionToken<string>('API_BASE', {
   providedIn: 'root',
-  factory: () => (isDevMode() ? 'http://localhost:7420' : globalThis.location.origin),
+  factory: () => globalThis.location.origin,
 })
 
 /**

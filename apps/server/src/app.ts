@@ -5,6 +5,7 @@ import { Elysia } from 'elysia'
 
 import { authGuard, isAuthenticated } from './auth'
 import type { AppContext } from './context'
+import { adminRoutes } from './routes/admin'
 import { cardRoutes, CARD_RULES } from './routes/cards'
 import { fileApiRoutes, fileRoutes } from './routes/files'
 import { projectRoutes } from './routes/projects'
@@ -68,6 +69,7 @@ export const buildApp = (ctx: AppContext) => {
         .use(cardRoutes(ctx))
         .use(fileApiRoutes(ctx))
         .use(runRoutes(ctx))
+        .use(adminRoutes(ctx))
         .use(systemRoutes(ctx)),
     )
     .use(fileRoutes(ctx))

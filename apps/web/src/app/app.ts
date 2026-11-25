@@ -4,17 +4,20 @@ import { NavigationEnd, Router, RouterOutlet } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { filter, map } from 'rxjs'
 import { NAV, currentKey } from './core/navigation/navigation'
+import { SessionService } from './services/session.service'
+import { StatusBarComponent } from './shared/status-bar.component'
 
 /** The frame every page sits in: brand, the navigator, the page. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, BAHT_UI],
+  imports: [RouterOutlet, BAHT_UI, StatusBarComponent],
   selector: 'app-root',
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
 export class App {
   private readonly router = inject(Router)
+  protected readonly session = inject(SessionService)
 
   private readonly url = toSignal(
     this.router.events.pipe(

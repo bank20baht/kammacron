@@ -1,0 +1,95 @@
+<div class="app-page">
+  @if (project.value(); as p) {
+    <baht-page-header
+      [heading]="p.name"
+      [description]="p.repo_path ?? 'No repo linked: a board only'"
+      back-label="Settings"
+      back-href="/settings"
+    >
+      <baht-button variant="secondary" [disabled]="busy() || !p.repo_path" (click)="runNow()"
+        >Run now</baht-button
+      >
+    </baht-page-header>
+    @if (p.paused_reason) {
+      <baht-alert
+        tone="warning"
+        heading="Paused by kammacron"
+        [message]="p.paused_reason"
+      ></baht-alert>
+      <div class="row">
+        <baht-button variant="primary" (click)="resume()">Resume this project</baht-button>
+      </div>
+    }
+    @if (message(); as m) {
+      <baht-alert
+        [tone]="m.tone"
+        [message]="m.text"
+        dismissible
+        (bahtDismiss)="message.set(null)"
+      ></baht-alert>
+    }
+    @if (p.last_checked_at) {
+      <p class="muted">
+        Last check {{ ago(p.last_checked_at) }}: {{ p.last_check_result }} · next
+        {{ ago(p.next_run_at) }}
+      </p>
+    }
+
+    @if (check(); as c) {
+      <baht-card heading="Ready to run?" [subtitle]="c.ok ? 'Yes' : 'Not yet'">
+        @for (item of c.checks; track item.name) {
+          <div class="row">
+            <baht-badge
+              [tone]="item.ok ? 'success' : item.name === 'pre-push hook' ? 'warning' : 'danger'"
+              [label]="item.name"
+            ></baht-badge>
+            <span class="muted">{{ item.detail }}</span>
+          </div>
+        }
+      </baht-card>
+    } @else if (p.repo_path) {
+      <div class="row">
+        <baht-button variant="ghost" (click)="runCheck()">Check the repo</baht-button>
+      </div>
+    }
+
+    <baht-card heading="Settings">
+      <baht-form #pf="bahtForm" [form]="projectForm" [value]="value()"></baht-form>
+      <div class="row">
+        <baht-button variant="primary" [loading]="busy()" (click)="save(pf.element)"
+          >Save</baht-button
+        >
+      </div>
+    </baht-card>
+
+    <baht-card
+      heading="Schedules"
+      subtitle="A command on a timer; when it fails, a card opens (or the open one gets a comment)"
+    >
+      @for (s of schedules().data ?? []; track s.id) {
+        <div class="row">
+          <strong>{{ s.name }}</strong>
+          <baht-code [code]="s.command"></baht-code>
+          <span class="muted"
+            >every {{ s.interval_minutes }} min · last {{ ago(s.last_run_at) }} · exit
+            {{ s.last_exit_code ?? '—' }}</span
+          >
+          <baht-button size="sm" variant="ghost" (click)="toggleSchedule(s.id, !s.enabled)">
+            {{ s.enabled ? 'Turn off' : 'Turn on' }}
+          </baht-button>
+        </div>
+      }
+      <baht-form #sf="bahtForm" [form]="scheduleForm" [value]="scheduleValue"></baht-form>
+      <baht-button variant="secondary" [disabled]="busy()" (click)="addSchedule(sf.element)"
+        >Add</baht-button
+      >
+    </baht-card>
+  } @else if (project.error()) {
+    <baht-error-state
+      heading="This project did not load"
+      [message]="'Project ' + id()"
+    ></baht-error-state>
+  } @else {
+    <baht-skeleton variant="text"></baht-skeleton>
+  }
+</div>

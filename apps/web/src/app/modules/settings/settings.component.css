@@ -1,0 +1,20 @@
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--baht-space-3);
+  margin-block: var(--baht-space-2);
+}
+.project {
+  align-items: center;
+  padding: var(--baht-space-2);
+  border-radius: var(--baht-radius-md);
+  cursor: pointer;
+}
+.project:hover,
+.project:focus-visible {
+  background: var(--baht-color-bg-sunken);
+}
+.muted {
+  color: var(--baht-color-text-muted);
+}

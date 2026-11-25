@@ -50,7 +50,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@20baht/angular": "0.3.32",
-        "@20baht/ngx-eden": "^0.1.0",
+        "@20baht/live": "^0.1.1",
         "@20baht/ui": "0.3.32",
         "@angular/common": "^22.2.0",
         "@angular/compiler": "^22.2.0",

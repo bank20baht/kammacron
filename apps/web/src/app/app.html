@@ -1,12 +1,15 @@
 <baht-app-shell
   brand="kammacron"
-  brand-href="/"
+  brand-href="/board"
   label="kammacron"
   [items]="items"
   [value]="current()"
   (baht-nav)="navigate($event)"
 >
   <div data-slot="actions">
+    @if (session.state() === 'open') {
+    <app-status-bar></app-status-bar>
+    }
     <baht-theme-toggle default="system"></baht-theme-toggle>
   </div>
   <main class="shell-main">

@@ -23,6 +23,11 @@ const ProjectFields = {
   verify_command: t.Optional(t.Nullable(t.String())),
   enabled_mcp_servers: t.Optional(t.Array(t.String())),
   web_tools: t.Optional(t.Boolean()),
+  mode: t.Optional(t.UnionEnum(['watch', 'autopilot'])),
+  ship_policy: t.Optional(t.UnionEnum(['push', 'branch'])),
+  worktree_path: t.Optional(t.Nullable(t.String())),
+  verify_timeout_minutes: t.Optional(t.Integer({ minimum: 1, maximum: 240 })),
+  lock_files: t.Optional(t.Array(t.String())),
 }
 
 export const projectRoutes = (ctx: AppContext) =>

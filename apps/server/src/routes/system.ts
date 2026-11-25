@@ -55,6 +55,10 @@ export const systemRoutes = (ctx: AppContext) =>
           stale_minutes: row.stale_minutes,
           run_log_retention_days: row.run_log_retention_days,
           allowed_hosts: row.allowed_hosts,
+          worker_path: row.worker_path,
+          concurrency: row.concurrency,
+          webhook_url: row.webhook_url,
+          desktop_notifications: row.desktop_notifications,
           claude_token: {
             source: envToken
               ? ('env' as const)
@@ -81,6 +85,10 @@ export const systemRoutes = (ctx: AppContext) =>
             stale_minutes: t.Integer({ minimum: 5, maximum: 24 * 60 }),
             run_log_retention_days: t.Integer({ minimum: 1, maximum: 3650 }),
             allowed_hosts: t.Array(t.String({ pattern: '^[a-z0-9.-]+$' })),
+            worker_path: t.Nullable(t.String()),
+            concurrency: t.Integer({ minimum: 1, maximum: 8 }),
+            webhook_url: t.Nullable(t.String({ pattern: '^https?://' })),
+            desktop_notifications: t.Boolean(),
           }),
         ),
         detail: { operationId: 'update_settings', summary: 'Pause, timeouts, allowed hosts' },

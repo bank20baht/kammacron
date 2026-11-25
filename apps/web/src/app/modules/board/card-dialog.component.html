@@ -1,0 +1,119 @@
+@if (card().data; as c) {
+  <div class="head">
+    <baht-badge tone="outline" [label]="'#' + c.id"></baht-badge>
+    <baht-badge
+      [tone]="c.status === 'review' ? 'warning' : c.status === 'done' ? 'success' : 'neutral'"
+      [label]="label[c.status]"
+    ></baht-badge>
+    @if (c.human) {
+      <baht-badge tone="gold" label="human"></baht-badge>
+    }
+    @for (tag of c.tags; track tag) {
+      <baht-badge tone="mono" [label]="tag"></baht-badge>
+    }
+  </div>
+
+  @if (error(); as message) {
+    <baht-alert
+      tone="danger"
+      [message]="message"
+      dismissible
+      (bahtDismiss)="error.set(null)"
+    ></baht-alert>
+  }
+
+  @if (c.status === 'review') {
+    <baht-card heading="Review" [subtitle]="c.review_reason ?? ''">
+      @if (c.branch) {
+        <p class="muted">Branch <baht-code [code]="c.branch"></baht-code></p>
+        @if (diff(); as d) {
+          <baht-code variant="block" [code]="d.stat"></baht-code>
+        }
+      }
+      <baht-form #back="bahtForm" [form]="sendBackForm"></baht-form>
+      <div class="actions">
+        <baht-button variant="primary" [loading]="busy()" (click)="approve()">
+          {{ c.branch ? 'Approve and push' : 'Approve' }}
+        </baht-button>
+        <baht-button variant="secondary" [disabled]="busy()" (click)="sendBack(back.element)"
+          >Send back</baht-button
+        >
+        <baht-button variant="ghost" [disabled]="busy()" (click)="take()">I'll take it</baht-button>
+      </div>
+    </baht-card>
+  }
+
+  @if (editing()) {
+    <div class="form">
+      <baht-form
+        #f="bahtForm"
+        [form]="cardForm"
+        [value]="editValue()"
+        [registry]="registry"
+      ></baht-form>
+      <div class="actions">
+        <baht-button variant="primary" [loading]="busy()" (click)="save(f.element)"
+          >Save</baht-button
+        >
+        <baht-button variant="ghost" (click)="editing.set(false)">Cancel</baht-button>
+      </div>
+    </div>
+  } @else {
+    <h2 class="title">{{ c.title }}</h2>
+    @if (c.body.trim()) {
+      <baht-markdown-view [source]="c.body" [allowImage]="allowImage"></baht-markdown-view>
+    } @else {
+      <p class="muted">No description.</p>
+    }
+    @if (images().length > 0) {
+      <baht-image-preview [images]="images()"></baht-image-preview>
+    }
+    @if (c.waits_on.length > 0) {
+      <p class="muted">
+        Waits on
+        @for (w of c.waits_on; track w.id) {
+          <baht-badge
+            [tone]="w.status === 'done' ? 'success' : 'neutral'"
+            [label]="'#' + w.id + ' ' + w.title"
+          ></baht-badge>
+        }
+      </p>
+    }
+    <div class="actions">
+      <baht-button variant="secondary" (click)="edit()">Edit</baht-button>
+      <baht-button variant="ghost" [disabled]="busy()" (click)="archive()">Archive</baht-button>
+    </div>
+  }
+
+  @if (c.last_run; as run) {
+    <baht-card heading="Last run" [subtitle]="'run ' + run.id + ' · ' + ago(run.started_at)">
+      <div class="head">
+        <baht-badge
+          [tone]="runTone[run.status] ?? 'neutral'"
+          [label]="run.status"
+          [busy]="run.status === 'running'"
+        ></baht-badge>
+        <span class="muted">{{ run.num_turns ?? 0 }} turns · {{ cost(run.cost_usd) }}</span>
+        <a [routerLink]="['/runs', run.id]">Open run</a>
+      </div>
+      @if (run.summary) {
+        <baht-markdown-view [source]="run.summary"></baht-markdown-view>
+      }
+    </baht-card>
+  }
+
+  <baht-comments
+    [entries]="comments()"
+    placeholder="Comment (the worker reads every comment next run)"
+    empty-message="No comments yet"
+    [busy]="busy()"
+    (bahtSubmit)="comment($any($event).body)"
+  ></baht-comments>
+} @else if (card().error) {
+  <baht-error-state
+    heading="This card did not load"
+    [message]="'Card #' + cardId()"
+  ></baht-error-state>
+} @else {
+  <baht-skeleton variant="text"></baht-skeleton>
+}

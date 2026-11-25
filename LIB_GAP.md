@@ -65,3 +65,26 @@ what the library could do instead.
 - **Workaround:** kammacron keeps worktrees outside the repo, at `~/.kammacron/worktrees/<slug>`.
 - **Fix in the lib:** add `.worktrees/**` (and `.claude/worktrees/**`) to the default ignores of the
   `base` ESLint config.
+
+## @20baht/formats
+
+### No display formats for time, duration or money
+
+- **Seen:** the spec planned `@20baht/formats` for "x minutes ago", run durations and cost. The package (0.1.0)
+  validates and formats identifiers (Thai ID, tax ID, phone, E.164, card number, IBAN), not those.
+- **Workaround:** `apps/web/src/app/shared/format.ts`, a few lines over `Intl.RelativeTimeFormat` and
+  `Intl.NumberFormat`.
+- **Fix in the lib:** `relativeTime(date, now?)`, `duration(ms)` and `money(amount, currency)` beside the
+  identifier formats, Thai and English, so every 20baht app shows them the same way.
+
+## @20baht/elysia-idempotency
+
+### `idempotent: true` widens the route's 200 to `Response | Body`
+
+- **Seen:** on a route with `idempotent: true` the macro's `beforeHandle` returns the replayed answer as a raw
+  `Response`, so Elysia types the route's 200 as `Response | <the handler's body>`. Every typed client (Eden,
+  `@20baht/ngx-eden`, `typedLive`) then hands back `Response | Card[]`, and `const [card] = await …` does not
+  compile.
+- **Workaround:** `answer()` in `packages/kit/src/answer.ts` narrows the type (over HTTP the body is always parsed).
+- **Fix in the lib:** type the macro's `beforeHandle` so it does not add to the route's response, e.g. return
+  the replay through `status(...)` with the route's own type, or document `response:` on idempotent routes.

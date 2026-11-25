@@ -48,7 +48,17 @@ export const rotateToken = async (
 export const updateSettings = async (
   db: Executor,
   patch: Partial<
-    Pick<Settings, 'paused' | 'stale_minutes' | 'run_log_retention_days' | 'allowed_hosts'>
+    Pick<
+      Settings,
+      | 'paused'
+      | 'stale_minutes'
+      | 'run_log_retention_days'
+      | 'allowed_hosts'
+      | 'worker_path'
+      | 'concurrency'
+      | 'webhook_url'
+      | 'desktop_notifications'
+    >
   >,
 ) => {
   return firstRow(await db.update(settings).set(patch).where(eq(settings.id, 1)).returning())

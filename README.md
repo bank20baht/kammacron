@@ -14,6 +14,22 @@ You only see the cards that need a decision.
 - **Cards triaged before Claude works.** `claude` / `human`, `waits_on`, splitting a person's task
   into small Claude cards, and review only for what could not ship.
 
+## What it does
+
+| Area          | In short                                                                                                                                                                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Board**     | Four columns (To do, Doing, Review, Done) per project or all together, live. Drag or Alt+arrows to move; one-line quick add. A card has a markdown body with pasted images, an owner (Claude or a person), tags, a priority, and cards it waits on.                |
+| **Worker**    | On each project's interval it picks the next card Claude may take and runs one `claude -p` on it, in the repo folder or a worktree of its own. Modes `autopilot` / `watch`; shipping `push` / `branch`; an optional diff gate and a `verify_command` that reverts. |
+| **Review**    | The cards waiting for you, with the reason and the diff of `claude/<card>`. Approve (rebased and pushed for you) or send back with a comment for the next run.                                                                                                     |
+| **Runs**      | Every run with its live event stream, turns, cost, commits and where they went; stop one that is going.                                                                                                                                                            |
+| **Calendar**  | What runs on its own and when: each project's worker round, its schedules and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                                       |
+| **Stats**     | Week by week: runs shipped, sent to review, reverted, failed, and what they cost.                                                                                                                                                                                  |
+| **Schedules** | A shell command per project on an interval (tests, audits); when it fails it opens a card for Claude, or comments on the one already open.                                                                                                                         |
+| **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                                         |
+| **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a run was reverted, a project paused, a round skipped.                                                                                                                                 |
+| **Settings**  | The Claude token (with a test run), the worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), each project's repo checklist and limits, and the language.                                                                             |
+| **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                                         |
+
 The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
 lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
 

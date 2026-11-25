@@ -8,7 +8,9 @@ import type { AppContext } from './context'
 import { cardRoutes, CARD_RULES } from './routes/cards'
 import { fileApiRoutes, fileRoutes } from './routes/files'
 import { projectRoutes } from './routes/projects'
+import { runRoutes } from './routes/runs'
 import { systemRoutes } from './routes/system'
+import { staticRoutes } from './static'
 import { ServiceError } from './services/errors'
 
 const MCP_INSTRUCTIONS = `kammacron is a Kanban board whose "claude"-tagged cards are worked by an unattended Claude worker.
@@ -65,9 +67,11 @@ export const buildApp = (ctx: AppContext) => {
         .use(projectRoutes(ctx))
         .use(cardRoutes(ctx))
         .use(fileApiRoutes(ctx))
+        .use(runRoutes(ctx))
         .use(systemRoutes(ctx)),
     )
     .use(fileRoutes(ctx))
+    .use(staticRoutes(ctx.webDir)) // last: its `/*` must not shadow a route
   // the hub runs a subscribed route again through `app.handle`, with the stream's credentials
   bindLive(ctx.live, app)
   return app

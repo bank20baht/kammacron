@@ -181,3 +181,30 @@ describe('worker selection', () => {
     expect(await pickableCards(t.ctx.db, projectId)).toHaveLength(0)
   })
 })
+
+describe('on a real server', () => {
+  // `app.handle` skips Bun.serve's router, where Elysia once failed to coerce path params (500)
+  test('every route with a path param answers through Bun.serve', async () => {
+    const [card] = await create([{ project_id: projectId, title: 'served' }])
+    const server = t.app.listen({ hostname: '127.0.0.1', port: 0 })
+    try {
+      const base = `http://127.0.0.1:${String(must(server.server).port)}`
+      const headers = { authorization: `Bearer ${t.ctx.auth.apiToken}` }
+      for (const path of [
+        `/api/cards/${String(must(card).id)}`,
+        `/api/projects/${String(projectId)}`,
+      ]) {
+        const response = await fetch(`${base}${path}`, { headers })
+        expect(`${path} ${String(response.status)}`).toBe(`${path} 200`)
+      }
+      const comment = await fetch(`${base}/api/cards/${String(must(card).id)}/comments`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ body: 'via Bun.serve' }),
+      })
+      expect(comment.status).toBe(200)
+    } finally {
+      await server.stop()
+    }
+  })
+})

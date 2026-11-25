@@ -11,13 +11,14 @@
   },
   "types": "dist/types/index.d.ts",
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
-    "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --target bun --outdir dist",
+    "dev": "bun run --watch src/cli.ts start --port 7420",
+    "start": "bun run src/cli.ts start",
+    "build": "bun build src/cli.ts --target bun --outdir dist",
     "build:types": "tsc -p tsconfig.types.json",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "cli": "bun run src/cli.ts"
   },
   "dependencies": {
     "@20baht/elysia-idempotency": "^0.1.2",

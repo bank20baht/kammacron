@@ -1,23 +1,25 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { buildApp } from './app'
-import type { AppContext } from './context'
+import { buildContext } from './bootstrap'
 import { openDatabase } from './db'
-import { createLiveHub } from './live'
-import { secretsPath } from './secrets'
-import { ensureSecrets, getSettings } from './services/settings'
 
 export type ServerOptions = {
   host?: string | undefined
   port?: number | undefined
   dataDir?: string | undefined
+  /** false: serve the board and MCP only, run no worker. */
+  worker?: boolean | undefined
+  /** The built web app; found beside the bundle (`./web`) or in `apps/web/dist` when omitted. */
+  webDir?: string | undefined
 }
 
-const DEFAULT_PORT = 7420
+export const DEFAULT_PORT = 7420
 
-const resolveDataDir = (dataDir?: string) =>
+export const resolveDataDir = (dataDir?: string) =>
   dataDir ?? process.env['KAMMACRON_DATA_DIR'] ?? join(homedir(), '.kammacron')
 
 /** `<data>/server.json`: who holds the data dir, so a second process (and the CLI) can tell. */
@@ -30,6 +32,20 @@ export type ServerLock = {
 
 const lockPath = (dataDir: string) => join(dataDir, 'server.json')
 
+/** The web app: as given, then `web/` beside this file (the npm package), then the dev build. */
+const findWebDir = async (given?: string) => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    given,
+    process.env['KAMMACRON_WEB_DIR'],
+    join(here, 'web'),
+    join(here, '..', '..', 'web', 'dist', 'web', 'browser'),
+  ]
+  for (const dir of candidates)
+    if (dir && (await Bun.file(join(dir, 'index.html')).exists())) return dir
+  return null
+}
+
 const isAlive = (pid: number) => {
   try {
     process.kill(pid, 0)
@@ -39,7 +55,7 @@ const isAlive = (pid: number) => {
   }
 }
 
-const readLock = async (dataDir: string): Promise<ServerLock | null> => {
+export const readLock = async (dataDir: string): Promise<ServerLock | null> => {
   try {
     const lock = JSON.parse(await readFile(lockPath(dataDir), 'utf8')) as ServerLock
     return isAlive(lock.pid) ? lock : null
@@ -66,33 +82,28 @@ export const startServer = async (options: ServerOptions = {}) => {
     )
 
   const database = await openDatabase(join(dataDir, 'db'))
-  const path = secretsPath(dataDir)
-  const secrets = await ensureSecrets(database.db, path)
-  const settings = await getSettings(database.db)
-
   // filled once listening: `isLoopback` asks the Bun server for the peer address
-  const listening: { server?: { requestIP: (r: Request) => { address: string } | null } } = {}
-  const auth = {
-    apiToken: secrets.api_token,
-    sessionSecret: secrets.session_secret,
-    allowedHosts: settings.allowed_hosts,
-  }
-  const ctx: AppContext = {
-    db: database.db,
-    live: createLiveHub(database.client, auth),
-    auth,
-    secrets,
-    secretsPath: path,
-    filesDir: join(dataDir, 'files'),
+  const listening: {
+    server?: { requestIP: (r: Request) => { address: string } | null }
+    port?: number
+  } = {}
+  const ctx = await buildContext({
+    database,
+    dataDir,
+    worker: options.worker,
+    webDir: await findWebDir(options.webDir),
+    serverUrl: () => `http://127.0.0.1:${String(listening.port ?? port)}`,
     isLoopback: (request) => {
       const ip = listening.server?.requestIP(request)?.address
       return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
     },
-  }
+  })
 
   const app = buildApp(ctx).listen({ hostname: host, port })
   if (app.server) listening.server = app.server
   const actualPort = app.server?.port ?? port
+  listening.port = actualPort
+  await ctx.scheduler?.start()
   const lock: ServerLock = {
     pid: process.pid,
     host,
@@ -105,6 +116,7 @@ export const startServer = async (options: ServerOptions = {}) => {
     ctx,
     url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${String(actualPort)}`,
     stop: async () => {
+      await ctx.scheduler?.stop()
       await app.stop()
       ctx.live.close()
       await database.close()

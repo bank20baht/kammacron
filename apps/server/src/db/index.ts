@@ -6,13 +6,15 @@ import { drizzle } from 'drizzle-orm/pglite'
 import { migrate } from 'drizzle-orm/pglite/migrator'
 
 import {
+  alerts,
   attachments,
-  cardWaitsOn,
   cards,
+  cardWaitsOn,
   comments,
   projects,
   runEvents,
   runs,
+  schedules,
   schema,
   settings,
 } from './schema'
@@ -45,6 +47,8 @@ const LIVE_TABLES = [
   { table: runs, scope: [runs.card_id, runs.project_id, runs.status] },
   { table: runEvents, scope: [runEvents.run_id] },
   { table: attachments, scope: [attachments.card_id] },
+  { table: alerts },
+  { table: schedules },
 ]
 
 /** Opens PGlite at `dataDir` (in memory when omitted), migrated and with live triggers. */

@@ -3,14 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { buildApp } from '../src/app'
+import { buildContext } from '../src/bootstrap'
 import type { AppContext } from '../src/context'
 import { openDatabase, type Database } from '../src/db'
-import { createLiveHub } from '../src/live'
-import { secretsPath } from '../src/secrets'
-import { ensureSecrets, getSettings } from '../src/services/settings'
 
 export type TestApp = {
   ctx: AppContext
+  dataDir: string
   database: Database
   app: ReturnType<typeof buildApp>
   /** A request with the API token, as JSON. */
@@ -24,26 +23,20 @@ export type TestApp = {
   close: () => Promise<void>
 }
 
-export const testApp = async (options: { loopback?: boolean } = {}): Promise<TestApp> => {
+export const testApp = async (
+  options: { loopback?: boolean; claudeBin?: string; serverUrl?: () => string } = {},
+): Promise<TestApp> => {
   const dataDir = await mkdtemp(join(tmpdir(), 'kammacron-test-'))
   const database = await openDatabase()
-  const path = secretsPath(dataDir)
-  const secrets = await ensureSecrets(database.db, path)
-  const row = await getSettings(database.db)
-  const auth = {
-    apiToken: secrets.api_token,
-    sessionSecret: secrets.session_secret,
-    allowedHosts: row.allowed_hosts,
-  }
-  const ctx: AppContext = {
-    db: database.db,
-    live: createLiveHub(database.client, auth),
-    auth,
-    secrets,
-    secretsPath: path,
-    filesDir: join(dataDir, 'files'),
+  const ctx = await buildContext({
+    database,
+    dataDir,
+    worker: false,
+    serverUrl: () => options.serverUrl?.() ?? 'http://127.0.0.1:0',
     isLoopback: () => options.loopback ?? true,
-  }
+    claudeBin: options.claudeBin,
+    notify: () => Promise.resolve(),
+  })
   const app = buildApp(ctx)
   const call = (
     method: string,
@@ -70,6 +63,7 @@ export const testApp = async (options: { loopback?: boolean } = {}): Promise<Tes
   }
   return {
     ctx,
+    dataDir,
     database,
     app,
     call,

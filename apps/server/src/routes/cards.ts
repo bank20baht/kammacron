@@ -5,6 +5,7 @@ import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
+import { idParams } from './params'
 import { CARD_STATUSES, idempotencyKeys, type CommentAuthor } from '../db/schema'
 import {
   addComment,
@@ -24,7 +25,7 @@ Work that touches security, data or migrations, release or deploy, a breaking AP
 When a task is mostly a person's, split what Claude can do alone into small "claude" cards and make the big card wait on them (waits_on).`
 
 const Status = t.UnionEnum([...CARD_STATUSES], { description: 'todo, doing, review or done' })
-const Id = t.Object({ id: t.Numeric({ description: 'Card number, as in #12' }) })
+const Id = idParams('Card number, as in #12')
 const IdempotencyHeader = t.Object({
   'idempotency-key': t.Optional(
     t.String({
@@ -87,7 +88,7 @@ export const cardRoutes = (ctx: AppContext) =>
         mcp: true,
       },
     })
-    .get('/cards/:id', ({ params }) => getCard(ctx.db, params.id), {
+    .get('/cards/:id', ({ params }) => getCard(ctx.db, Number(params.id)), {
       params: Id,
       live: liveRoute(ctx.live, {
         topics: ({ params }) => {
@@ -125,7 +126,7 @@ export const cardRoutes = (ctx: AppContext) =>
         mcp: true,
       },
     })
-    .patch('/cards/:id', ({ params, body }) => updateCard(ctx.db, params.id, body), {
+    .patch('/cards/:id', ({ params, body }) => updateCard(ctx.db, Number(params.id), body), {
       params: Id,
       body: t.Object({
         title: t.Optional(t.String({ minLength: 1, maxLength: 300, description: 'New title' })),
@@ -143,7 +144,7 @@ export const cardRoutes = (ctx: AppContext) =>
         mcp: true,
       },
     })
-    .post('/cards/:id/move', ({ params, body }) => moveCard(ctx.db, params.id, body), {
+    .post('/cards/:id/move', ({ params, body }) => moveCard(ctx.db, Number(params.id), body), {
       params: Id,
       body: t.Object({
         status: Status,
@@ -163,7 +164,7 @@ export const cardRoutes = (ctx: AppContext) =>
     .post(
       '/cards/:id/comments',
       ({ params, body, request }) =>
-        addComment(ctx.db, params.id, { ...authorOf(request), body: body.body }),
+        addComment(ctx.db, Number(params.id), { ...authorOf(request), body: body.body }),
       {
         params: Id,
         body: t.Object({ body: t.String({ minLength: 1, description: 'Markdown' }) }),
@@ -172,7 +173,7 @@ export const cardRoutes = (ctx: AppContext) =>
         detail: { operationId: 'add_comment', summary: 'Comment on a card', mcp: true },
       },
     )
-    .post('/cards/:id/archive', ({ params }) => archiveCard(ctx.db, params.id), {
+    .post('/cards/:id/archive', ({ params }) => archiveCard(ctx.db, Number(params.id)), {
       params: Id,
       detail: {
         operationId: 'archive_card',
@@ -180,16 +181,20 @@ export const cardRoutes = (ctx: AppContext) =>
         mcp: true,
       },
     })
-    .post('/cards/:id/unarchive', ({ params }) => archiveCard(ctx.db, params.id, false), {
+    .post('/cards/:id/unarchive', ({ params }) => archiveCard(ctx.db, Number(params.id), false), {
       params: Id,
       detail: { operationId: 'unarchive_card', summary: 'Bring an archived card back' },
     })
     // Review decisions are the person's: never tools, so Claude cannot pass its own work.
-    .post('/cards/:id/send-back', ({ params, body }) => sendBack(ctx.db, params.id, body.comment), {
-      params: Id,
-      body: t.Object({ comment: t.String({ minLength: 1 }) }),
-      detail: {
-        operationId: 'send_back_card',
-        summary: 'Return a review card to todo with a comment',
+    .post(
+      '/cards/:id/send-back',
+      ({ params, body }) => sendBack(ctx.db, Number(params.id), body.comment),
+      {
+        params: Id,
+        body: t.Object({ comment: t.String({ minLength: 1 }) }),
+        detail: {
+          operationId: 'send_back_card',
+          summary: 'Return a review card to todo with a comment',
+        },
       },
-    })
+    )

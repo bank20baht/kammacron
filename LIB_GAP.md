@@ -39,3 +39,29 @@ what the library could do instead.
   changes, lint fails with `Unsafe call of a type that could not be resolved` on every `api.*` call.
 - **Workaround:** root `package.json` has `"prelint": "bun run --filter server build:types"`.
 - **Fix in the lib:** have `create` add that `prelint` (or make the CI lint job depend on a types step).
+
+## Upstream (not `@20baht/*`), noted because the scaffold hides them
+
+### Elysia 1.4.32 on Bun 1.3.14: a coerced path param answers 500 on a real server
+
+- **Seen:** a route with `params: t.Object({ id: t.Numeric() })` (or `t.Integer()` / `t.Number()`) answers
+  `500 Attempting to change configurable attribute of unconfigurable property.` when served by
+  `Bun.serve` (`app.listen`). The same route through `app.handle()` answers 200, so tests written the way
+  the `20baht create` scaffold writes them (only `app.handle`) never see it. Query numerics are fine;
+  `new Elysia({ aot: false })` also avoids it.
+- **Workaround:** path ids are `t.String({ pattern: '^[1-9][0-9]{0,9}$' })` (`apps/server/src/routes/params.ts`),
+  read with `Number(params.id)`; `test/api.test.ts` has a test that goes through a listening server.
+- **For the scaffold:** a starter test that calls the app through `app.listen({ port: 0 })` and `fetch`,
+  beside the `app.handle` ones.
+
+## @20baht/strict
+
+### ESLint lints git worktrees that sit inside the repo
+
+- **Seen (spike S6):** with a worktree at `<repo>/.worktrees/claude` (listed in `.git/info/exclude`), `eslint .`
+  in the main repo lints the worktree's copy as well: 49 of 98 files. Prettier, tsc and knip skip it.
+  The flat config ignores what `.gitignore` lists, not `.git/info/exclude`, so a worker's half-done
+  worktree can fail the owner's own `bun run check`.
+- **Workaround:** kammacron keeps worktrees outside the repo, at `~/.kammacron/worktrees/<slug>`.
+- **Fix in the lib:** add `.worktrees/**` (and `.claude/worktrees/**`) to the default ignores of the
+  `base` ESLint config.

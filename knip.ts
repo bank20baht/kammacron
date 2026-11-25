@@ -16,7 +16,10 @@ export default knip({
   ],
   workspaces: {
     '.': { entry: ['scripts/*.ts'], project: ['scripts/**/*.ts'] },
-    'apps/server': tested,
+    'apps/server': {
+      entry: ['src/cli.ts', 'test/**/*.test.ts', 'test/fixtures/*.ts'],
+      project: [...SRC, 'test/**/*.ts'],
+    },
     'apps/web': { project: SRC },
     'packages/kit': tested,
   },

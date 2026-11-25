@@ -2,9 +2,10 @@ import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
+import { idParams } from './params'
 import { createProject, getProject, listProjects, updateProject } from '../services/projects'
 
-const Id = t.Object({ id: t.Numeric() })
+const Id = idParams()
 
 const ProjectFields = {
   name: t.String({ minLength: 1, maxLength: 120 }),
@@ -34,7 +35,7 @@ export const projectRoutes = (ctx: AppContext) =>
       live: liveRoute(ctx.live, { topics: () => ['projects'], key: 'id' }),
       detail: { operationId: 'list_projects', summary: 'The projects cards belong to', mcp: true },
     })
-    .get('/projects/:id', ({ params }) => getProject(ctx.db, params.id), {
+    .get('/projects/:id', ({ params }) => getProject(ctx.db, Number(params.id)), {
       params: Id,
       detail: { operationId: 'get_project', summary: 'One project' },
     })
@@ -43,7 +44,7 @@ export const projectRoutes = (ctx: AppContext) =>
       body: t.Object({ slug: t.String(), ...ProjectFields }),
       detail: { operationId: 'create_project', summary: 'Create a project' },
     })
-    .patch('/projects/:id', ({ params, body }) => updateProject(ctx.db, params.id, body), {
+    .patch('/projects/:id', ({ params, body }) => updateProject(ctx.db, Number(params.id), body), {
       params: Id,
       body: t.Partial(t.Object({ slug: t.String(), archived: t.Boolean(), ...ProjectFields })),
       detail: { operationId: 'update_project', summary: 'Change a project' },

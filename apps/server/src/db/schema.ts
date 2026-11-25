@@ -29,6 +29,12 @@ export const settings = pgTable('settings', {
   stale_minutes: integer('stale_minutes').notNull().default(60),
   run_log_retention_days: integer('run_log_retention_days').notNull().default(30),
   allowed_hosts: text('allowed_hosts').array().notNull().default([]),
+  /** PATH for `claude`, `git` and hooks: the shell's, saved when the service was installed. */
+  worker_path: text('worker_path'),
+  /** How many cards run at once across projects (one per project at most). */
+  concurrency: integer('concurrency').notNull().default(1),
+  webhook_url: text('webhook_url'),
+  desktop_notifications: boolean('desktop_notifications').notNull().default(true),
   ...timestamps,
 })
 
@@ -39,6 +45,25 @@ export const projects = pgTable('projects', {
   repo_path: text('repo_path'),
   default_branch: text('default_branch'),
   worker_enabled: boolean('worker_enabled').notNull().default(false),
+  /** Paused by the program (a push outside the allowed refs, main broken, revert refused). */
+  paused_reason: text('paused_reason'),
+  /** watch: ask when unsure; autopilot: decide reversible things and say so in a comment. */
+  mode: text('mode', { enum: ['watch', 'autopilot'] })
+    .notNull()
+    .default('autopilot'),
+  /** push: Claude pushes to the default branch; branch: only to claude/<card>, a person merges. */
+  ship_policy: text('ship_policy', { enum: ['push', 'branch'] })
+    .notNull()
+    .default('push'),
+  /** Where the worktree lives; `<data>/worktrees/<slug>` when null. */
+  worktree_path: text('worktree_path'),
+  /** Files hashed to decide whether `setup_command` runs again. */
+  lock_files: text('lock_files')
+    .array()
+    .notNull()
+    .default(['bun.lock', 'bun.lockb', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']),
+  setup_hash: text('setup_hash'),
+  verify_timeout_minutes: integer('verify_timeout_minutes').notNull().default(15),
   interval_minutes: integer('interval_minutes').notNull().default(30),
   next_run_at: timestamp('next_run_at', { withTimezone: true }),
   last_checked_at: timestamp('last_checked_at', { withTimezone: true }),
@@ -150,6 +175,16 @@ export const runs = pgTable(
     session_id: text('session_id'),
     commits: text('commits').array().notNull().default([]),
     pushed_to: text('pushed_to'),
+    /** origin/<default> when the run began: what verify and revert compare with. */
+    base_sha: text('base_sha'),
+    head_sha: text('head_sha'),
+    /** The worker's last words (`result` of stream-json). */
+    summary: text('summary'),
+    /** Tool calls the allowlist refused: what `allowed_bash` may be missing. */
+    permission_denials: jsonb('permission_denials'),
+    /** auth | rate_limit | max_turns | timeout | crash, when the run did not end normally. */
+    error_kind: text('error_kind'),
+    verify_output: text('verify_output'),
     revert_commit: text('revert_commit'),
     exit_code: integer('exit_code'),
     error: text('error'),
@@ -193,6 +228,42 @@ export const attachments = pgTable(
   (t) => [index('attachments_card').on(t.card_id)],
 )
 
+export const ALERT_LEVELS = ['info', 'warning', 'error'] as const
+
+/** What the program wants the person to see: a pause it made, a revert, a run that broke. */
+export const alerts = pgTable('alerts', {
+  id: serial('id').primaryKey(),
+  level: text('level', { enum: ALERT_LEVELS }).notNull(),
+  project_id: integer('project_id').references(() => projects.id),
+  card_id: integer('card_id').references(() => cards.id),
+  run_id: integer('run_id').references(() => runs.id),
+  message: text('message').notNull(),
+  read: boolean('read').notNull().default(false),
+  ...timestamps,
+})
+
+/**
+ * A command run on a schedule that opens a card when it fails (nightly tests, a link check):
+ * work for the board found without anyone filing it.
+ */
+export const schedules = pgTable('schedules', {
+  id: serial('id').primaryKey(),
+  project_id: integer('project_id')
+    .notNull()
+    .references(() => projects.id),
+  name: text('name').notNull(),
+  command: text('command').notNull(),
+  interval_minutes: integer('interval_minutes').notNull().default(1440),
+  next_run_at: timestamp('next_run_at', { withTimezone: true }),
+  last_run_at: timestamp('last_run_at', { withTimezone: true }),
+  last_exit_code: integer('last_exit_code'),
+  /** The card it opened last; while that card is open, a failure comments on it instead. */
+  last_card_id: integer('last_card_id').references(() => cards.id),
+  card_tags: text('card_tags').array().notNull().default(['claude']),
+  enabled: boolean('enabled').notNull().default(true),
+  ...timestamps,
+})
+
 export const idempotencyKeys = idempotencyTable()
 
 export const schema = {
@@ -204,5 +275,7 @@ export const schema = {
   runs,
   runEvents,
   attachments,
+  alerts,
+  schedules,
   idempotencyKeys,
 }

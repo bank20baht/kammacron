@@ -44,6 +44,7 @@ describe('mcp', () => {
       'archive_card',
       'create_cards',
       'get_card',
+      'get_run',
       'list_cards',
       'list_projects',
       'move_card',
@@ -68,14 +69,14 @@ describe('mcp', () => {
 
     await rpc(
       'tools/call',
-      { name: 'add_comment', arguments: { id: must(card).id, body: 'done in abc123' } },
+      { name: 'add_comment', arguments: { id: String(must(card).id), body: 'done in abc123' } },
       {
         'x-kammacron-run': '7',
       },
     )
     await rpc('tools/call', {
       name: 'add_comment',
-      arguments: { id: must(card).id, body: 'from a desktop client' },
+      arguments: { id: String(must(card).id), body: 'from a desktop client' },
     })
     const full = await t.json<{ comments: { author: string; run_id: number | null }[] }>(
       'GET',

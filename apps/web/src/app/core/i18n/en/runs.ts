@@ -1,7 +1,7 @@
 /** The runs page: every run, searched, filtered and paged. */
 export const runs = {
   heading: 'Runs',
-  description: 'Every claude -p, newest first. Open one to watch it live or stop it.',
+  description: 'Every run of a playbook, newest first. Open one to watch it live or stop it.',
   searchPlaceholder: 'Search cards, summaries or errors',
   searchLabel: 'Search runs',
   status: 'Status',

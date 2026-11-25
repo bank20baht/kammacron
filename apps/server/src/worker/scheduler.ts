@@ -176,7 +176,8 @@ export const createScheduler = (env: WorkerEnv) => {
     const [created] = await createCards(env.db, [
       {
         project_id: project.id,
-        title: `${schedule.name} (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+        // local time, as the app shows it ('sv-SE' writes 2026-11-25 23:51)
+        title: `${schedule.name} (${new Date().toLocaleString('sv-SE').slice(0, 16)})`,
         body: `Opened by the schedule "${schedule.name}": run the playbook "${schedule.playbook ?? ''}".`,
         tags: [`${PLAYBOOK_TAG}${schedule.playbook ?? ''}`],
         priority: 1,

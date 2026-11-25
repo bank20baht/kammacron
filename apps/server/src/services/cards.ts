@@ -19,6 +19,7 @@ import {
   cardWaitsOn,
   cards,
   comments,
+  PLAYBOOK_TAG,
   projects,
   runs,
   type CardStatus,
@@ -311,7 +312,11 @@ export const pickableCards = (db: Executor, projectId: number, limit = 1) => {
         eq(cards.status, 'todo'),
         eq(cards.archived, false),
         eq(cards.human, false),
-        arrayContains(cards.tags, [CLAUDE_TAG]),
+        // tagged claude, or naming a playbook (which may have no Claude step at all)
+        or(
+          arrayContains(cards.tags, [CLAUDE_TAG]),
+          sql`exists (select 1 from unnest(${cards.tags}) as tag where tag like ${`${PLAYBOOK_TAG}%`})`,
+        ),
         eq(projects.worker_enabled, true),
         sql`${projects.repo_path} is not null`,
         notExists(blocker),

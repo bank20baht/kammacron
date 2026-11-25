@@ -360,7 +360,10 @@ export const projectForm = (t: Translate) =>
     ],
   })
 
-export const scheduleForm = (t: Translate) =>
+/** What a schedule runs: a command, or one of the project's playbooks. */
+export const COMMAND = 'command'
+
+export const scheduleForm = (t: Translate, playbooks: readonly string[]) =>
   defineForm({
     form_id: 'schedule',
     form_name: t('forms.schedule.name'),
@@ -376,12 +379,18 @@ export const scheduleForm = (t: Translate) =>
       },
       {
         order: 2,
-        type: 'text',
-        key: 'command',
-        label: t('forms.schedule.command'),
-        placeholder: 'bun run test',
-        required: true,
+        type: 'dropdown',
+        key: 'runs',
+        label: t('forms.schedule.runs'),
+        help: t('forms.schedule.runsHelp'),
         width: '1/3',
+        options: [
+          { key: COMMAND, label: t('forms.schedule.runsCommand') },
+          ...playbooks.map((name) => ({
+            key: name,
+            label: t('forms.schedule.runsPlaybook', { name }),
+          })),
+        ],
       },
       {
         order: 3,
@@ -389,6 +398,30 @@ export const scheduleForm = (t: Translate) =>
         key: 'interval_minutes',
         label: t('forms.schedule.interval'),
         width: '1/3',
+      },
+      {
+        order: 4,
+        type: 'text',
+        key: 'command',
+        label: t('forms.schedule.command'),
+        placeholder: 'bun run test',
+        help: t('forms.schedule.commandHelp'),
+      },
+    ],
+  })
+
+/** The name of a new playbook: what the tag `playbook:<name>` says. */
+export const playbookNameForm = (t: Translate) =>
+  defineForm({
+    form_id: 'playbook-name',
+    form_name: t('forms.playbook.name'),
+    fields: [
+      {
+        order: 1,
+        type: 'text',
+        key: 'name',
+        label: t('forms.playbook.playbookName'),
+        placeholder: t('forms.playbook.placeholder'),
       },
     ],
   })

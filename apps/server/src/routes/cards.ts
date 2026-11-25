@@ -21,6 +21,7 @@ import {
 /** Rules for making cards, shared by the MCP server's instructions and the worker's prompt. */
 export const CARD_RULES = `A card tagged "claude" is picked up by an unattended worker that runs the project's playbook on it (a Claude step, and the project's own commands).
 Tag a card "claude" only when the work is reversible and has a clear done condition.
+A card tagged "playbook:<name>" runs that playbook of its project instead of the default one (list_projects shows each project's playbooks).
 Work that touches security, data or migrations, release or deploy, a breaking API, money, or a product decision is for a person: set human=true.
 When a task is mostly a person's, split what Claude can do alone into small "claude" cards and make the big card wait on them (waits_on).`
 

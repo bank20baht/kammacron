@@ -72,7 +72,7 @@ const scheduleJob = (s: ScheduleRow, p: ProjectRow, off: string | null): CronJob
   project_id: p.id,
   project_name: p.name,
   project_slug: p.slug,
-  command: s.command,
+  command: s.command ?? `playbook ${s.playbook ?? ''}`,
   every_minutes: s.interval_minutes,
   next_at: off ? null : (iso(s.next_run_at) ?? new Date().toISOString()),
   last_at: iso(s.last_run_at),

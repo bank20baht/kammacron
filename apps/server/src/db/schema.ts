@@ -66,7 +66,15 @@ export type ClaudeStep = {
 
 export type PlaybookStep = RunStep | ClaudeStep
 
-export const DEFAULT_PLAYBOOK: PlaybookStep[] = [{ kind: 'claude', name: 'Claude' }]
+/** A named list of steps. A card runs `default`, or the one its `playbook:<name>` tag names. */
+export type Playbook = { name: string; steps: PlaybookStep[] }
+
+export const DEFAULT_PLAYBOOK_NAME = 'default'
+export const PLAYBOOK_TAG = 'playbook:'
+
+export const DEFAULT_PLAYBOOKS: Playbook[] = [
+  { name: DEFAULT_PLAYBOOK_NAME, steps: [{ kind: 'claude', name: 'Claude' }] },
+]
 
 export const projects = pgTable('projects', {
   id: serial('id').primaryKey(),
@@ -81,8 +89,8 @@ export const projects = pgTable('projects', {
   mode: text('mode', { enum: ['watch', 'autopilot'] })
     .notNull()
     .default('autopilot'),
-  /** What a run does with a card, step by step; one claude step when nothing else is set. */
-  playbook: jsonb('playbook').$type<PlaybookStep[]>().notNull().default(DEFAULT_PLAYBOOK),
+  /** What a run does with a card, step by step: `default`, and others a card picks by tag. */
+  playbooks: jsonb('playbooks').$type<Playbook[]>().notNull().default(DEFAULT_PLAYBOOKS),
   interval_minutes: integer('interval_minutes').notNull().default(30),
   next_run_at: timestamp('next_run_at', { withTimezone: true }),
   last_checked_at: timestamp('last_checked_at', { withTimezone: true }),
@@ -282,7 +290,10 @@ export const schedules = pgTable('schedules', {
     .notNull()
     .references(() => projects.id),
   name: text('name').notNull(),
-  command: text('command').notNull(),
+  /** A shell command whose failure opens a card; or null with `playbook` set. */
+  command: text('command'),
+  /** A playbook to run on the interval: each time, a card tagged `playbook:<name>` the worker runs. */
+  playbook: text('playbook'),
   interval_minutes: integer('interval_minutes').notNull().default(1440),
   next_run_at: timestamp('next_run_at', { withTimezone: true }),
   last_run_at: timestamp('last_run_at', { withTimezone: true }),

@@ -2,7 +2,9 @@ import { join } from 'node:path'
 
 import { and, eq, isNull, lte, or } from 'drizzle-orm'
 
-import { cards, projects, runs, schedules } from '../db/schema'
+import { cards, PLAYBOOK_TAG, projects, runs, schedules } from '../db/schema'
+
+type Schedule = typeof schedules.$inferSelect
 import { addAlert } from '../services/alerts'
 import { HOUSEKEEPING_MINUTES } from '../services/calendar'
 import { purgeOrphans } from '../services/attachments'
@@ -142,47 +144,78 @@ export const createScheduler = (env: WorkerEnv) => {
         ),
       )
     if (due.length === 0 || !project.repo_path) return
-    const childEnvironment = await childEnv(env)
-    // in the directory as it is: kammacron never resets or switches it
     for (const schedule of due) {
-      const r = await exec(['sh', '-c', schedule.command], {
-        cwd: project.repo_path,
-        env: childEnvironment,
-        timeoutMs: 30 * 60_000,
-      })
-      const output = `${r.stdout}\n${r.stderr}`.trim().slice(-3000)
-      let cardId = schedule.last_card_id
-      if (r.code !== 0) {
-        const [open] =
-          cardId === null ? [] : await env.db.select().from(cards).where(eq(cards.id, cardId))
-        const body = `\`${schedule.command}\` failed with exit ${String(r.code)}.\n\n\`\`\`\n${output}\n\`\`\``
-        if (open && open.status !== 'done' && !open.archived)
-          await addComment(env.db, open.id, {
-            author: 'claude-worker',
-            body: `Still failing (${new Date().toISOString().slice(0, 16)}).\n\n${body}`,
-          })
-        else {
-          const [created] = await createCards(env.db, [
-            {
-              project_id: project.id,
-              title: `${schedule.name} fails`,
-              body: `Autonomy: claude - opened by the schedule "${schedule.name}"; make it pass again.\n\n${body}`,
-              tags: schedule.card_tags,
-            },
-          ])
-          cardId = created?.id ?? null
-        }
-      }
+      const cardId = schedule.playbook
+        ? await playbookCard(project, schedule)
+        : await commandSchedule(project, schedule, project.repo_path)
       await env.db
         .update(schedules)
         .set({
           last_run_at: new Date(),
-          last_exit_code: r.code,
           last_card_id: cardId,
           next_run_at: new Date(Date.now() + schedule.interval_minutes * 60_000),
         })
         .where(eq(schedules.id, schedule.id))
     }
+  }
+
+  /** The card a schedule opened last, while it is still open. */
+  const openCard = async (cardId: number | null) => {
+    if (cardId === null) return null
+    const [card] = await env.db.select().from(cards).where(eq(cards.id, cardId))
+    return card && card.status !== 'done' && !card.archived ? card : null
+  }
+
+  /**
+   * A playbook on a timer: a card tagged `playbook:<name>`, which this same round runs (schedules
+   * go before cards). While the last one is still open, no second one.
+   */
+  const playbookCard = async (project: Project, schedule: Schedule) => {
+    const open = await openCard(schedule.last_card_id)
+    if (open) return open.id
+    const [created] = await createCards(env.db, [
+      {
+        project_id: project.id,
+        title: `${schedule.name} (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+        body: `Opened by the schedule "${schedule.name}": run the playbook "${schedule.playbook ?? ''}".`,
+        tags: [`${PLAYBOOK_TAG}${schedule.playbook ?? ''}`],
+        priority: 1,
+      },
+    ])
+    return created?.id ?? null
+  }
+
+  /** A command on a timer, in the directory as it is: a failure opens (or comments on) a card. */
+  const commandSchedule = async (project: Project, schedule: Schedule, dir: string) => {
+    const r = await exec(['sh', '-c', schedule.command ?? 'true'], {
+      cwd: dir,
+      env: await childEnv(env),
+      timeoutMs: 30 * 60_000,
+    })
+    await env.db
+      .update(schedules)
+      .set({ last_exit_code: r.code })
+      .where(eq(schedules.id, schedule.id))
+    if (r.code === 0) return schedule.last_card_id
+    const output = `${r.stdout}\n${r.stderr}`.trim().slice(-3000)
+    const body = `\`${schedule.command ?? ''}\` failed with exit ${String(r.code)}.\n\n\`\`\`\n${output}\n\`\`\``
+    const open = await openCard(schedule.last_card_id)
+    if (open) {
+      await addComment(env.db, open.id, {
+        author: 'claude-worker',
+        body: `Still failing (${new Date().toISOString().slice(0, 16)}).\n\n${body}`,
+      })
+      return open.id
+    }
+    const [created] = await createCards(env.db, [
+      {
+        project_id: project.id,
+        title: `${schedule.name} fails`,
+        body: `Autonomy: claude - opened by the schedule "${schedule.name}"; make it pass again.\n\n${body}`,
+        tags: schedule.card_tags,
+      },
+    ])
+    return created?.id ?? null
   }
 
   const pump = () => {

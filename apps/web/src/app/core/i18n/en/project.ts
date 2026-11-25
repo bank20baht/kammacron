@@ -24,7 +24,8 @@ export const project = {
   unsaved: 'Unsaved changes to this project',
   schedules: {
     heading: 'Schedules',
-    subtitle: 'A command on a timer; when it fails, a card opens (or the open one gets a comment)',
+    subtitle:
+      'A command on a timer (when it fails, a card opens, or the open one gets a comment), or a playbook on a timer (a card each time, which the worker runs)',
     line: 'every {minutes} min · last {last} · exit {exit}',
     turnOff: 'Turn off',
     turnOn: 'Turn on',
@@ -49,6 +50,12 @@ export const project = {
     saved: 'Playbook saved',
     unsaved: 'Unsaved changes to the playbook',
     empty: 'A playbook needs at least one step.',
+    defaultHelp: 'Cards without a playbook tag run this one.',
+    tagHelp: 'Cards tagged {tag} run this one.',
+    removeBook: 'Remove this playbook',
+    addBook: 'Add playbook',
+    badName: 'A playbook name is lowercase letters, digits and "-", such as deploy.',
+    nameTaken: 'There is a playbook named {name} already.',
     env: 'Commands get KAMMACRON_CARD_ID, KAMMACRON_CARD_TITLE, KAMMACRON_CARD_FILE (the card and its comments as markdown), KAMMACRON_RUN_ID and KAMMACRON_PROJECT_DIR. SSH uses this machine’s keys and ~/.ssh/config.',
     sshName: 'Deploy over SSH',
     sshCommand: "ssh deploy@my-server 'cd /srv/app && git pull && ./restart.sh'",

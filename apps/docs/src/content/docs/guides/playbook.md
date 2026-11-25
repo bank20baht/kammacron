@@ -14,6 +14,14 @@ A playbook is a list of steps, run in order for each card the worker picks:
 
 A new project has one step, **Claude**: the card goes to `claude -p` and nothing else. Edit it under **Settings → Projects → (a project) → Playbook**, where **Claude step**, **Command** and **Command over SSH** add a step from a template.
 
+## Several playbooks
+
+A project can have more than one: `default`, and others with a name of their own (lowercase letters, digits and `-`, such as `deploy`). A card runs **`default`**, unless it is tagged **`playbook:<name>`**: then it runs that one. A card tagged with a playbook is picked up even without the `claude` tag, so a playbook of plain commands (a deploy, a backup) needs no Claude at all. A tag naming a playbook the project lacks sends the card to Review saying so.
+
+In the editor, each playbook is a tab; **Add playbook** makes a new one, and a playbook other than `default` can be removed. Claude (and any MCP client) can make such cards too: `create_cards` with the tag `playbook:deploy`.
+
+A **schedule** can run a playbook on a timer instead of a command: see [schedules](/guides/schedules/).
+
 ## An example
 
 A playbook that has Claude do the card, tests it, then deploys and migrates over SSH:

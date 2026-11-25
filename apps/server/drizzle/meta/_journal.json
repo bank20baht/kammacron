@@ -43,6 +43,13 @@
       "when": 1795623581647,
       "tag": "0005_playbook",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795624851331,
+      "tag": "0006_playbooks",
+      "breakpoints": true
     }
   ]
 }

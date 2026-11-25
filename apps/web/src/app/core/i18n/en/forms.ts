@@ -78,6 +78,7 @@ export const forms = {
     extraPrompt: 'Extra rules for Claude',
     extraPromptHelp: 'Beside CLAUDE.md and .claude-worker/prompt.md in the directory',
   },
+  playbook: { name: 'New playbook', playbookName: 'Name', placeholder: 'deploy' },
   step: {
     name: 'Step',
     stepName: 'Name',
@@ -98,6 +99,11 @@ export const forms = {
     scheduleName: 'Name',
     namePlaceholder: 'nightly tests',
     command: 'Command',
+    commandHelp: 'A failure opens a card',
+    runs: 'Runs',
+    runsCommand: 'A command',
+    runsPlaybook: 'Playbook {name}',
+    runsHelp: 'A playbook: a card each time, which the same round runs',
     interval: 'Every (minutes)',
   },
 } as const

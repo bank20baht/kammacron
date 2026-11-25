@@ -5,7 +5,9 @@ import { eq } from 'drizzle-orm'
 
 import {
   cards,
-  DEFAULT_PLAYBOOK,
+  DEFAULT_PLAYBOOK_NAME,
+  DEFAULT_PLAYBOOKS,
+  PLAYBOOK_TAG,
   projects,
   type ClaudeStep,
   type PlaybookStep,
@@ -510,6 +512,8 @@ export const runCard = async (
   const claimed = await claim(env, project, cardId, logDir)
   if (!claimed) return { run: null, skipped: 'claimed by someone else' }
   const { run, card } = claimed
+  const chosen = playbookOf(project, card)
+  if (!chosen) return { run: await noPlaybook(env, project, card, run) }
   const runDir = await prepareRunDir(env, run.id, card.id)
   try {
     return await play({
@@ -518,7 +522,7 @@ export const runCard = async (
       card,
       dir,
       run,
-      steps: project.playbook.length > 0 ? project.playbook : DEFAULT_PLAYBOOK,
+      steps: chosen.steps,
       runDir,
       childEnvironment: await childEnv(env),
       logFile: run.log_path ?? join(logDir, `${String(run.id)}.jsonl`),
@@ -528,6 +532,27 @@ export const runCard = async (
   } finally {
     await rm(runDir.dir, { recursive: true, force: true })
   }
+}
+
+/** The card's `playbook:<name>` tag names the playbook; without one, `default`. */
+const playbookOf = (project: Project, card: Card) => {
+  const tag = card.tags.find((t) => t.startsWith(PLAYBOOK_TAG))
+  const name = tag ? tag.slice(PLAYBOOK_TAG.length) : DEFAULT_PLAYBOOK_NAME
+  const playbooks = project.playbooks.length > 0 ? project.playbooks : DEFAULT_PLAYBOOKS
+  return playbooks.find((p) => p.name === name) ?? null
+}
+
+/** A tag naming a playbook the project lacks: nothing runs, a person fixes the tag. */
+const noPlaybook = async (env: WorkerEnv, project: Project, card: Card, run: Run) => {
+  const tag = card.tags.find((t) => t.startsWith(PLAYBOOK_TAG)) ?? ''
+  const reason = `${project.name} has no playbook "${tag.slice(PLAYBOOK_TAG.length)}" (tag ${tag})`
+  await moveCard(env.db, card.id, { status: 'review', reason })
+  return updateRun(env.db, run.id, {
+    status: 'failed',
+    ended_at: new Date(),
+    error: reason,
+    error_kind: 'step',
+  })
 }
 
 const isDir = async (path: string) =>

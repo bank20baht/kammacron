@@ -8,8 +8,8 @@ import { cards, projects, RUN_STATUSES, runs, schedules } from '../db/schema'
 import { listAlerts, markAlertsRead } from '../services/alerts'
 import { listCronJobs, runsBetween } from '../services/calendar'
 import { getCard, moveCard, updateCard } from '../services/cards'
-import { conflict, notFound } from '../services/errors'
-import { getProject, updateProject } from '../services/projects'
+import { conflict, invalid, notFound } from '../services/errors'
+import { getProject, updateProject, type Project } from '../services/projects'
 import { getRunWithEvents, listRuns } from '../services/runs'
 import { getSettings } from '../services/settings'
 import { approveCard } from '../worker/approve'
@@ -18,6 +18,17 @@ import { childEnv } from '../worker/env'
 import { idParams, oneOf } from './params'
 
 const Id = idParams()
+
+/** A schedule runs a command or a playbook of its project, never both, never neither. */
+const checkSchedule = (
+  project: Project,
+  s: { command?: string | null | undefined; playbook?: string | null | undefined },
+) => {
+  if (!s.command === !s.playbook)
+    throw invalid('BAD_SCHEDULE', 'a schedule runs either a command or a playbook')
+  if (s.playbook && !project.playbooks.some((p) => p.name === s.playbook))
+    throw invalid('BAD_SCHEDULE', `${project.name} has no playbook "${s.playbook}"`)
+}
 
 /** The Runs table's columns, as SQL text the query can search, filter and sort (@20baht/table-query). */
 const runsTable = tableQuery(sql, {
@@ -298,7 +309,7 @@ export const runRoutes = (ctx: AppContext) =>
     .post(
       '/projects/:id/schedules',
       async ({ params, body }) => {
-        await getProject(ctx.db, Number(params.id))
+        checkSchedule(await getProject(ctx.db, Number(params.id)), body)
         const [row] = await ctx.db
           .insert(schedules)
           .values({ ...body, project_id: Number(params.id) })
@@ -309,7 +320,12 @@ export const runRoutes = (ctx: AppContext) =>
         params: Id,
         body: t.Object({
           name: t.String({ minLength: 1, maxLength: 120 }),
-          command: t.String({ minLength: 1 }),
+          command: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
+          playbook: t.Optional(
+            t.Nullable(
+              t.String({ minLength: 1, description: 'Run this playbook instead of a command' }),
+            ),
+          ),
           interval_minutes: t.Optional(t.Integer({ minimum: 5, maximum: 7 * 24 * 60 })),
           card_tags: t.Optional(t.Array(t.String())),
           enabled: t.Optional(t.Boolean()),
@@ -320,6 +336,12 @@ export const runRoutes = (ctx: AppContext) =>
     .patch(
       '/schedules/:id',
       async ({ params, body }) => {
+        const [current] = await ctx.db
+          .select()
+          .from(schedules)
+          .where(eq(schedules.id, Number(params.id)))
+        if (!current) throw notFound('schedule', params.id)
+        checkSchedule(await getProject(ctx.db, current.project_id), { ...current, ...body })
         const [row] = await ctx.db
           .update(schedules)
           .set(body)
@@ -333,7 +355,8 @@ export const runRoutes = (ctx: AppContext) =>
         body: t.Partial(
           t.Object({
             name: t.String({ minLength: 1, maxLength: 120 }),
-            command: t.String({ minLength: 1 }),
+            command: t.Nullable(t.String({ minLength: 1 })),
+            playbook: t.Nullable(t.String({ minLength: 1 })),
             interval_minutes: t.Integer({ minimum: 5, maximum: 7 * 24 * 60 }),
             card_tags: t.Array(t.String()),
             enabled: t.Boolean(),

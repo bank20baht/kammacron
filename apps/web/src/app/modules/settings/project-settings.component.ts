@@ -17,7 +17,7 @@ import { firstValueFrom } from 'rxjs'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
-import { projectForm, scheduleForm } from '../../shared/forms'
+import { COMMAND, projectForm, scheduleForm } from '../../shared/forms'
 import { PlaybookEditorComponent } from './playbook-editor.component'
 
 type Check = {
@@ -91,8 +91,13 @@ export class ProjectSettingsComponent {
   protected readonly busy = signal(false)
   protected readonly ago = ago
   protected readonly projectForm = computed(() => projectForm(this.t))
-  protected readonly scheduleForm = computed(() => scheduleForm(this.t))
-  protected readonly scheduleValue = { interval_minutes: 1440 }
+  protected readonly scheduleForm = computed(() =>
+    scheduleForm(
+      this.t,
+      (this.project.value()?.playbooks ?? []).map((p) => p.name),
+    ),
+  )
+  protected readonly scheduleValue = { interval_minutes: 1440, runs: COMMAND }
 
   protected readonly value = computed(() => {
     const p = this.project.value()
@@ -188,7 +193,9 @@ export class ProjectSettingsComponent {
       await firstValueFrom(
         this.api.projects({ id: this.id() }).schedules.post({
           name: text(d['name']) ?? '',
-          command: text(d['command']) ?? '',
+          ...(text(d['runs']) && text(d['runs']) !== COMMAND
+            ? { playbook: text(d['runs']) }
+            : { command: text(d['command']) }),
           interval_minutes: count(d['interval_minutes'], 1440),
         }),
       )

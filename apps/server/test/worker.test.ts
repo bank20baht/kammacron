@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 import { eq } from 'drizzle-orm'
 
-import { cards, projects, settings, type PlaybookStep } from '../src/db/schema'
+import { cards, projects, schedules, settings, type PlaybookStep } from '../src/db/schema'
 import { listAlerts } from '../src/services/alerts'
 import { getCard, type Card } from '../src/services/cards'
 import { getProject } from '../src/services/projects'
@@ -81,9 +81,9 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const newCard = async (title = 'fix it') => {
+const newCard = async (title = 'fix it', tags = ['claude']) => {
   const [card] = await t.json<Card[]>('POST', '/api/cards/batch', {
-    cards: [{ project_id: projectId, title, tags: ['claude'] }],
+    cards: [{ project_id: projectId, title, tags }],
   })
   return must(card)
 }
@@ -93,8 +93,16 @@ const run = async (scenario: string, cardId: number) => {
   return runCard(t.ctx.worker, await getProject(t.ctx.db, projectId), cardId)
 }
 
-const playbook = (steps: PlaybookStep[]) =>
-  t.ctx.db.update(projects).set({ playbook: steps }).where(eq(projects.id, projectId))
+const playbook = (steps: PlaybookStep[], others: Record<string, PlaybookStep[]> = {}) =>
+  t.ctx.db
+    .update(projects)
+    .set({
+      playbooks: [
+        { name: 'default', steps },
+        ...Object.entries(others).map(([name, s]) => ({ name, steps: s })),
+      ],
+    })
+    .where(eq(projects.id, projectId))
 
 const stepsOf = async (runId: number) =>
   (await getRunWithEvents(t.ctx.db, runId)).steps.map((s) => [s.name, s.status])
@@ -305,6 +313,103 @@ describe('a playbook of steps', () => {
     })
     expect(rules).toContain('step 1 of 2')
     expect(rules).toContain("- Deploy: `ssh app './deploy.sh'`")
+  })
+})
+
+describe('several playbooks', () => {
+  test('a card runs the playbook its tag names, and default without one', async () => {
+    await playbook([{ kind: 'run', name: 'Default', command: 'touch default-ran' }], {
+      deploy: [{ kind: 'run', name: 'Deploy', command: 'touch deploy-ran' }],
+    })
+    const tagged = await newCard('ship it', ['playbook:deploy'])
+    const plain = await newCard('fix it')
+    await run('done', tagged.id)
+    expect(await Bun.file(join(repo, 'deploy-ran')).exists()).toBe(true)
+    expect(await Bun.file(join(repo, 'default-ran')).exists()).toBe(false)
+    await run('done', plain.id)
+    expect(await Bun.file(join(repo, 'default-ran')).exists()).toBe(true)
+  })
+
+  test('a card tagged with a playbook is picked without the claude tag', async () => {
+    await playbook([{ kind: 'claude', name: 'Claude' }], {
+      backup: [{ kind: 'run', name: 'Backup', command: 'touch backed-up' }],
+    })
+    await newCard('nightly backup', ['playbook:backup'])
+    const scheduler = createScheduler(t.ctx.worker)
+    scheduler.runNow(projectId)
+    await scheduler.idle()
+    expect(await Bun.file(join(repo, 'backed-up')).exists()).toBe(true)
+  })
+
+  test('a tag naming no playbook: nothing runs, the card goes to review saying so', async () => {
+    const card = await newCard('x', ['playbook:nope'])
+    const { run: r } = await run('done', card.id)
+    expect(must(r).status).toBe('failed')
+    const after = await getCard(t.ctx.db, card.id)
+    expect(after.status).toBe('review')
+    expect(after.review_reason).toContain('no playbook "nope"')
+  })
+
+  test('playbooks need unique names and a default', async () => {
+    const steps = [{ kind: 'claude', name: 'Claude' }]
+    const patch = (playbooks: unknown) =>
+      t.call('PATCH', `/api/projects/${String(projectId)}`, { playbooks })
+    expect((await patch([{ name: 'deploy', steps }])).status).toBe(422)
+    expect(
+      (
+        await patch([
+          { name: 'default', steps },
+          { name: 'default', steps },
+        ])
+      ).status,
+    ).toBe(422)
+    expect((await patch([{ name: 'Bad Name', steps }])).status).toBe(422)
+    expect(
+      (
+        await patch([
+          { name: 'default', steps },
+          { name: 'deploy', steps },
+        ])
+      ).status,
+    ).toBe(200)
+  })
+})
+
+describe('a schedule that runs a playbook', () => {
+  test('opens a card the same round runs; no second card while it is open', async () => {
+    await playbook([{ kind: 'claude', name: 'Claude' }], {
+      report: [{ kind: 'run', name: 'Report', command: 'echo ran >> report.txt; exit 1' }],
+    })
+    await t.json('POST', `/api/projects/${String(projectId)}/schedules`, {
+      name: 'Nightly report',
+      playbook: 'report',
+    })
+    const scheduler = createScheduler(t.ctx.worker)
+    scheduler.runNow(projectId)
+    await scheduler.idle()
+    const opened = await t.ctx.db.select().from(cards).where(eq(cards.project_id, projectId))
+    expect(opened).toHaveLength(1)
+    expect(opened[0]?.tags).toEqual(['playbook:report'])
+    // the playbook failed: the card waits in review
+    expect(opened[0]?.status).toBe('review')
+    expect(await Bun.file(join(repo, 'report.txt')).text()).toBe('ran\n')
+    // due again while that card is still open: no new card
+    await t.ctx.db.update(schedules).set({ next_run_at: new Date(0) })
+    scheduler.runNow(projectId)
+    await scheduler.idle()
+    expect(await t.ctx.db.select().from(cards).where(eq(cards.project_id, projectId))).toHaveLength(
+      1,
+    )
+  })
+
+  test('a schedule runs a command or a playbook of its project, not both, not neither', async () => {
+    const url = `/api/projects/${String(projectId)}/schedules`
+    expect((await t.call('POST', url, { name: 'x' })).status).toBe(422)
+    expect(
+      (await t.call('POST', url, { name: 'x', command: 'ls', playbook: 'default' })).status,
+    ).toBe(422)
+    expect((await t.call('POST', url, { name: 'x', playbook: 'nope' })).status).toBe(422)
+    expect((await t.call('POST', url, { name: 'x', playbook: 'default' })).status).toBe(200)
   })
 })
 

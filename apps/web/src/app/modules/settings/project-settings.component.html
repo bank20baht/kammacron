@@ -70,7 +70,7 @@
     @if (current() === 'playbook') {
       <web-playbook-editor
         [projectId]="id()"
-        [playbook]="p.playbook"
+        [playbooks]="p.playbooks"
         (saved)="
           project.reload(); message.set({ tone: 'success', text: t('project.playbook.saved') })
         "
@@ -122,28 +122,31 @@
         [heading]="t('project.schedules.heading')"
         [subtitle]="t('project.schedules.subtitle')"
       >
-        @for (s of schedules().data ?? []; track s.id) {
-          <div class="row">
-            <strong>{{ s.name }}</strong>
-            <baht-code [code]="s.command"></baht-code>
-            <span class="muted">{{
-              t('project.schedules.line', {
-                minutes: s.interval_minutes,
-                last: ago(s.last_run_at),
-                exit: s.last_exit_code ?? t('common.none'),
-              })
-            }}</span>
-            <baht-button size="sm" variant="ghost" (click)="toggleSchedule(s.id, !s.enabled)">{{
-              s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
-            }}</baht-button>
-          </div>
-        } @empty {
-          <p class="muted">{{ t('project.schedules.empty') }}</p>
-        }
-        <baht-form #sf="bahtForm" [form]="scheduleForm()" [value]="scheduleValue"></baht-form>
-        <baht-button variant="secondary" [disabled]="busy()" (click)="addSchedule(sf.element)">{{
-          t('project.schedules.add')
-        }}</baht-button>
+        <!-- one element of ours: baht-card moves its children, and Angular's anchors with them -->
+        <div>
+          @for (s of schedules().data ?? []; track s.id) {
+            <div class="row">
+              <strong>{{ s.name }}</strong>
+              <baht-code [code]="s.command ?? 'playbook:' + s.playbook"></baht-code>
+              <span class="muted">{{
+                t('project.schedules.line', {
+                  minutes: s.interval_minutes,
+                  last: ago(s.last_run_at),
+                  exit: s.last_exit_code ?? t('common.none'),
+                })
+              }}</span>
+              <baht-button size="sm" variant="ghost" (click)="toggleSchedule(s.id, !s.enabled)">{{
+                s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
+              }}</baht-button>
+            </div>
+          } @empty {
+            <p class="muted">{{ t('project.schedules.empty') }}</p>
+          }
+          <baht-form #sf="bahtForm" [form]="scheduleForm()" [value]="scheduleValue"></baht-form>
+          <baht-button variant="secondary" [disabled]="busy()" (click)="addSchedule(sf.element)">{{
+            t('project.schedules.add')
+          }}</baht-button>
+        </div>
       </baht-card>
     }
   } @else if (project.error()) {

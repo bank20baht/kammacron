@@ -12,7 +12,7 @@ const Id = idParams()
 const StepName = t.String({ minLength: 1, maxLength: 80 })
 
 /** The steps a run takes with a card; checked here, so the runner only meets good ones. */
-const Playbook = t.Array(
+const Steps = t.Array(
   t.Union([
     t.Object(
       {
@@ -39,6 +39,20 @@ const Playbook = t.Array(
   { minItems: 1, maxItems: 50, description: 'What a run does with a card, step by step' },
 )
 
+const Playbooks = t.Array(
+  t.Object(
+    {
+      name: t.String({
+        pattern: '^[a-z0-9][a-z0-9-]{0,39}$',
+        description: 'Lowercase, digits and "-"; a card picks it with the tag playbook:<name>',
+      }),
+      steps: Steps,
+    },
+    { additionalProperties: false },
+  ),
+  { minItems: 1, maxItems: 30, description: 'The project\'s playbooks; one is named "default"' },
+)
+
 const ProjectFields = {
   name: t.String({ minLength: 1, maxLength: 120 }),
   repo_path: t.Optional(t.Nullable(t.String())),
@@ -52,7 +66,7 @@ const ProjectFields = {
   enabled_mcp_servers: t.Optional(t.Array(t.String())),
   web_tools: t.Optional(t.Boolean()),
   mode: t.Optional(oneOf(['watch', 'autopilot'])),
-  playbook: t.Optional(Playbook),
+  playbooks: t.Optional(Playbooks),
 }
 
 export const projectRoutes = (ctx: AppContext) =>

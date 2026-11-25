@@ -25,7 +25,7 @@ see the cards that need a decision.
 | **Runs**      | Every run with its steps, Claude's live event stream, turns and cost; stop one that is going.                                                                                                                                                       |
 | **Calendar**  | What runs on its own and when: each project's worker round, its schedules and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                        |
 | **Stats**     | Week by week: runs done, sent to review, failed, and what they cost.                                                                                                                                                                                |
-| **Schedules** | A shell command per project on an interval (tests, audits); when it fails it opens a card for Claude, or comments on the one already open.                                                                                                          |
+| **Schedules** | Per project, on an interval: a shell command (when it fails it opens a card for Claude, or comments on the open one), or a playbook (a card each time, run in the same round).                                                                      |
 | **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                          |
 | **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a project paused, a round skipped.                                                                                                                                      |
 | **Settings**  | The Claude token (with a test run), the worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), each project's directory, playbook and limits, and the language.                                                         |
@@ -75,7 +75,8 @@ Every project is checked on its interval. With a pickable card (tagged `claude`,
 | **Claude**  | `claude -p` with the card, its comments and earlier runs, the rules, and only the kammacron MCP tools plus the project's enabled servers. Goes on when Claude moves the card to done. |
 | **Command** | `sh -c` in the directory, with `KAMMACRON_CARD_ID`, `_CARD_TITLE`, `_CARD_FILE` (the card as markdown), `_RUN_ID`, `_PROJECT_DIR`. `ssh` uses this machine's keys. Passes on exit 0.  |
 
-A failing step stops the rest: the card goes to review with the step's name and output. Claude
+A card tagged `playbook:<name>` runs that playbook instead of `default`, with or without the
+`claude` tag. A failing step stops the rest: the card goes to review with the step's name and output. Claude
 handing the card to a person (review, or a question) ends the run there. All steps passed: done.
 
 kammacron does not branch, reset, check or push the directory: that is the playbook's and the

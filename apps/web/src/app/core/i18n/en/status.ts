@@ -1,14 +1,19 @@
-/** The names of card and run states, wherever they show. */
+/** The names of card, run and step states, wherever they show. */
 export const status = {
   card: { todo: 'To do', doing: 'Doing', review: 'Review', done: 'Done' },
   run: {
     running: 'running',
-    verifying: 'verifying',
     succeeded: 'succeeded',
     review: 'review',
     failed: 'failed',
     stopped: 'stopped',
     stale: 'stale',
-    reverted: 'reverted',
+  },
+  step: {
+    running: 'running',
+    succeeded: 'passed',
+    failed: 'failed',
+    stopped: 'stopped',
+    skipped: 'skipped',
   },
 } as const

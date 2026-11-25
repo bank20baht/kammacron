@@ -43,43 +43,46 @@ export const settings = pgTable('settings', {
   ...timestamps,
 })
 
+/** A step that runs a shell command in the project's directory (ssh, tests, deploys: anything). */
+export type RunStep = {
+  kind: 'run'
+  name: string
+  command: string
+  timeout_minutes?: number
+  continue_on_error?: boolean
+}
+
+/** The Claude step: one `claude -p` on the card, with the worker's rules and tools. */
+export type ClaudeStep = {
+  kind: 'claude'
+  name: string
+  /** Added after the card, for this step only. */
+  prompt?: string
+  model?: string
+  max_turns?: number
+  /** More Bash patterns this step may run, as in `allowed_bash`. */
+  allow?: string[]
+}
+
+export type PlaybookStep = RunStep | ClaudeStep
+
+export const DEFAULT_PLAYBOOK: PlaybookStep[] = [{ kind: 'claude', name: 'Claude' }]
+
 export const projects = pgTable('projects', {
   id: serial('id').primaryKey(),
   slug: text('slug').notNull().unique(),
   name: text('name').notNull(),
+  /** The directory runs happen in: kammacron points there and leaves the rest to the playbook. */
   repo_path: text('repo_path'),
-  default_branch: text('default_branch'),
   worker_enabled: boolean('worker_enabled').notNull().default(false),
-  /** Paused by the program (a push outside the allowed refs, main broken, revert refused). */
+  /** Paused by the program; cleared with resume. */
   paused_reason: text('paused_reason'),
   /** watch: ask when unsure; autopilot: decide reversible things and say so in a comment. */
   mode: text('mode', { enum: ['watch', 'autopilot'] })
     .notNull()
     .default('autopilot'),
-  /** push: Claude pushes to the default branch; branch: only to claude/<card>, a person merges. */
-  ship_policy: text('ship_policy', { enum: ['push', 'branch'] })
-    .notNull()
-    .default('push'),
-  /**
-   * false: Claude works in `repo_path` itself, on the branch it is on, and a round is skipped while
-   * it has uncommitted changes. true: in a worktree of its own, from the default branch.
-   */
-  use_worktree: boolean('use_worktree').notNull().default(false),
-  /** Where the worktree lives (with use_worktree); `<data>/worktrees/<slug>` when null. */
-  worktree_path: text('worktree_path'),
-  /** Files hashed to decide whether `setup_command` runs again. */
-  lock_files: text('lock_files')
-    .array()
-    .notNull()
-    .default(['bun.lock', 'bun.lockb', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']),
-  setup_hash: text('setup_hash'),
-  verify_timeout_minutes: integer('verify_timeout_minutes').notNull().default(15),
-  /**
-   * The gate before the default branch: with either set, Claude pushes only to claude/<card>, and
-   * kammacron pushes it on when the diff is at most this many lines and touches no protected path.
-   */
-  max_diff_lines: integer('max_diff_lines'),
-  protected_paths: text('protected_paths').array().notNull().default([]),
+  /** What a run does with a card, step by step; one claude step when nothing else is set. */
+  playbook: jsonb('playbook').$type<PlaybookStep[]>().notNull().default(DEFAULT_PLAYBOOK),
   interval_minutes: integer('interval_minutes').notNull().default(30),
   next_run_at: timestamp('next_run_at', { withTimezone: true }),
   last_checked_at: timestamp('last_checked_at', { withTimezone: true }),
@@ -89,12 +92,6 @@ export const projects = pgTable('projects', {
   model: text('model'),
   extra_prompt: text('extra_prompt').notNull().default(''),
   allowed_bash: text('allowed_bash').array().notNull().default([]),
-  copy_files: text('copy_files')
-    .array()
-    .notNull()
-    .default(['.mcp.json', '.claude/settings.local.json']),
-  setup_command: text('setup_command'),
-  verify_command: text('verify_command'),
   enabled_mcp_servers: text('enabled_mcp_servers').array().notNull().default([]),
   web_tools: boolean('web_tools').notNull().default(false),
   archived: boolean('archived').notNull().default(false),
@@ -119,7 +116,6 @@ export const cards = pgTable(
     priority: integer('priority').notNull().default(0),
     position: doublePrecision('position').notNull().default(0),
     review_reason: text('review_reason'),
-    branch: text('branch'),
     stale_count: integer('stale_count').notNull().default(0),
     claimed_by_run: integer('claimed_by_run'),
     archived: boolean('archived').notNull().default(false),
@@ -162,13 +158,11 @@ export const comments = pgTable(
 
 export const RUN_STATUSES = [
   'running',
-  'verifying',
   'succeeded',
   'review',
   'failed',
   'stopped',
   'stale',
-  'reverted',
 ] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
 
@@ -189,19 +183,12 @@ export const runs = pgTable(
     cost_usd: doublePrecision('cost_usd'),
     usage: jsonb('usage'),
     session_id: text('session_id'),
-    commits: text('commits').array().notNull().default([]),
-    pushed_to: text('pushed_to'),
-    /** origin/<default> when the run began: what verify and revert compare with. */
-    base_sha: text('base_sha'),
-    head_sha: text('head_sha'),
     /** The worker's last words (`result` of stream-json). */
     summary: text('summary'),
     /** Tool calls the allowlist refused: what `allowed_bash` may be missing. */
     permission_denials: jsonb('permission_denials'),
-    /** auth | rate_limit | max_turns | timeout | crash, when the run did not end normally. */
+    /** auth | rate_limit | max_turns | stopped | crash | step, when the run did not end normally. */
     error_kind: text('error_kind'),
-    verify_output: text('verify_output'),
-    revert_commit: text('revert_commit'),
     exit_code: integer('exit_code'),
     error: text('error'),
     log_path: text('log_path'),
@@ -227,6 +214,33 @@ export const runEvents = pgTable(
     ...timestamps,
   },
   (t) => [index('run_events_run_seq').on(t.run_id, t.seq)],
+)
+
+export const STEP_STATUSES = ['running', 'succeeded', 'failed', 'stopped', 'skipped'] as const
+export type StepStatus = (typeof STEP_STATUSES)[number]
+
+/** One step of a run's playbook: what ran, how it ended, and the end of what it printed. */
+export const runSteps = pgTable(
+  'run_steps',
+  {
+    id: serial('id').primaryKey(),
+    run_id: integer('run_id')
+      .notNull()
+      .references(() => runs.id),
+    /** Position in the playbook, from 0. */
+    position: integer('position').notNull(),
+    kind: text('kind', { enum: ['claude', 'run'] }).notNull(),
+    name: text('name').notNull(),
+    command: text('command'),
+    status: text('status', { enum: STEP_STATUSES }).notNull().default('running'),
+    exit_code: integer('exit_code'),
+    /** The last 8 000 characters of stdout and stderr (a run step); the whole is in the run's log. */
+    output: text('output'),
+    started_at: timestamp('started_at', { withTimezone: true }),
+    ended_at: timestamp('ended_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index('run_steps_run').on(t.run_id, t.position)],
 )
 
 export const attachments = pgTable(

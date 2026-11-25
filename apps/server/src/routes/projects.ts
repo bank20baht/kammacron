@@ -5,15 +5,43 @@ import type { AppContext } from '../context'
 import { idParams, oneOf } from './params'
 import { createProject, getProject, listProjects, updateProject } from '../services/projects'
 import { childEnv } from '../worker/env'
-import { gitIn } from '../worker/git'
-import { localGit } from '../worker/workspace'
+import { gitIn, localGit } from '../worker/git'
 
 const Id = idParams()
+
+const StepName = t.String({ minLength: 1, maxLength: 80 })
+
+/** The steps a run takes with a card; checked here, so the runner only meets good ones. */
+const Playbook = t.Array(
+  t.Union([
+    t.Object(
+      {
+        kind: t.Literal('claude'),
+        name: StepName,
+        prompt: t.Optional(t.String({ maxLength: 20_000 })),
+        model: t.Optional(t.String({ minLength: 1 })),
+        max_turns: t.Optional(t.Integer({ minimum: 1, maximum: 500 })),
+        allow: t.Optional(t.Array(t.String({ minLength: 1 }))),
+      },
+      { additionalProperties: false },
+    ),
+    t.Object(
+      {
+        kind: t.Literal('run'),
+        name: StepName,
+        command: t.String({ minLength: 1, maxLength: 20_000 }),
+        timeout_minutes: t.Optional(t.Integer({ minimum: 1, maximum: 720 })),
+        continue_on_error: t.Optional(t.Boolean()),
+      },
+      { additionalProperties: false },
+    ),
+  ]),
+  { minItems: 1, maxItems: 50, description: 'What a run does with a card, step by step' },
+)
 
 const ProjectFields = {
   name: t.String({ minLength: 1, maxLength: 120 }),
   repo_path: t.Optional(t.Nullable(t.String())),
-  default_branch: t.Optional(t.Nullable(t.String())),
   worker_enabled: t.Optional(t.Boolean()),
   interval_minutes: t.Optional(t.Integer({ minimum: 1, maximum: 1440 })),
   max_cards_per_run: t.Optional(t.Integer({ minimum: 1, maximum: 50 })),
@@ -21,19 +49,10 @@ const ProjectFields = {
   model: t.Optional(t.Nullable(t.String())),
   extra_prompt: t.Optional(t.String()),
   allowed_bash: t.Optional(t.Array(t.String())),
-  copy_files: t.Optional(t.Array(t.String())),
-  setup_command: t.Optional(t.Nullable(t.String())),
-  verify_command: t.Optional(t.Nullable(t.String())),
   enabled_mcp_servers: t.Optional(t.Array(t.String())),
   web_tools: t.Optional(t.Boolean()),
   mode: t.Optional(oneOf(['watch', 'autopilot'])),
-  ship_policy: t.Optional(oneOf(['push', 'branch'])),
-  use_worktree: t.Optional(t.Boolean()),
-  worktree_path: t.Optional(t.Nullable(t.String())),
-  verify_timeout_minutes: t.Optional(t.Integer({ minimum: 1, maximum: 240 })),
-  lock_files: t.Optional(t.Array(t.String())),
-  max_diff_lines: t.Optional(t.Nullable(t.Integer({ minimum: 1 }))),
-  protected_paths: t.Optional(t.Array(t.String())),
+  playbook: t.Optional(Playbook),
 }
 
 export const projectRoutes = (ctx: AppContext) =>
@@ -58,7 +77,7 @@ export const projectRoutes = (ctx: AppContext) =>
         const local = project.repo_path
           ? await localGit(gitIn(project.repo_path, await childEnv(ctx.worker)))
           : none
-        return { ...local, use_worktree: project.use_worktree }
+        return local
       },
       {
         params: Id,

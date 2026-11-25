@@ -15,6 +15,5 @@ export const runs = {
     took: 'Duration',
     turns: 'Turns',
     cost: 'Cost (API equivalent)',
-    pushed: 'Branch',
   },
 } as const

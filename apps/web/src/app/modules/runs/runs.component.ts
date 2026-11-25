@@ -28,20 +28,18 @@ const runColumns = (t: Translate): ColumnMap => ({
     cell: 'badge',
     tone: RUN_TONE,
     labels: (value) => runStatusLabel(t, value),
-    busy: { running: true, verifying: true },
+    busy: { running: true },
   },
   started: { label: t('runs.column.started'), sortable: true },
   took: t('runs.column.took'),
   turns: { label: t('runs.column.turns'), align: 'end', sortable: true },
   cost: { label: t('runs.column.cost'), align: 'end', sortable: true },
-  pushed: t('runs.column.pushed'),
 })
 
 const STATUSES: (keyof typeof status.run)[] = [
   'running',
   'succeeded',
   'review',
-  'reverted',
   'failed',
   'stopped',
   'stale',
@@ -161,7 +159,6 @@ export class RunsComponent {
       took: duration(r.started_at, r.ended_at),
       turns: String(r.num_turns ?? '—'),
       cost: cost(r.cost_usd),
-      pushed: r.pushed_to ?? '—',
     })),
   )
 

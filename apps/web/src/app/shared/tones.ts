@@ -9,11 +9,17 @@ export const statusLabel = (t: Translate, status: CardStatus): string => t(`stat
 
 export const RUN_TONE: Record<string, BadgeTone> = {
   running: 'info',
-  verifying: 'info',
   succeeded: 'success',
   review: 'warning',
   failed: 'danger',
   stopped: 'neutral',
   stale: 'neutral',
-  reverted: 'danger',
+}
+
+export const STEP_TONE: Record<string, BadgeTone> = {
+  running: 'info',
+  succeeded: 'success',
+  failed: 'danger',
+  stopped: 'neutral',
+  skipped: 'neutral',
 }

@@ -13,8 +13,7 @@
 .grow {
   flex: 1;
 }
-.review,
-.changes {
+.review {
   display: flex;
   flex-direction: column;
   gap: var(--baht-space-3);

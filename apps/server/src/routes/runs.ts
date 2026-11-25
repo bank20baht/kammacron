@@ -1,6 +1,6 @@
 import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { parseTableQuery, tableQuery } from '@20baht/table-query'
-import { and, count, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, eq, sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
@@ -13,7 +13,7 @@ import { getProject, updateProject } from '../services/projects'
 import { getRunWithEvents, listRuns } from '../services/runs'
 import { getSettings } from '../services/settings'
 import { approveCard } from '../worker/approve'
-import { checkRepo } from '../worker/git'
+import { checkDir } from '../worker/git'
 import { childEnv } from '../worker/env'
 import { idParams, oneOf } from './params'
 
@@ -28,7 +28,6 @@ const runsTable = tableQuery(sql, {
     status: sql`${runs.status}`,
     project: sql`${projects.id}::text`,
     started: sql`to_char(${runs.started_at}, 'YYYY-MM-DD HH24:MI')`,
-    pushed: sql`coalesce(${runs.pushed_to}, '')`,
     error: sql`coalesce(${runs.error_kind}, '')`,
     took: sql`coalesce((${runs.ended_at} - ${runs.started_at})::text, '')`,
     turns: sql`coalesce(${runs.num_turns}::text, '')`,
@@ -109,6 +108,7 @@ export const runRoutes = (ctx: AppContext) =>
           topics: ({ params }) => [
             `runs:${params['id'] ?? ''}`,
             `run_events@run_id=${params['id'] ?? ''}`,
+            `run_steps@run_id=${params['id'] ?? ''}`,
           ],
         }),
         detail: {
@@ -160,25 +160,22 @@ export const runRoutes = (ctx: AppContext) =>
       '/projects/:id/check-repo',
       async ({ params }) => {
         const project = await getProject(ctx.db, Number(params.id))
-        if (!project.repo_path) throw conflict('NO_REPO', 'no repo_path set')
-        const result = await checkRepo(project.repo_path, await childEnv(ctx.worker))
-        if (result.default_branch && !project.default_branch)
-          await updateProject(ctx.db, project.id, { default_branch: result.default_branch })
-        return result
+        if (!project.repo_path) throw conflict('NO_REPO', 'no directory set')
+        return checkDir(project.repo_path, await childEnv(ctx.worker))
       },
       {
         params: Id,
         detail: {
           operationId: 'check_repo',
-          summary: 'Is the linked path a repo with origin, a default branch and a pre-push hook?',
+          summary: 'Is the directory there, and what kammacron finds in it (git, instructions)?',
         },
       },
     )
-    .post('/cards/:id/approve', ({ params }) => approveCard(ctx.worker, Number(params.id)), {
+    .post('/cards/:id/approve', ({ params }) => approveCard(ctx.db, Number(params.id)), {
       params: Id,
       detail: {
         operationId: 'approve_card',
-        summary: 'Rebase claude/<card> onto the default branch and push it',
+        summary: 'Agree with what a card in review left: it is done',
       },
     })
     .post(
@@ -211,7 +208,7 @@ export const runRoutes = (ctx: AppContext) =>
           })
           .from(runs)
           .innerJoin(cards, eq(cards.id, runs.card_id))
-          .where(inArray(runs.status, ['running', 'verifying']))
+          .where(eq(runs.status, 'running'))
         const paused = await ctx.db
           .select({ id: projects.id, name: projects.name, reason: projects.paused_reason })
           .from(projects)

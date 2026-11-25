@@ -20,7 +20,6 @@ export const stats = {
   series: {
     shipped: 'Shipped',
     review: 'Review',
-    reverted: 'Reverted',
     failed: 'Failed or stopped',
     cost: 'Cost (USD)',
   },
@@ -29,7 +28,6 @@ export const stats = {
     runs: 'Runs',
     done: 'Shipped',
     review: 'Review',
-    reverted: 'Reverted',
     cost: 'Cost (API equivalent)',
   },
 } as const

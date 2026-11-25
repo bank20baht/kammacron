@@ -73,7 +73,6 @@ export class CardDialogComponent {
   protected readonly dirty = signal(false)
   protected readonly error = signal<string | null>(null)
   protected readonly decision = signal<Decision>('send-back')
-  protected readonly diff = signal<string | null>(null)
   /** The form's starting data: taken once per card, so live frames never wipe an edit. */
   protected readonly start = signal<Record<string, unknown> | null>(null)
   private loadedFor: number | null = null
@@ -117,9 +116,7 @@ export class CardDialogComponent {
       const card = this.card().data
       if (!card || this.loadedFor === card.id) return
       this.loadedFor = card.id
-      this.diff.set(null)
       this.start.set(this.valueOf(card))
-      if (card.status === 'review' && card.branch) void this.loadDiff(card.id)
     })
   }
 
@@ -132,15 +129,6 @@ export class CardDialogComponent {
       priority: card.priority,
       tags: card.tags.filter((t) => t !== CLAUDE),
       waits_on: card.waits_on.map((w) => String(w.id)).join(', '),
-    }
-  }
-
-  private async loadDiff(id: number): Promise<void> {
-    try {
-      const diff = await firstValueFrom(this.api.cards({ id: String(id) }).diff.get())
-      this.diff.set(diff.stat || this.t('card.noChanges'))
-    } catch (error) {
-      this.diff.set(describeError(error))
     }
   }
 

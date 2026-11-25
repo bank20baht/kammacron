@@ -262,26 +262,13 @@ export const projectForm = (t: Translate) =>
     form_id: 'project',
     form_name: t('forms.project.name'),
     views: [
-      {
-        name: 'general',
-        fields: ['name', 'worker_enabled', 'repo_path', 'use_worktree', 'default_branch'],
-      },
+      { name: 'general', fields: ['name', 'worker_enabled', 'repo_path'] },
       {
         name: 'worker',
         fields: ['mode', 'interval_minutes', 'max_cards_per_run', 'max_turns', 'model'],
       },
-      {
-        name: 'shipping',
-        fields: [
-          'ship_policy',
-          'verify_command',
-          'max_diff_lines',
-          'protected_paths',
-          'setup_command',
-        ],
-      },
       { name: 'permissions', fields: ['allowed_bash', 'web_tools', 'enabled_mcp_servers'] },
-      { name: 'advanced', fields: ['copy_files', 'extra_prompt'] },
+      { name: 'advanced', fields: ['extra_prompt'] },
     ],
     fields: [
       {
@@ -306,33 +293,6 @@ export const projectForm = (t: Translate) =>
         label: t('forms.project.repoPath'),
         placeholder: '/Users/me/code/my-app',
         help: t('forms.project.repoPathHelp'),
-        width: '2/3',
-      },
-      {
-        order: 3.5,
-        type: 'toggle',
-        key: 'use_worktree',
-        label: t('forms.project.useWorktree'),
-        help: t('forms.project.useWorktreeHelp'),
-      },
-      {
-        order: 4,
-        type: 'text',
-        key: 'default_branch',
-        label: t('forms.project.defaultBranch'),
-        help: t('forms.project.defaultBranchHelp'),
-        width: '1/3',
-      },
-      {
-        order: 5,
-        type: 'dropdown',
-        key: 'ship_policy',
-        label: t('forms.project.shipPolicy'),
-        width: '1/2',
-        options: [
-          { key: 'push', label: t('forms.project.shipPush') },
-          { key: 'branch', label: t('forms.project.shipBranch') },
-        ],
       },
       {
         order: 6,
@@ -376,24 +336,6 @@ export const projectForm = (t: Translate) =>
         help: t('forms.project.modelHelp'),
       },
       {
-        order: 11,
-        type: 'text',
-        key: 'setup_command',
-        label: t('forms.project.setup'),
-        placeholder: 'bun install',
-        width: '1/3',
-        help: t('forms.project.setupHelp'),
-      },
-      {
-        order: 12,
-        type: 'text',
-        key: 'verify_command',
-        label: t('forms.project.verify'),
-        placeholder: 'bun run test',
-        width: '1/3',
-        help: t('forms.project.verifyHelp'),
-      },
-      {
         order: 13,
         type: 'tags',
         key: 'allowed_bash',
@@ -406,29 +348,6 @@ export const projectForm = (t: Translate) =>
         key: 'enabled_mcp_servers',
         label: t('forms.project.mcpServers'),
         width: '1/2',
-      },
-      {
-        order: 15,
-        type: 'tags',
-        key: 'copy_files',
-        label: t('forms.project.copyFiles'),
-        width: '1/2',
-      },
-      {
-        order: 15.5,
-        type: 'number',
-        key: 'max_diff_lines',
-        label: t('forms.project.maxDiff'),
-        width: '1/3',
-        help: t('forms.project.maxDiffHelp'),
-      },
-      {
-        order: 15.6,
-        type: 'tags',
-        key: 'protected_paths',
-        label: t('forms.project.protectedPaths'),
-        width: '2/3',
-        help: t('forms.project.protectedPathsHelp'),
       },
       { order: 16, type: 'toggle', key: 'web_tools', label: t('forms.project.webTools') },
       {
@@ -470,6 +389,87 @@ export const scheduleForm = (t: Translate) =>
         key: 'interval_minutes',
         label: t('forms.schedule.interval'),
         width: '1/3',
+      },
+    ],
+  })
+
+/** A Claude step of the playbook: the card goes to `claude -p`, with this step's own words. */
+export const claudeStepForm = (t: Translate) =>
+  defineForm({
+    form_id: 'claude-step',
+    form_name: t('forms.step.name'),
+    fields: [
+      {
+        order: 1,
+        type: 'text',
+        key: 'name',
+        label: t('forms.step.stepName'),
+        required: true,
+        width: '1/2',
+      },
+      {
+        order: 2,
+        type: 'text',
+        key: 'model',
+        label: t('forms.step.model'),
+        placeholder: 'sonnet',
+        help: t('forms.step.modelHelp'),
+        width: '1/4',
+      },
+      { order: 3, type: 'number', key: 'max_turns', label: t('forms.step.maxTurns'), width: '1/4' },
+      {
+        order: 4,
+        type: 'textarea',
+        key: 'prompt',
+        label: t('forms.step.prompt'),
+        help: t('forms.step.promptHelp'),
+      },
+      {
+        order: 5,
+        type: 'tags',
+        key: 'allow',
+        label: t('forms.step.allow'),
+        help: t('forms.step.allowHelp'),
+      },
+    ],
+  })
+
+/** A command step: `sh -c` in the project directory (ssh, tests, a deploy: anything). */
+export const runStepForm = (t: Translate) =>
+  defineForm({
+    form_id: 'run-step',
+    form_name: t('forms.step.name'),
+    fields: [
+      {
+        order: 1,
+        type: 'text',
+        key: 'name',
+        label: t('forms.step.stepName'),
+        required: true,
+        width: '1/2',
+      },
+      {
+        order: 2,
+        type: 'number',
+        key: 'timeout_minutes',
+        label: t('forms.step.timeout'),
+        placeholder: '15',
+        width: '1/4',
+      },
+      {
+        order: 3,
+        type: 'toggle',
+        key: 'continue_on_error',
+        label: t('forms.step.continueOnError'),
+        width: '1/4',
+      },
+      {
+        order: 4,
+        type: 'textarea',
+        key: 'command',
+        label: t('forms.step.command'),
+        help: t('forms.step.commandHelp'),
+        required: true,
       },
     ],
   })

@@ -4,15 +4,11 @@ import { and, eq, gte, sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
-import { cards, runs } from '../db/schema'
+import { runs } from '../db/schema'
 import { writeSecrets } from '../secrets'
-import { conflict } from '../services/errors'
-import { getProject } from '../services/projects'
 import { getSettings } from '../services/settings'
-import { cardBranch, childEnv } from '../worker/env'
-import { exec, gitIn } from '../worker/git'
-import { targetBranch, worktreeDir } from '../worker/workspace'
-import { idParams } from './params'
+import { childEnv } from '../worker/env'
+import { exec } from '../worker/git'
 
 /** Where a tool is on the worker's PATH, and its version line. */
 const locate = async (name: string, env: Record<string, string>) => {
@@ -23,7 +19,7 @@ const locate = async (name: string, env: Record<string, string>) => {
   return { name, path, version: (version.stdout || version.stderr).trim().split('\n')[0] ?? null }
 }
 
-/** Settings' system box, the Claude token, review diffs and the weekly numbers. None are tools. */
+/** Settings' system box, the Claude token and the weekly numbers. None are tools. */
 export const adminRoutes = (ctx: AppContext) =>
   new Elysia()
     .get(
@@ -97,47 +93,6 @@ export const adminRoutes = (ctx: AppContext) =>
       },
     )
     .get(
-      '/cards/:id/diff',
-      async ({ params }) => {
-        const [card] = await ctx.db
-          .select()
-          .from(cards)
-          .where(eq(cards.id, Number(params.id)))
-        if (!card?.branch)
-          return {
-            branch: null,
-            stat: '',
-            files: [] as { path: string; added: number; removed: number }[],
-          }
-        const project = await getProject(ctx.db, card.project_id)
-        if (!project.repo_path) throw conflict('NO_REPO', 'the project has no repo')
-        const env = await childEnv(ctx.worker)
-        const branchName = await targetBranch(project, gitIn(project.repo_path, env))
-        const dir = worktreeDir(ctx.worker, project)
-        const inWorktree = project.use_worktree && (await Bun.file(`${dir}/.git`).exists())
-        const git = gitIn(inWorktree ? dir : project.repo_path, env)
-        await git.run('fetch', 'origin', '--prune')
-        const range = `origin/${branchName ?? 'main'}...origin/${cardBranch(card.id)}`
-        const stat = await git.run('diff', '--stat', range)
-        const numstat = await git.run('diff', '--numstat', range)
-        const files = numstat.stdout
-          .split('\n')
-          .filter(Boolean)
-          .map((line) => {
-            const [added, removed, path] = line.split('\t')
-            return { path: path ?? '', added: Number(added) || 0, removed: Number(removed) || 0 }
-          })
-        return { branch: card.branch, stat: stat.stdout.trim(), files }
-      },
-      {
-        params: idParams(),
-        detail: {
-          operationId: 'card_diff',
-          summary: 'What claude/<card> changes against the default branch',
-        },
-      },
-    )
-    .get(
       '/stats',
       async ({ query }) => {
         const weeks = query.weeks ?? 8
@@ -152,7 +107,6 @@ export const adminRoutes = (ctx: AppContext) =>
             runs: sql<number>`count(*)::int`,
             done: sql<number>`count(*) filter (where ${runs.status} = 'succeeded')::int`,
             review: sql<number>`count(*) filter (where ${runs.status} = 'review')::int`,
-            reverted: sql<number>`count(*) filter (where ${runs.status} = 'reverted')::int`,
             failed: sql<number>`count(*) filter (where ${runs.status} in ('failed', 'stale', 'stopped'))::int`,
             cost: sql<number>`coalesce(sum(${runs.cost_usd}), 0)::float`,
             turns: sql<number>`coalesce(sum(${runs.num_turns}), 0)::int`,
@@ -182,7 +136,7 @@ export const adminRoutes = (ctx: AppContext) =>
         }),
         detail: {
           operationId: 'get_stats',
-          summary: 'Runs per week: done, to review, reverted, cost',
+          summary: 'Runs per week: done, to review, failed, cost',
         },
       },
     )

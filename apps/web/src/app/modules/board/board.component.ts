@@ -128,9 +128,7 @@ export class BoardComponent {
   protected readonly gitState = resource({
     params: () => {
       const p = this.project()
-      return p?.repo_path
-        ? { id: p.id, at: p.last_checked_at, worktree: p.use_worktree }
-        : undefined
+      return p?.repo_path ? { id: p.id, at: p.last_checked_at } : undefined
     },
     loader: ({ params }) => firstValueFrom(this.api.projects({ id: params.id }).git.get()),
   })

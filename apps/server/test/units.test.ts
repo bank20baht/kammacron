@@ -7,45 +7,43 @@ import { launchdPlist, systemdUnit } from '../src/service'
 import { linkedIds, sniffImage } from '../src/services/attachments'
 import type { Project } from '../src/services/projects'
 import { classify, eventsOf, redact } from '../src/worker/claude'
-import { exec, gitIn, prePushHook } from '../src/worker/git'
+import { checkDir, exec } from '../src/worker/git'
 import { toolLists } from '../src/worker/runner'
 
 const project = (patch: Partial<Project> = {}) =>
   ({
-    ship_policy: 'push',
     allowed_bash: ['Bash(bun test:*)'],
     web_tools: false,
-    max_diff_lines: null,
-    protected_paths: [],
     ...patch,
   }) as Project
 
 describe('toolLists', () => {
-  test('push policy: the card branch and the default branch, exact; denies force and --no-verify', () => {
-    const { allowed, denied } = toolLists(project(), 'main', 12, ['zvec'])
-    expect(allowed).toContain('Bash(git push origin HEAD:claude/12)')
-    expect(allowed).toContain('Bash(git push origin HEAD:main)')
+  test('git as the project decides (push included), what loses work denied, MCP and allowed_bash', () => {
+    const { allowed, denied } = toolLists(project(), { kind: 'claude', name: 'Claude' }, ['zvec'])
+    expect(allowed).toContain('Bash(git push:*)')
+    expect(allowed).toContain('Bash(git worktree:*)')
     expect(allowed).toContain('mcp__kammacron')
     expect(allowed).toContain('mcp__zvec')
     expect(allowed).toContain('Bash(bun test:*)')
-    expect(allowed.some((tool) => tool.startsWith('Bash(git push:'))).toBe(false)
     for (const tool of [
       'Bash(git push --force:*)',
+      'Bash(git push origin +:*)',
       'Bash(git commit --no-verify:*)',
+      'Bash(git reset --hard:*)',
       'Bash(git -c:*)',
     ])
       expect(denied).toContain(tool)
     expect(allowed).not.toContain('WebFetch')
   })
 
-  test('branch policy never allows a push to the default branch; web tools only when on', () => {
+  test("a step's own allow list adds to the project's; web tools only when on", () => {
     const { allowed } = toolLists(
-      project({ ship_policy: 'branch', web_tools: true }),
-      'main',
-      3,
+      project({ web_tools: true }),
+      { kind: 'claude', name: 'Deploy notes', allow: ['Bash(ssh app:*)'] },
       [],
     )
-    expect(allowed).not.toContain('Bash(git push origin HEAD:main)')
+    expect(allowed).toContain('Bash(ssh app:*)')
+    expect(allowed).toContain('Bash(bun test:*)')
     expect(allowed).toContain('WebSearch')
     expect(allowed).toContain('WebFetch')
   })
@@ -151,16 +149,19 @@ describe('service files', () => {
   })
 })
 
-describe('prePushHook', () => {
-  test('finds a hook through core.hooksPath (husky), and none in a bare repo', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'kammacron-hook-'))
+describe('checkDir', () => {
+  test('a missing directory fails; any directory passes, git or not, and says what it found', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kammacron-dir-'))
     try {
-      await exec(['git', 'init', '-q', dir], { cwd: dir })
-      const git = gitIn(dir)
-      expect(await prePushHook(git)).toBeNull()
-      await Bun.write(join(dir, '.husky', 'pre-push'), 'bun run check\n')
-      await exec(['git', 'config', 'core.hooksPath', '.husky'], { cwd: dir })
-      expect(await prePushHook(git)).toBe(join(dir, '.husky', 'pre-push'))
+      expect((await checkDir(join(dir, 'nope'))).ok).toBe(false)
+      const plain = await checkDir(dir)
+      expect(plain.ok).toBe(true)
+      expect(plain.checks.find((c) => c.name === 'git')?.detail).toContain('not a git repository')
+      await exec(['git', 'init', '-q', '-b', 'main', dir], { cwd: dir })
+      await Bun.write(join(dir, 'CLAUDE.md'), '# rules\n')
+      const repo = await checkDir(dir)
+      expect(repo.checks.find((c) => c.name === 'git')?.detail).toContain('on main')
+      expect(repo.checks.find((c) => c.name === 'project instructions')?.detail).toBe('CLAUDE.md')
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

@@ -19,11 +19,10 @@ const columnsOf = (t: Translate): ColumnMap => ({
   runs: { label: t('stats.column.runs'), numeric: true },
   done: { label: t('stats.column.done'), numeric: true },
   review: { label: t('stats.column.review'), numeric: true },
-  reverted: { label: t('stats.column.reverted'), numeric: true },
   cost: { label: t('stats.column.cost'), align: 'end' },
 })
 
-/** What the worker did, week by week: shipped, handed back, reverted, and what it cost. */
+/** What the worker did, week by week: done, handed back, failed, and what it cost. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BAHT_UI],
@@ -151,7 +150,6 @@ export class StatsComponent {
     return [
       { name: this.t('stats.series.shipped'), values: weeks.map((w) => w.done) },
       { name: this.t('stats.series.review'), values: weeks.map((w) => w.review) },
-      { name: this.t('stats.series.reverted'), values: weeks.map((w) => w.reverted) },
       { name: this.t('stats.series.failed'), values: weeks.map((w) => w.failed) },
     ]
   })
@@ -167,7 +165,6 @@ export class StatsComponent {
       runs: w.runs,
       done: w.done,
       review: w.review,
-      reverted: w.reverted,
       cost: cost(w.cost),
     })),
   )

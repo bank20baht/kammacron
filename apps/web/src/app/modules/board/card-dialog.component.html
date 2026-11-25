@@ -42,14 +42,6 @@
           <a [routerLink]="['/runs', run.id]">{{ t('card.viewRun') }}</a>
         </p>
       }
-      @if (c.branch) {
-        <div class="changes">
-          <span class="muted"
-            >{{ t('card.changesOn') }} <baht-code [code]="c.branch"></baht-code
-          ></span>
-          <baht-code variant="block" [code]="diff() ?? '…'"></baht-code>
-        </div>
-      }
       <baht-choice-group
         [label]="t('card.decisionLabel')"
         [options]="decisions()"
@@ -66,14 +58,10 @@
           </div>
         }
         @case ('approve') {
-          <p class="muted">
-            {{
-              c.branch ? t('card.approveBranch', { branch: c.branch }) : t('card.approveNoBranch')
-            }}
-          </p>
+          <p class="muted">{{ t('card.approveText') }}</p>
           <div class="actions">
             <baht-button variant="primary" [loading]="busy()" (click)="approve()">{{
-              c.branch ? t('card.approveAndPush') : t('card.decision.approve')
+              t('card.decision.approve')
             }}</baht-button>
           </div>
         }

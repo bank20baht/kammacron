@@ -18,14 +18,14 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { projectForm, scheduleForm } from '../../shared/forms'
+import { PlaybookEditorComponent } from './playbook-editor.component'
 
 type Check = {
   ok: boolean
   checks: { name: string; ok: boolean; detail: string }[]
-  default_branch: string | null
 }
 
-const SECTIONS = ['general', 'worker', 'shipping', 'permissions', 'schedules', 'advanced'] as const
+const SECTIONS = ['general', 'playbook', 'worker', 'permissions', 'schedules', 'advanced'] as const
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const count = (v: unknown, fallback: number) => {
@@ -34,10 +34,10 @@ const count = (v: unknown, fallback: number) => {
 }
 const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
 
-/** One project's settings, the repo checklist, Run now, and its schedules. */
+/** One project's settings, its playbook, the directory check, Run now, and its schedules. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [BAHT_UI, PlaybookEditorComponent],
   selector: 'web-project-settings',
   styles: `
     .row {
@@ -100,10 +100,7 @@ export class ProjectSettingsComponent {
     return {
       ...p,
       repo_path: p.repo_path ?? '',
-      default_branch: p.default_branch ?? '',
       model: p.model ?? '',
-      setup_command: p.setup_command ?? '',
-      verify_command: p.verify_command ?? '',
     }
   })
 
@@ -141,11 +138,8 @@ export class ProjectSettingsComponent {
         this.api.projects({ id: this.id() }).patch({
           name: text(d['name']) ?? '',
           repo_path: text(d['repo_path']),
-          default_branch: text(d['default_branch']),
           worker_enabled: d['worker_enabled'] === true,
-          use_worktree: d['use_worktree'] === true,
           mode: d['mode'] === 'watch' ? 'watch' : 'autopilot',
-          ship_policy: d['ship_policy'] === 'branch' ? 'branch' : 'push',
           interval_minutes: count(d['interval_minutes'], 30),
           max_cards_per_run: count(d['max_cards_per_run'], 3),
           max_turns: count(d['max_turns'], 60),
@@ -153,13 +147,7 @@ export class ProjectSettingsComponent {
           allowed_bash: list(d['allowed_bash']),
           web_tools: d['web_tools'] === true,
           enabled_mcp_servers: list(d['enabled_mcp_servers']),
-          copy_files: list(d['copy_files']),
-          setup_command: text(d['setup_command']),
-          verify_command: text(d['verify_command']),
           extra_prompt: typeof d['extra_prompt'] === 'string' ? d['extra_prompt'] : '',
-          max_diff_lines:
-            Number(d['max_diff_lines']) > 0 ? Math.round(Number(d['max_diff_lines'])) : null,
-          protected_paths: list(d['protected_paths']),
         }),
       )
       form.markClean()

@@ -19,8 +19,8 @@ import {
 } from '../services/cards'
 
 /** Rules for making cards, shared by the MCP server's instructions and the worker's prompt. */
-export const CARD_RULES = `A card tagged "claude" is picked up by an unattended Claude worker that commits and pushes to the default branch.
-Tag a card "claude" only when the work is reversible, stays inside the repo, and has a clear done condition.
+export const CARD_RULES = `A card tagged "claude" is picked up by an unattended worker that runs the project's playbook on it (a Claude step, and the project's own commands).
+Tag a card "claude" only when the work is reversible and has a clear done condition.
 Work that touches security, data or migrations, release or deploy, a breaking API, money, or a product decision is for a person: set human=true.
 When a task is mostly a person's, split what Claude can do alone into small "claude" cards and make the big card wait on them (waits_on).`
 

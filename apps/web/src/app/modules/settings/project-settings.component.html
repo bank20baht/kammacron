@@ -67,15 +67,23 @@
       (bahtChange)="picked.set($any($event).value)"
     ></baht-tabs>
 
-    <div [hidden]="current() === 'schedules'">
+    @if (current() === 'playbook') {
+      <web-playbook-editor
+        [projectId]="id()"
+        [playbook]="p.playbook"
+        (saved)="
+          project.reload(); message.set({ tone: 'success', text: t('project.playbook.saved') })
+        "
+      ></web-playbook-editor>
+    }
+
+    <div [hidden]="current() === 'schedules' || current() === 'playbook'">
       @if (current() === 'general') {
         @if (check(); as c) {
           <div class="checks">
             @for (item of c.checks; track item.name) {
-              <baht-badge
-                [tone]="item.ok ? 'success' : item.name === 'pre-push hook' ? 'warning' : 'danger'"
-                [label]="item.name"
-              ></baht-badge>
+              <baht-badge [tone]="item.ok ? 'success' : 'danger'" [label]="item.name"></baht-badge>
+              <span class="muted">{{ item.detail }}</span>
             }
             <span class="muted">{{
               c.ok ? t('project.checks.ready') : t('project.checks.notReady')

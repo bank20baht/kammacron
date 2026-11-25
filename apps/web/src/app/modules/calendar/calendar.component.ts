@@ -34,11 +34,9 @@ const JOB_TONE: Record<string, CalendarTone> = {
 }
 const RUN_TONE: Record<string, CalendarTone> = {
   running: 'primary',
-  verifying: 'primary',
   succeeded: 'success',
   review: 'warning',
   failed: 'danger',
-  reverted: 'danger',
   stopped: 'neutral',
   stale: 'neutral',
 }

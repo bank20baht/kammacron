@@ -3,29 +3,39 @@ import { dirname, join } from 'node:path'
 
 import { eq } from 'drizzle-orm'
 
-import { cards, projects } from '../db/schema'
+import {
+  cards,
+  DEFAULT_PLAYBOOK,
+  projects,
+  type ClaudeStep,
+  type PlaybookStep,
+  type RunStep,
+} from '../db/schema'
 import { addAlert } from '../services/alerts'
 import { attachmentPath, cardAttachments } from '../services/attachments'
 import { addComment, claimCard, getCard, moveCard, type Card } from '../services/cards'
 import type { Project } from '../services/projects'
-import { addRunEvent, createRun, getRun, previousRuns, updateRun, type Run } from '../services/runs'
+import {
+  addRunEvent,
+  createRun,
+  endStep,
+  previousRuns,
+  skipSteps,
+  startStep,
+  updateRun,
+  type Run,
+} from '../services/runs'
 import { getSettings, updateSettings } from '../services/settings'
 import { spawnClaude, type ClaudeResult } from './claude'
-import { cardBranch, childEnv, type WorkerEnv } from './env'
-import { checkGate, isGated, shipBranch } from './gate'
-import { exclude, exec, hashFiles, remoteHeads, type Git } from './git'
+import { childEnv, type RunHandle, type WorkerEnv } from './env'
 import { taskPrompt, workerRules } from './prompt'
-import { verifyAndRevert } from './verify'
-import { openWorkspace, type Workspace } from './workspace'
+import { spawnShell } from './shell'
 
-/** Exact tools: anything not listed is refused (spike S3: compound commands are split and checked). */
-export const toolLists = (
-  project: Project,
-  defaultBranchName: string,
-  cardId: number,
-  mcpServers: readonly string[],
-) => {
-  const branch = cardBranch(cardId)
+/**
+ * The tools of a Claude step. Exact for everything but git, where the project's own instructions
+ * decide the workflow (branches, worktrees, pushes); what could lose work stays refused.
+ */
+export const toolLists = (project: Project, step: ClaudeStep, mcpServers: readonly string[]) => {
   const allowed = [
     'Read',
     'Edit',
@@ -42,20 +52,28 @@ export const toolLists = (
       'add',
       'commit',
       'fetch',
+      'pull',
+      'push',
       'rebase',
+      'merge',
+      'cherry-pick',
+      'revert',
       'restore',
+      'checkout',
+      'switch',
+      'branch',
+      'worktree',
+      'tag',
       'rev-parse',
       'stash',
       'merge-base',
       'ls-files',
       'blame',
+      'mv',
+      'rm',
     ].map((cmd) => `Bash(git ${cmd}:*)`),
-    'Bash(git branch --show-current)',
-    `Bash(git push origin HEAD:${branch})`,
-    ...(project.ship_policy === 'push' && !isGated(project)
-      ? [`Bash(git push origin HEAD:${defaultBranchName})`]
-      : []),
     ...project.allowed_bash,
+    ...(step.allow ?? []),
     ...(project.web_tools ? ['WebSearch', 'WebFetch'] : []),
   ]
   const denied = [
@@ -63,6 +81,11 @@ export const toolLists = (
     'Bash(git push -f:*)',
     'Bash(git push --force-with-lease:*)',
     'Bash(git push --no-verify:*)',
+    'Bash(git push --delete:*)',
+    'Bash(git push --mirror:*)',
+    'Bash(git push origin +:*)',
+    'Bash(git push origin --force:*)',
+    'Bash(git push origin -f:*)',
     'Bash(git commit --no-verify:*)',
     'Bash(git commit -n:*)',
     'Bash(git reset --hard:*)',
@@ -79,12 +102,7 @@ export const toolLists = (
 type McpServer = Record<string, unknown>
 
 /** kammacron (with this run's id) and the project's own servers that Settings turned on. */
-const writeMcpConfig = async (
-  env: WorkerEnv,
-  project: Project,
-  worktree: string,
-  runId: number,
-) => {
+const writeMcpConfig = async (env: WorkerEnv, project: Project, dir: string, runId: number) => {
   const servers: Record<string, McpServer> = {
     kammacron: {
       type: 'http',
@@ -92,7 +110,7 @@ const writeMcpConfig = async (
       headers: { Authorization: `Bearer ${env.apiToken()}`, 'X-Kammacron-Run': String(runId) },
     },
   }
-  const own: Record<string, McpServer> = await readFile(join(worktree, '.mcp.json'), 'utf8')
+  const own: Record<string, McpServer> = await readFile(join(dir, '.mcp.json'), 'utf8')
     .then(
       (text) => (JSON.parse(text) as { mcpServers?: Record<string, McpServer> }).mcpServers ?? {},
     )
@@ -110,69 +128,47 @@ const writeMcpConfig = async (
   return { path, servers: enabled }
 }
 
-const prepareBranch = async (
-  wt: Git,
-  defaultBranchName: string,
-  card: Card,
-  heads: Record<string, string>,
-) => {
-  const branch = cardBranch(card.id)
-  await wt.out('fetch', 'origin', '--prune')
-  // a card sent back continues on the branch its earlier run left
-  const resume = card.branch === branch && heads[branch] !== undefined
-  await wt.out(
-    'checkout',
-    '-f',
-    '-B',
-    branch,
-    resume ? `origin/${branch}` : `origin/${defaultBranchName}`,
-  )
-  await wt.out('clean', '-fd') // ignored files (node_modules, .kammacron/) stay
-  return resume
-}
+type Attachment = { filename: string; path: string }
 
-const copyProjectFiles = async (repoPath: string, worktree: string, files: readonly string[]) => {
-  if (repoPath === worktree) return // working in the directory itself: they are already there
-  for (const name of files) {
-    const from = join(repoPath, name)
-    if (!(await Bun.file(from).exists())) continue
-    await mkdir(dirname(join(worktree, name)), { recursive: true })
-    await copyFile(from, join(worktree, name))
-  }
-}
-
-/** `setup_command` the first time, and again whenever a lock file changed. */
-const setup = async (env: WorkerEnv, project: Project, worktree: string) => {
-  if (!project.setup_command) return null
-  const hash = await hashFiles(worktree, project.lock_files)
-  if (hash === project.setup_hash) return null
-  const r = await exec(['sh', '-c', project.setup_command], {
-    cwd: worktree,
-    env: await childEnv(env),
-    timeoutMs: 15 * 60_000,
-  })
-  if (r.code !== 0)
-    return `setup_command failed (exit ${String(r.code)}): ${(r.stderr || r.stdout).trim().slice(-1500)}`
-  await env.db.update(projects).set({ setup_hash: hash }).where(eq(projects.id, project.id))
-  return null
-}
-
-const copyAttachments = async (env: WorkerEnv, cardId: number, worktree: string) => {
-  const dir = join(worktree, '.kammacron', 'attachments')
-  await rm(dir, { recursive: true, force: true })
+/**
+ * The run's own folder, outside the project: the card as markdown (for run steps) and its
+ * attached files (for Claude). Gone when the run ends; the project directory is never written to.
+ */
+const prepareRunDir = async (env: WorkerEnv, runId: number, cardId: number) => {
+  const dir = join(env.dataDir, 'runs', String(runId))
+  await mkdir(dir, { recursive: true, mode: 0o700 })
+  const full = await getCard(env.db, cardId)
   const rows = await cardAttachments(env.db, cardId)
-  if (rows.length === 0) return []
-  await mkdir(dir, { recursive: true })
-  const out: { filename: string; path: string }[] = []
+  const attachments: Attachment[] = []
+  if (rows.length > 0) await mkdir(join(dir, 'attachments'))
   for (const row of rows) {
     const name = `${row.id.slice(0, 8)}-${row.filename.replace(/[^\w.-]/g, '_')}`
-    await copyFile(attachmentPath(join(env.dataDir, 'files'), row), join(dir, name))
-    out.push({ filename: row.filename, path: `.kammacron/attachments/${name}` })
+    const path = join(dir, 'attachments', name)
+    await copyFile(attachmentPath(join(env.dataDir, 'files'), row), path)
+    attachments.push({ filename: row.filename, path })
   }
-  return out
+  const cardFile = join(dir, 'card.md')
+  await writeFile(
+    cardFile,
+    [
+      `# #${String(full.id)} ${full.title}`,
+      '',
+      full.body.trim(),
+      ...full.comments.map(
+        (c) => `\n## ${c.author} (${new Date(c.created_at).toISOString()})\n\n${c.body.trim()}`,
+      ),
+      '',
+    ].join('\n'),
+  )
+  return { dir, cardFile, attachments }
 }
 
-export type CardOutcome = { run: Run | null; result: ClaudeResult | null; skipped?: string }
+export type CardOutcome = {
+  run: Run | null
+  /** Why a Claude step ended early (auth and usage limits end the project's round). */
+  errorKind?: ClaudeResult['errorKind']
+  skipped?: string
+}
 
 /** Moves the card back to todo after a run that did not get to work, counting it as stale. */
 const returnCard = async (
@@ -193,43 +189,11 @@ const returnCard = async (
   else await moveCard(env.db, cardId, { status: 'todo' })
 }
 
-type Stage = {
-  env: WorkerEnv
-  project: Project
-  card: Card
-  wt: Git
-  dir: string
-  branchName: string
-  before: Record<string, string>
-  baseSha: string | null
-  release: Workspace['release']
-  childEnvironment: Record<string, string>
-}
-
-const failRun = (env: WorkerEnv, runId: number, message: string, kind: string) =>
-  updateRun(env.db, runId, {
-    status: 'failed',
-    ended_at: new Date(),
-    error: message,
-    error_kind: kind,
-  })
-
 /** The claim: a run row and the card's move to doing, together or not at all. */
-const claim = async (
-  env: WorkerEnv,
-  project: Project,
-  cardId: number,
-  baseSha: string | null,
-  logDir: string,
-) =>
+const claim = async (env: WorkerEnv, project: Project, cardId: number, logDir: string) =>
   env.db
     .transaction(async (tx) => {
-      const run = await createRun(tx, {
-        project_id: project.id,
-        card_id: cardId,
-        base_sha: baseSha,
-        log_path: null,
-      })
+      const run = await createRun(tx, { project_id: project.id, card_id: cardId, log_path: null })
       const card = await claimCard(tx, cardId, run.id)
       if (!card) {
         tx.rollback()
@@ -245,89 +209,41 @@ const claim = async (
       throw error
     })
 
-/** Branch, project files, setup and attachments; a failure ends the run here. */
-const prepare = async (stage: Stage, run: Run) => {
-  const { env, project, card, wt, dir } = stage
-  try {
-    const resume = await prepareBranch(wt, stage.branchName, card, stage.before)
-    await copyProjectFiles(project.repo_path ?? '', dir, project.copy_files)
-    const setupError = await setup(env, project, dir)
-    if (setupError) {
-      await failRun(env, run.id, setupError, 'setup')
-      await moveCard(env.db, card.id, { status: 'review', reason: setupError })
-      await addAlert(env.db, {
-        level: 'error',
-        project_id: project.id,
-        card_id: card.id,
-        run_id: run.id,
-        message: `${project.name}: ${setupError.slice(0, 200)}`,
-      })
-      return null
-    }
-    return { resume, attachments: await copyAttachments(env, card.id, dir) }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    await failRun(env, run.id, `preparing the worktree: ${message}`, 'setup')
-    await returnCard(env, card.id, false, '')
-    await addAlert(env.db, {
-      level: 'error',
-      project_id: project.id,
-      run_id: run.id,
-      message: `${project.name}: preparing the worktree failed: ${message.slice(0, 300)}`,
-    })
-    return null
-  }
+/** Everything a step needs of the run it is in. */
+type Context = {
+  env: WorkerEnv
+  project: Project
+  card: Card
+  dir: string
+  run: Run
+  steps: readonly PlaybookStep[]
+  runDir: { dir: string; cardFile: string; attachments: Attachment[] }
+  childEnvironment: Record<string, string>
+  logFile: string
+  staleMinutes: number
+  /** Events so far (one sequence across the run's Claude steps). */
+  seq: { value: number }
 }
 
-/** The command line and the prompt of the run. */
-const invocation = async (
-  stage: Stage,
-  run: Run,
-  prepared: { resume: boolean; attachments: { filename: string; path: string }[] },
-) => {
-  const { env, project, card, dir, branchName } = stage
-  const full = await getCard(env.db, card.id)
-  const rules = await readFile(join(dir, '.claude-worker', 'prompt.md'), 'utf8').catch(() => null)
-  const mcp = await writeMcpConfig(env, project, dir, run.id)
-  const tools = toolLists(project, branchName, card.id, mcp.servers)
-  const args = [
-    '-p',
-    '--output-format',
-    'stream-json',
-    '--verbose',
-    '--max-turns',
-    String(project.max_turns),
-    '--allowedTools',
-    tools.allowed.join(','),
-    '--disallowedTools',
-    tools.denied.join(','),
-    '--mcp-config',
-    mcp.path,
-    '--strict-mcp-config',
-    '--append-system-prompt',
-    workerRules({ project, defaultBranch: branchName, cardId: card.id, projectRules: rules }),
-    ...(project.model ? ['--model', project.model] : []),
-  ]
-  const prompt = taskPrompt({
-    card,
-    comments: full.comments,
-    attachments: prepared.attachments,
-    previousRuns: (await previousRuns(env.db, card.id)).filter((r) => r.id !== run.id),
-    defaultBranch: branchName,
-    resumingBranch: prepared.resume,
-  })
-  return { args, prompt }
-}
+/** What a step printed (a run step), kept on its row. */
+type Printed = { output?: string; exitCode?: number }
+
+/** How a step ended, for the loop: go on, stop here, or the run is over already. */
+type StepEnd = Printed &
+  (
+    | { next: true }
+    | { handed: true }
+    | { failed: string }
+    | { interrupted: Run; errorKind: ClaudeResult['errorKind'] }
+  )
 
 /** Errors that are not the card's fault (token, usage limit, stop): the card goes back, untouched or counted. */
 const settleInterrupted = async (
-  stage: Stage,
-  run: Run,
+  ctx: Context,
   result: ClaudeResult,
   stoppedByUser: boolean,
-  staleMinutes: number,
 ): Promise<Run | null> => {
-  const { env, project, card } = stage
+  const { env, project, card, run } = ctx
   if (result.errorKind === 'auth') {
     await updateSettings(env.db, { paused: true })
     await returnCard(env, card.id, false, '')
@@ -335,7 +251,7 @@ const settleInterrupted = async (
       'Claude refused the token: the worker is paused. Set a new CLAUDE_CODE_OAUTH_TOKEN in Settings (claude setup-token), then resume.'
     await addAlert(env.db, { level: 'error', run_id: run.id, message })
     await env.notify('kammacron paused', message)
-    return updateRun(env.db, run.id, { status: 'failed' })
+    return updateRun(env.db, run.id, { status: 'failed', ended_at: new Date() })
   }
   if (result.errorKind === 'rate_limit') {
     await returnCard(env, card.id, false, '')
@@ -349,274 +265,76 @@ const settleInterrupted = async (
       run_id: run.id,
       message: `${project.name}: usage limit reached; next try in an hour`,
     })
-    return updateRun(env.db, run.id, { status: 'failed' })
+    return updateRun(env.db, run.id, { status: 'failed', ended_at: new Date() })
   }
-  if (result.errorKind === 'stopped') {
-    await returnCard(
-      env,
-      card.id,
-      true,
-      stoppedByUser ? 'stopped by hand' : `ran past ${String(staleMinutes)} minutes`,
-    )
-    return updateRun(env.db, run.id, { status: stoppedByUser ? 'stopped' : 'stale' })
-  }
+  if (result.errorKind === 'stopped') return stopRun(ctx, stoppedByUser)
   return null
 }
 
-/** What really reached the remote: the run's commits, where they went, and refs it may not touch. */
-const inspectRemote = async (stage: Stage) => {
-  const { wt, project, card, branchName, before, baseSha } = stage
-  await wt.run('fetch', 'origin', '--prune')
-  const after = await remoteHeads(wt)
-  const branch = cardBranch(card.id)
-  const headSha = (await wt.out('rev-parse', 'HEAD')) || null
-  const commits = baseSha
-    ? (await wt.out('rev-list', '--reverse', `${baseSha}..HEAD`)).split('\n').filter(Boolean)
-    : []
-  const defaultTip = after[branchName]
-  const onDefault =
-    headSha !== null &&
-    defaultTip !== undefined &&
-    commits.length > 0 &&
-    (await wt.run('merge-base', '--is-ancestor', headSha, defaultTip)).code === 0
-  const onBranch = after[branch] !== undefined && after[branch] === headSha
-  const allowedRefs = new Set([
-    branch,
-    ...(project.ship_policy === 'push' && !isGated(project) ? [branchName] : []),
-  ])
-  // a ref counts as the run's only when it now holds one of the run's commits: the owner may push
-  // their own branches while a run goes
-  const first = commits[0]
-  const outside: string[] = []
-  for (const ref of Object.keys({ ...before, ...after })) {
-    const sha = after[ref]
-    if (before[ref] === sha || allowedRefs.has(ref) || !sha || first === undefined) continue
-    if (sha === headSha || (await wt.run('merge-base', '--is-ancestor', first, sha)).code === 0)
-      outside.push(ref)
-  }
-  return {
-    headSha,
-    commits,
-    onDefault,
-    onBranch,
-    branch,
-    outside,
-    pushedTo: onDefault ? branchName : onBranch ? branch : null,
-  }
-}
-
-/** The card as the run left it: still doing, or done without its commits on main, goes to review. */
-const settleCard = async (
-  stage: Stage,
-  result: ClaudeResult,
-  remote: { commits: string[]; onDefault: boolean; onBranch: boolean },
-) => {
-  const { env, project, card, branchName } = stage
-  const [now] = await env.db.select().from(cards).where(eq(cards.id, card.id))
-  const status = now?.status ?? 'doing'
-  if (status === 'doing') {
-    const reason =
-      result.errorKind === 'max_turns'
-        ? `the run hit max_turns (${String(project.max_turns)}) before finishing`
-        : 'the run ended without moving the card'
-    await moveCard(env.db, card.id, { status: 'review', reason })
-    return 'review'
-  }
-  const shipped = isGated(project) ? remote.onBranch : remote.onDefault
-  if (status === 'done' && remote.commits.length > 0 && !shipped) {
-    const where = isGated(project) ? `origin/${cardBranch(card.id)}` : `origin/${branchName}`
-    await moveCard(env.db, card.id, {
-      status: 'review',
-      reason: `the card was moved to done, but its commits are not on ${where}`,
-    })
-    return 'review'
-  }
-  return status
-}
-
-/** The diff gate, then the push on: the new tip and its commits, or null (the card went to review). */
-const throughGate = async (stage: Stage, run: Run, base: string, head: string) => {
-  const { env, project, card, wt, branchName } = stage
-  const verdict = await checkGate(wt, project, base, head)
-  if (!verdict.ok) {
-    await moveCard(env.db, card.id, {
-      status: 'review',
-      reason: `held at the gate: ${verdict.reason ?? ''}`,
-    })
-    return null
-  }
-  try {
-    const sha = await shipBranch(wt, await childEnv(env), cardBranch(card.id), branchName)
-    const commits = (await wt.out('rev-list', '--reverse', `${base}..${sha}`))
-      .split('\n')
-      .filter(Boolean)
-    await addComment(env.db, card.id, {
-      author: 'claude-worker',
-      run_id: run.id,
-      body: `Passed the gate (${String(verdict.lines)} lines, ${String(verdict.files.length)} files): kammacron pushed ${cardBranch(card.id)} to ${branchName} at ${sha.slice(0, 8)}.`,
-    })
-    return { sha, commits }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    await moveCard(env.db, card.id, {
-      status: 'review',
-      reason: `passed the gate, but the push on failed: ${message.slice(0, 500)}`,
-    })
-    return null
-  }
-}
-
-const pauseForRefs = async (stage: Stage, run: Run, outside: string[]) => {
-  const { env, project, card } = stage
-  const reason = `run ${String(run.id)} changed refs it may not push: ${outside.join(', ')}`
-  await env.db.update(projects).set({ paused_reason: reason }).where(eq(projects.id, project.id))
-  await addAlert(env.db, {
-    level: 'error',
-    project_id: project.id,
-    card_id: card.id,
-    run_id: run.id,
-    message: `${project.name} paused: ${reason}`,
-  })
-  await env.notify('kammacron paused a project', `${project.name}: ${reason}`)
-}
-
-/** Where a run starts: the branch it ships to, where it works, and the remote's heads before it. */
-const openStage = async (env: WorkerEnv, project: Project & { repo_path: string }) => {
-  const childEnvironment = await childEnv(env)
-  const space = await openWorkspace(env, project, childEnvironment)
-  if ('skip' in space) return space
-  const { git: wt, dir, branch: branchName, release } = space
-  await exclude(wt, ['.kammacron/'])
-  const before = await remoteHeads(wt)
-  return {
-    childEnvironment,
-    branchName,
-    dir,
-    wt,
-    before,
-    baseSha: before[branchName] ?? null,
-    release,
-  }
-}
-
-/** After a clean end: what reached the remote, the card's state, the gate, then verify. */
-const finish = async (stage: Stage, started: Run, result: ClaudeResult): Promise<Run> => {
-  const { env, project, card, baseSha, branchName } = stage
-  const remote = await inspectRemote(stage)
-  let run = await updateRun(env.db, started.id, {
-    head_sha: remote.headSha,
-    commits: remote.commits,
-    pushed_to: remote.pushedTo,
-  })
-  if (remote.onBranch)
-    await env.db.update(cards).set({ branch: remote.branch }).where(eq(cards.id, card.id))
-  if (remote.outside.length > 0) await pauseForRefs(stage, run, remote.outside)
-
-  let status = await settleCard(stage, result, remote)
-  let shipped = { sha: remote.headSha, commits: remote.commits, onDefault: remote.onDefault }
-  // gated: kammacron checks the diff, then rebases claude/<card> and pushes it on itself
-  if (status === 'done' && isGated(project) && remote.onBranch && remote.headSha && baseSha) {
-    const passed = await throughGate(stage, run, baseSha, remote.headSha)
-    if (passed) {
-      shipped = { ...passed, onDefault: true }
-      run = await updateRun(env.db, run.id, {
-        pushed_to: branchName,
-        head_sha: passed.sha,
-        commits: passed.commits,
-      })
-    } else status = 'review'
-  }
-  run = await updateRun(env.db, run.id, {
-    status: status === 'review' ? 'review' : result.errorKind ? 'failed' : 'succeeded',
-  })
-  if (status === 'review')
-    await env.notify(`#${String(card.id)} needs review`, `${project.name}: ${card.title}`)
-  if (
-    status !== 'done' ||
-    !shipped.onDefault ||
-    !project.verify_command ||
-    !shipped.sha ||
-    !baseSha
+/** Stopped by hand, or past the stale time: the card back to todo, counted. */
+const stopRun = async (ctx: Context, stoppedByUser: boolean) => {
+  await returnCard(
+    ctx.env,
+    ctx.card.id,
+    true,
+    stoppedByUser ? 'stopped by hand' : `ran past ${String(ctx.staleMinutes)} minutes`,
   )
-    return run
-  return verifyAndRevert(env, {
-    project,
-    run,
-    cardId: card.id,
-    git: stage.wt,
-    defaultBranch: branchName,
-    baseSha,
-    headSha: shipped.sha,
-    commits: shipped.commits,
-  })
-}
-
-/**
- * One card, one `claude -p`, one row of `runs`. Steps 4 to 6 of a project's round: worktree,
- * claim, run, then check what really happened (the card's status, what reached the remote).
- */
-export const runCard = async (
-  env: WorkerEnv,
-  project: Project,
-  cardId: number,
-): Promise<CardOutcome> => {
-  const repoPath = project.repo_path
-  if (!repoPath) return { run: null, result: null, skipped: 'no repo' }
-  const opened = await openStage(env, { ...project, repo_path: repoPath })
-  if ('skip' in opened) return { run: null, result: null, skipped: opened.skip }
-  let label = 'a run'
-  try {
-    const logDir = join(env.dataDir, 'logs', 'runs')
-    await mkdir(logDir, { recursive: true, mode: 0o700 })
-    const claimed = await claim(env, project, cardId, opened.baseSha, logDir)
-    if (!claimed) return { run: null, result: null, skipped: 'claimed by someone else' }
-    label = `run ${String(claimed.run.id)}`
-    return await work({ env, project, card: claimed.card, ...opened }, claimed.run)
-  } finally {
-    const problem = await opened.release(label)
-    if (problem)
-      await addAlert(env.db, {
-        level: 'warning',
-        project_id: project.id,
-        message: `${project.name}: ${problem}`.slice(0, 1000),
-      })
-  }
-}
-
-/** The claimed card's run: prepare, `claude -p`, then what it left. */
-const work = async (stage: Stage, claimedRun: Run): Promise<CardOutcome> => {
-  const { env } = stage
-  let run = claimedRun
-
-  const prepared = await prepare(stage, run)
-  if (!prepared) return { run: await getRun(env.db, run.id), result: null }
-  const { args, prompt } = await invocation(stage, run, prepared)
-  const settings = await getSettings(env.db)
-
-  let seq = 0
-  const logFile = run.log_path ?? join(env.dataDir, 'logs', 'runs', `${String(run.id)}.jsonl`)
-  const handle = spawnClaude({
-    bin: env.claudeBin,
-    args,
-    cwd: stage.dir,
-    env: stage.childEnvironment,
-    prompt,
-    secrets: [env.apiToken(), env.claudeToken() ?? ''].filter(Boolean),
-    timeoutMs: settings.stale_minutes * 60_000,
-    onLine: (line) => appendFile(logFile, `${line}\n`),
-    onEvent: async (event) => {
-      seq += 1
-      await addRunEvent(env.db, run.id, seq, event)
-    },
-  })
-  const entry = { ...handle, stoppedByUser: false }
-  env.handles.set(run.id, entry)
-  const result = await handle.result.finally(() => env.handles.delete(run.id))
-
-  run = await updateRun(env.db, run.id, {
+  return updateRun(ctx.env.db, ctx.run.id, {
+    status: stoppedByUser ? 'stopped' : 'stale',
     ended_at: new Date(),
-    num_turns: result.numTurns,
-    cost_usd: result.costUsd,
+  })
+}
+
+/** Keeps the step reachable by Stop while it goes. */
+const track = async <T>(ctx: Context, handle: { stop: () => void; result: Promise<T> }) => {
+  const entry: RunHandle = { stop: handle.stop, stoppedByUser: false }
+  ctx.env.handles.set(ctx.run.id, entry)
+  const result = await handle.result.finally(() => ctx.env.handles.delete(ctx.run.id))
+  return { result, stoppedByUser: entry.stoppedByUser }
+}
+
+const claudeArgs = async (ctx: Context, step: ClaudeStep, index: number) => {
+  const { env, project, card, dir, run } = ctx
+  const rules = await readFile(join(dir, '.claude-worker', 'prompt.md'), 'utf8').catch(() => null)
+  const mcp = await writeMcpConfig(env, project, dir, run.id)
+  const tools = toolLists(project, step, mcp.servers)
+  const model = step.model ?? project.model
+  return [
+    '-p',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--max-turns',
+    String(step.max_turns ?? project.max_turns),
+    '--allowedTools',
+    tools.allowed.join(','),
+    '--disallowedTools',
+    tools.denied.join(','),
+    '--mcp-config',
+    mcp.path,
+    '--strict-mcp-config',
+    ...(ctx.runDir.attachments.length > 0
+      ? [`--add-dir=${join(ctx.runDir.dir, 'attachments')}`]
+      : []),
+    '--append-system-prompt',
+    workerRules({
+      project,
+      cardId: card.id,
+      projectRules: rules,
+      attachmentsDir:
+        ctx.runDir.attachments.length > 0 ? join(ctx.runDir.dir, 'attachments') : null,
+      steps: ctx.steps,
+      index,
+    }),
+    ...(model ? ['--model', model] : []),
+  ]
+}
+
+/** Adds what this Claude step spent to the run (a playbook may have more than one). */
+const recordClaude = (ctx: Context, result: ClaudeResult) =>
+  updateRun(ctx.env.db, ctx.run.id, {
+    num_turns: (ctx.run.num_turns ?? 0) + (result.numTurns ?? 0),
+    cost_usd: (ctx.run.cost_usd ?? 0) + (result.costUsd ?? 0),
     usage: result.usage,
     session_id: result.sessionId,
     summary: result.summary,
@@ -625,14 +343,192 @@ const work = async (stage: Stage, claimedRun: Run): Promise<CardOutcome> => {
     error: result.error,
     error_kind: result.errorKind,
   })
-  const interrupted = await settleInterrupted(
-    stage,
-    run,
-    result,
-    entry.stoppedByUser,
-    settings.stale_minutes,
-  )
-  if (interrupted) return { run: interrupted, result }
 
-  return { run: await finish(stage, run, result), result }
+/** One `claude -p` on the card: it goes on only when Claude moved the card to done. */
+const claudeStep = async (ctx: Context, step: ClaudeStep, index: number): Promise<StepEnd> => {
+  const { env, card } = ctx
+  const full = await getCard(env.db, card.id)
+  const prompt = taskPrompt({
+    card,
+    comments: full.comments,
+    attachments: ctx.runDir.attachments,
+    previousRuns: (await previousRuns(env.db, card.id)).filter((r) => r.id !== ctx.run.id),
+    stepPrompt: step.prompt,
+  })
+  const handle = spawnClaude({
+    bin: env.claudeBin,
+    args: await claudeArgs(ctx, step, index),
+    cwd: ctx.dir,
+    env: ctx.childEnvironment,
+    prompt,
+    secrets: [env.apiToken(), env.claudeToken() ?? ''].filter(Boolean),
+    timeoutMs: ctx.staleMinutes * 60_000,
+    onLine: (line) => appendFile(ctx.logFile, `${line}\n`),
+    onEvent: async (event) => {
+      ctx.seq.value += 1
+      await addRunEvent(env.db, ctx.run.id, ctx.seq.value, event)
+    },
+  })
+  const { result, stoppedByUser } = await track(ctx, handle)
+  ctx.run = await recordClaude(ctx, result)
+  const interrupted = await settleInterrupted(ctx, result, stoppedByUser)
+  if (interrupted) return { interrupted, errorKind: result.errorKind }
+  if (result.errorKind === 'max_turns') return { failed: `Claude hit max_turns before finishing` }
+  if (result.errorKind)
+    return { failed: `Claude ended with an error: ${result.error ?? result.errorKind}` }
+  const [now] = await env.db.select().from(cards).where(eq(cards.id, card.id))
+  const status = now?.status ?? 'doing'
+  if (status === 'done') return { next: true }
+  if (status === 'doing') return { failed: 'Claude ended without moving the card' }
+  return { handed: true } // review, or todo with a question
 }
+
+/** A shell command in the project's directory, with the card in the environment. */
+const runStep = async (ctx: Context, step: RunStep): Promise<StepEnd> => {
+  const handle = spawnShell({
+    command: step.command,
+    cwd: ctx.dir,
+    env: {
+      ...ctx.childEnvironment,
+      KAMMACRON_CARD_ID: String(ctx.card.id),
+      KAMMACRON_CARD_TITLE: ctx.card.title,
+      KAMMACRON_CARD_FILE: ctx.runDir.cardFile,
+      KAMMACRON_RUN_ID: String(ctx.run.id),
+      KAMMACRON_PROJECT_DIR: ctx.dir,
+    },
+    timeoutMs: (step.timeout_minutes ?? 15) * 60_000,
+    secrets: [ctx.env.apiToken(), ctx.env.claudeToken() ?? ''].filter(Boolean),
+    onChunk: (text) =>
+      appendFile(ctx.logFile, `${JSON.stringify({ type: 'step', name: step.name, text })}\n`),
+  })
+  const { result, stoppedByUser } = await track(ctx, handle)
+  const printed = { output: result.output, exitCode: result.exitCode }
+  if (result.stopped && !result.timedOut)
+    return { interrupted: await stopRun(ctx, stoppedByUser), errorKind: 'stopped', ...printed }
+  if (result.timedOut)
+    return { failed: `timed out after ${String(step.timeout_minutes ?? 15)} minutes`, ...printed }
+  if (result.exitCode !== 0 && !step.continue_on_error)
+    return { failed: `exit ${String(result.exitCode)}`, ...printed }
+  return { next: true, ...printed }
+}
+
+/** A failed step: the card to review with the step's name and what it printed last. */
+const failCard = async (ctx: Context, step: PlaybookStep, reason: string, output?: string) => {
+  const { env, card, run, project } = ctx
+  const message = `step "${step.name}" failed: ${reason}`
+  if (output?.trim())
+    await addComment(env.db, card.id, {
+      author: 'claude-worker',
+      run_id: run.id,
+      body: `The playbook stopped at **${step.name}** (${reason}).\n\n\`\`\`\n${output.trim().slice(-3000)}\n\`\`\``,
+    })
+  await moveCard(env.db, card.id, { status: 'review', reason: message })
+  await env.notify(`#${String(card.id)} needs review`, `${project.name}: ${message}`)
+  return updateRun(env.db, run.id, {
+    status: 'failed',
+    ended_at: new Date(),
+    error: message,
+    error_kind: ctx.run.error_kind ?? 'step',
+  })
+}
+
+/** All steps passed: the card is done, whoever moved it there. */
+const succeed = async (ctx: Context) => {
+  const { env, card, run, steps } = ctx
+  const [now] = await env.db.select().from(cards).where(eq(cards.id, card.id))
+  if (now?.status === 'doing') {
+    await addComment(env.db, card.id, {
+      author: 'claude-worker',
+      run_id: run.id,
+      body: `The playbook passed: ${steps.map((s) => s.name).join(' → ')}.`,
+    })
+    await moveCard(env.db, card.id, { status: 'done' })
+  }
+  return updateRun(env.db, run.id, { status: 'succeeded', ended_at: new Date() })
+}
+
+/** A step as the run_steps table holds it. */
+const stepRow = (step: PlaybookStep, position: number) => ({
+  position,
+  kind: step.kind,
+  name: step.name,
+  command: step.kind === 'run' ? step.command : null,
+})
+
+/** A person has the card now (review, or a question): the rest of the playbook waits. */
+const handOver = async (ctx: Context) => {
+  const [now] = await ctx.env.db.select().from(cards).where(eq(cards.id, ctx.card.id))
+  const review = now?.status === 'review'
+  if (review)
+    await ctx.env.notify(
+      `#${String(ctx.card.id)} needs review`,
+      `${ctx.project.name}: ${ctx.card.title}`,
+    )
+  return updateRun(ctx.env.db, ctx.run.id, {
+    status: review ? 'review' : 'succeeded',
+    ended_at: new Date(),
+  })
+}
+
+/** The playbook, step by step, until one stops it. */
+const play = async (ctx: Context): Promise<CardOutcome> => {
+  const { env, steps } = ctx
+  for (const [index, step] of steps.entries()) {
+    const row = await startStep(env.db, { run_id: ctx.run.id, ...stepRow(step, index) })
+    const end =
+      step.kind === 'claude' ? await claudeStep(ctx, step, index) : await runStep(ctx, step)
+    const status = 'interrupted' in end ? 'stopped' : 'failed' in end ? 'failed' : 'succeeded'
+    await endStep(env.db, row.id, {
+      status,
+      exit_code: end.exitCode ?? null,
+      output: end.output ?? null,
+    })
+    if ('next' in end) continue
+    const rest = steps.slice(index + 1).map((s, i) => stepRow(s, index + 1 + i))
+    await skipSteps(env.db, ctx.run.id, rest)
+    if ('interrupted' in end) return { run: end.interrupted, errorKind: end.errorKind }
+    if ('failed' in end) return { run: await failCard(ctx, step, end.failed, end.output) }
+    return { run: await handOver(ctx) }
+  }
+  return { run: await succeed(ctx) }
+}
+
+/**
+ * One card, one run of the project's playbook, one row of `runs`. The directory is the project's
+ * own: kammacron neither prepares nor checks it; the steps (and the project's instructions) do.
+ */
+export const runCard = async (
+  env: WorkerEnv,
+  project: Project,
+  cardId: number,
+): Promise<CardOutcome> => {
+  const dir = project.repo_path
+  if (!dir) return { run: null, skipped: 'no directory' }
+  if (!(await isDir(dir))) return { run: null, skipped: `the directory ${dir} does not exist` }
+  const logDir = join(env.dataDir, 'logs', 'runs')
+  await mkdir(logDir, { recursive: true, mode: 0o700 })
+  const claimed = await claim(env, project, cardId, logDir)
+  if (!claimed) return { run: null, skipped: 'claimed by someone else' }
+  const { run, card } = claimed
+  const runDir = await prepareRunDir(env, run.id, card.id)
+  try {
+    return await play({
+      env,
+      project,
+      card,
+      dir,
+      run,
+      steps: project.playbook.length > 0 ? project.playbook : DEFAULT_PLAYBOOK,
+      runDir,
+      childEnvironment: await childEnv(env),
+      logFile: run.log_path ?? join(logDir, `${String(run.id)}.jsonl`),
+      staleMinutes: (await getSettings(env.db)).stale_minutes,
+      seq: { value: 0 },
+    })
+  } finally {
+    await rm(runDir.dir, { recursive: true, force: true })
+  }
+}
+
+const isDir = async (path: string) =>
+  (await Bun.spawn(['test', '-d', path], { stdout: 'ignore', stderr: 'ignore' }).exited) === 0

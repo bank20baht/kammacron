@@ -9,8 +9,10 @@ import { firstValueFrom } from 'rxjs'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { cost, duration, stamp } from '../../shared/format'
-import { RUN_TONE } from '../../shared/tones'
+import { RUN_TONE, STEP_TONE } from '../../shared/tones'
 import { runStatusLabel } from './runs.component'
+
+type StepStatus = 'running' | 'succeeded' | 'failed' | 'stopped' | 'skipped'
 
 const EVENT_TONE: Record<string, TimelineItem['tone']> = {
   assistant: 'primary',
@@ -49,6 +51,16 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
       margin: var(--baht-space-1) 0 0;
       font-size: var(--baht-text-lg);
       font-variant-numeric: tabular-nums;
+    }
+    .step {
+      display: flex;
+      flex-direction: column;
+      gap: var(--baht-space-2);
+      padding-block: var(--baht-space-3);
+      border-bottom: 1px solid var(--baht-color-border);
+    }
+    .muted {
+      color: var(--baht-color-text-muted);
     }
     .facts {
       display: grid;
@@ -101,7 +113,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
           <baht-badge
             [tone]="tone[r.status] ?? 'neutral'"
             [label]="runStatusLabel(t, r.status)"
-            [busy]="r.status === 'running' || r.status === 'verifying'"
+            [busy]="r.status === 'running'"
           ></baht-badge>
           @if (r.error_kind) {
             <baht-badge tone="danger" [label]="r.error_kind"></baht-badge>
@@ -131,16 +143,8 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
             <dd>{{ cost(r.cost_usd) }}</dd>
           </div>
           <div>
-            <dt>{{ t('run.branch') }}</dt>
-            <dd class="row">
-              {{ r.pushed_to ?? '—' }}
-              @if (r.pushed_to) {
-                <baht-copy-button
-                  [text]="r.pushed_to"
-                  [label]="t('common.copy')"
-                ></baht-copy-button>
-              }
-            </dd>
+            <dt>{{ t('run.steps') }}</dt>
+            <dd>{{ stepsDone() }}</dd>
           </div>
           <div>
             <dt>{{ t('run.started') }}</dt>
@@ -171,6 +175,37 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
         }
 
         <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="tab.set($any($event).value)">
+          <div data-tab="steps">
+            @for (s of r.steps; track s.id) {
+              <div class="step">
+                <div class="row">
+                  <baht-badge
+                    [tone]="stepTone[s.status] ?? 'neutral'"
+                    [label]="stepLabel(s.status)"
+                    [busy]="s.status === 'running'"
+                  ></baht-badge>
+                  <strong>{{ s.name }}</strong>
+                  <span class="muted">{{
+                    s.kind === 'claude' ? t('run.claudeStep') : t('run.runStep')
+                  }}</span>
+                  @if (s.exit_code !== null) {
+                    <span class="muted">{{ t('run.exit', { code: s.exit_code }) }}</span>
+                  }
+                  @if (s.started_at) {
+                    <span class="muted">{{ duration(s.started_at, s.ended_at) }}</span>
+                  }
+                </div>
+                @if (s.command) {
+                  <baht-code variant="block" [code]="s.command"></baht-code>
+                }
+                @if (s.output) {
+                  <baht-code variant="block" [code]="s.output"></baht-code>
+                }
+              </div>
+            } @empty {
+              <p>{{ t('run.noSteps') }}</p>
+            }
+          </div>
           <div data-tab="summary">
             @if (r.summary) {
               <baht-markdown-view [source]="r.summary"></baht-markdown-view>
@@ -180,9 +215,6 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
           </div>
           <div data-tab="events">
             <baht-timeline [items]="timeline()"></baht-timeline>
-          </div>
-          <div data-tab="verify">
-            <baht-code variant="block" [code]="r.verify_output ?? ''"></baht-code>
           </div>
         </baht-tabs>
 
@@ -196,26 +228,6 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
               <dt>{{ t('run.log') }}</dt>
               <dd><baht-code [code]="r.log_path ?? '—'"></baht-code></dd>
             </div>
-            <div>
-              <dt>{{ t('run.base') }}</dt>
-              <dd><baht-code [code]="r.base_sha ?? '—'"></baht-code></dd>
-            </div>
-            <div>
-              <dt>{{ t('run.commits') }}</dt>
-              <dd>
-                @for (c of r.commits; track c) {
-                  <baht-code [code]="c"></baht-code>
-                } @empty {
-                  —
-                }
-              </dd>
-            </div>
-            @if (r.revert_commit) {
-              <div>
-                <dt>{{ t('run.revertedIn') }}</dt>
-                <dd><baht-code [code]="r.revert_commit"></baht-code></dd>
-              </div>
-            }
           </dl>
         </baht-accordion>
       } @else if (run().error) {
@@ -244,7 +256,16 @@ export class RunComponent {
   protected readonly stamp = stamp
   protected readonly busy = signal(false)
   protected readonly error = signal<string | null>(null)
-  protected readonly tab = signal('summary')
+  protected readonly tab = signal('steps')
+  protected readonly duration = duration
+  protected readonly stepTone = STEP_TONE
+  protected readonly stepLabel = (status: StepStatus) => this.t(`status.step.${status}`)
+
+  protected readonly stepsDone = computed(() => {
+    const steps = this.run().data?.steps ?? []
+    const done = steps.filter((s) => s.status === 'succeeded').length
+    return steps.length ? `${String(done)} / ${String(steps.length)}` : '—'
+  })
 
   protected readonly crumbs = computed<Crumb[]>(() => [
     { label: this.t('run.runs') }, // no href: `baht-navigate`, so the router moves without a reload
@@ -259,9 +280,9 @@ export class RunComponent {
   protected readonly tabs = computed<TabItem[]>(() => {
     const r = this.run().data
     return [
+      { key: 'steps', label: this.t('run.tab.steps'), badge: String(r?.steps.length ?? 0) },
       { key: 'summary', label: this.t('run.tab.summary') },
       { key: 'events', label: this.t('run.tab.events'), badge: String(r?.events.length ?? 0) },
-      ...(r?.verify_output ? [{ key: 'verify', label: this.t('run.tab.verify') }] : []),
     ]
   })
 

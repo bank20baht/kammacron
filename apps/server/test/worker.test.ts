@@ -5,12 +5,11 @@ import { join } from 'node:path'
 
 import { eq } from 'drizzle-orm'
 
-import { cards, projects, settings } from '../src/db/schema'
+import { cards, projects, settings, type PlaybookStep } from '../src/db/schema'
 import { listAlerts } from '../src/services/alerts'
 import { getCard, type Card } from '../src/services/cards'
 import { getProject } from '../src/services/projects'
 import { getRunWithEvents } from '../src/services/runs'
-import { approveCard } from '../src/worker/approve'
 import { exec } from '../src/worker/git'
 import { runCard } from '../src/worker/runner'
 import { createScheduler } from '../src/worker/scheduler'
@@ -72,7 +71,6 @@ beforeEach(async () => {
     name: 'Demo',
     repo_path: repo,
     worker_enabled: true,
-    use_worktree: true,
   })
   projectId = project.id
 })
@@ -95,45 +93,52 @@ const run = async (scenario: string, cardId: number) => {
   return runCard(t.ctx.worker, await getProject(t.ctx.db, projectId), cardId)
 }
 
-describe('a run', () => {
-  test('push: the commit reaches main, the card is done, events and comments are kept', async () => {
+const playbook = (steps: PlaybookStep[]) =>
+  t.ctx.db.update(projects).set({ playbook: steps }).where(eq(projects.id, projectId))
+
+const stepsOf = async (runId: number) =>
+  (await getRunWithEvents(t.ctx.db, runId)).steps.map((s) => [s.name, s.status])
+
+describe('the default playbook: one Claude step', () => {
+  test('Claude does the work its own way (here: commit and push); the card is done', async () => {
     const card = await newCard()
     const { run: r } = await run('push', card.id)
     const done = await getCard(t.ctx.db, card.id)
     expect(done.status).toBe('done')
     expect(must(r).status).toBe('succeeded')
-    expect(must(r).pushed_to).toBe('main')
-    expect(must(r).commits).toHaveLength(1)
     expect(await remoteHas('main', 'fixed.txt')).toBe(true)
     expect(done.comments.map((c) => [c.author, c.run_id])).toEqual([['claude-worker', must(r).id]])
     const withEvents = await getRunWithEvents(t.ctx.db, must(r).id)
     expect(withEvents.events.map((e) => e.type)).toContain('tool_use')
     expect(withEvents.summary).toBe(`DONE card=#${String(card.id)}`)
+    expect(withEvents.steps.map((s) => [s.kind, s.status])).toEqual([['claude', 'succeeded']])
   })
 
-  test('branch: work on claude/<card>, the card in review with its reason and branch', async () => {
+  test('the directory is left as it is: no branch made, uncommitted work untouched', async () => {
+    await Bun.write(join(repo, 'README.md'), '# mine, half done\n')
     const card = await newCard()
-    const { run: r } = await run('branch', card.id)
+    const { run: r } = await run('done', card.id)
+    expect(must(r).status).toBe('succeeded')
+    expect(await Bun.file(join(repo, 'README.md')).text()).toBe('# mine, half done\n')
+    expect(await git(repo, 'branch', '--format=%(refname:short)')).toBe('main')
+    expect(await Bun.file(join(repo, '.kammacron')).exists()).toBe(false)
+  })
+
+  test('Claude hands the card to a person: review, and the run says so', async () => {
+    const card = await newCard()
+    const { run: r } = await run('review', card.id)
     const after = await getCard(t.ctx.db, card.id)
-    expect(after.status).toBe('review')
-    expect(after.review_reason).toBe('pre-push failed twice')
-    expect(after.branch).toBe(`claude/${String(card.id)}`)
-    expect(must(r).pushed_to).toBe(`claude/${String(card.id)}`)
-    expect(await remoteHas('main', 'wip.txt')).toBe(false)
+    expect([after.status, after.review_reason]).toEqual(['review', 'needs a person'])
+    expect(must(r).status).toBe('review')
   })
 
   test('a run that ends without moving the card sends it to review', async () => {
     const card = await newCard()
-    await run('silent', card.id)
+    const { run: r } = await run('silent', card.id)
     const after = await getCard(t.ctx.db, card.id)
     expect(after.status).toBe('review')
     expect(after.review_reason).toContain('without moving the card')
-  })
-
-  test('done without the commits on main goes to review instead', async () => {
-    const card = await newCard()
-    await run('done-without-push', card.id)
-    expect((await getCard(t.ctx.db, card.id)).review_reason).toContain('not on origin/main')
+    expect(must(r).status).toBe('failed')
   })
 
   test('a bad token pauses everything and gives the card back untouched', async () => {
@@ -155,13 +160,6 @@ describe('a run', () => {
     expect(must(project.next_run_at).getTime()).toBeGreaterThan(Date.now() + 55 * 60_000)
   })
 
-  test('a push to a ref outside default and claude/* pauses the project', async () => {
-    const card = await newCard()
-    await run('evil', card.id)
-    const project = await getProject(t.ctx.db, projectId)
-    expect(project.paused_reason).toContain('somewhere-else')
-  })
-
   test('stop: the process is killed and the card returns to todo, counted', async () => {
     const card = await newCard()
     const scheduler = createScheduler(t.ctx.worker)
@@ -175,87 +173,150 @@ describe('a run', () => {
     const after = await getCard(t.ctx.db, card.id)
     expect([after.status, after.stale_count]).toEqual(['todo', 1])
   })
-})
 
-describe('verify and revert', () => {
-  test('verify fails on what was pushed: reverted on main, work kept on claude/<card>, card in review', async () => {
+  test('a directory that is gone: the round skips, the card is not claimed', async () => {
     await t.ctx.db
       .update(projects)
-      .set({ verify_command: 'test ! -f broken' })
+      .set({ repo_path: join(root, 'nope') })
       .where(eq(projects.id, projectId))
     const card = await newCard()
-    const { run: r } = await run('breaks', card.id)
-    expect(must(r).status).toBe('reverted')
-    expect(await remoteHas('main', 'broken')).toBe(false)
-    expect(await remoteHas(`claude/${String(card.id)}`, 'broken')).toBe(true)
-    const after = await getCard(t.ctx.db, card.id)
-    expect(after.status).toBe('review')
-    expect(after.review_reason).toContain('reverted')
-    const log = await git(repo, '--git-dir', remote, 'log', '--format=%s', 'main')
-    expect(log.split('\n')[0]).toContain(`revert: card #${String(card.id)}`)
-  })
-
-  test('verify that already failed before the run: nothing reverted, the project paused', async () => {
-    await t.ctx.db
-      .update(projects)
-      .set({ verify_command: 'false' })
-      .where(eq(projects.id, projectId))
-    const card = await newCard()
-    const { run: r } = await run('push', card.id)
-    expect(must(r).status).toBe('failed')
-    expect(await remoteHas('main', 'fixed.txt')).toBe(true)
-    expect((await getProject(t.ctx.db, projectId)).paused_reason).toContain('before run')
+    const outcome = await run('done', card.id)
+    expect(outcome.run).toBeNull()
+    expect(outcome.skipped).toContain('does not exist')
+    expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
   })
 })
 
-describe('the diff gate', () => {
-  test('a small change on claude/<card> passes and kammacron pushes it to main', async () => {
-    await t.ctx.db.update(projects).set({ max_diff_lines: 50 }).where(eq(projects.id, projectId))
+describe('a playbook of steps', () => {
+  test('run steps around Claude: in the directory, with the card in the environment', async () => {
+    await playbook([
+      {
+        kind: 'run',
+        name: 'Read the card',
+        command: 'echo "$KAMMACRON_CARD_TITLE"; head -1 "$KAMMACRON_CARD_FILE"',
+      },
+      { kind: 'claude', name: 'Claude' },
+      { kind: 'run', name: 'Where', command: 'pwd' },
+    ])
+    const card = await newCard('ship the thing')
+    const { run: r } = await run('done', card.id)
+    expect(must(r).status).toBe('succeeded')
+    const steps = (await getRunWithEvents(t.ctx.db, must(r).id)).steps
+    expect(steps.map((s) => [s.name, s.status, s.exit_code])).toEqual([
+      ['Read the card', 'succeeded', 0],
+      ['Claude', 'succeeded', null],
+      ['Where', 'succeeded', 0],
+    ])
+    expect(steps[0]?.output).toBe(`ship the thing\n# #${String(card.id)} ship the thing\n`)
+    expect(steps[2]?.output?.trim()).toEndWith('repo')
+    expect((await getCard(t.ctx.db, card.id)).status).toBe('done')
+    // the run's folder (card file, attachments) is gone afterwards
+    expect(await Bun.file(join(t.dataDir, 'runs', String(must(r).id), 'card.md')).exists()).toBe(
+      false,
+    )
+  })
+
+  test('without a Claude step: the commands alone, and the card is done when they pass', async () => {
+    await playbook([{ kind: 'run', name: 'Test', command: 'true' }])
     const card = await newCard()
-    const { run: r } = await run('gated', card.id)
-    expect(must(r).pushed_to).toBe('main')
-    expect(await remoteHas('main', 'fixed.txt')).toBe(true)
+    const { run: r } = await run('sleep', card.id)
+    expect(must(r).status).toBe('succeeded')
     const after = await getCard(t.ctx.db, card.id)
     expect(after.status).toBe('done')
-    expect(after.comments.at(-1)?.body).toContain('Passed the gate')
+    expect(after.comments.at(-1)?.body).toContain('The playbook passed: Test')
   })
 
-  test('a protected path holds the card in review; main is untouched', async () => {
-    await t.ctx.db
-      .update(projects)
-      .set({ protected_paths: ['migrations/**'] })
-      .where(eq(projects.id, projectId))
+  test('a step that fails stops the playbook: review, its output in a comment, the rest skipped', async () => {
+    await playbook([
+      { kind: 'claude', name: 'Claude' },
+      { kind: 'run', name: 'Test', command: 'echo "2 tests failed" >&2; exit 3' },
+      { kind: 'run', name: 'Deploy', command: 'touch deployed' },
+    ])
     const card = await newCard()
-    await run('gated-protected', card.id)
+    const { run: r } = await run('done', card.id)
+    expect(must(r).status).toBe('failed')
+    expect(must(r).error).toBe('step "Test" failed: exit 3')
+    expect(await stepsOf(must(r).id)).toEqual([
+      ['Claude', 'succeeded'],
+      ['Test', 'failed'],
+      ['Deploy', 'skipped'],
+    ])
     const after = await getCard(t.ctx.db, card.id)
     expect(after.status).toBe('review')
-    expect(after.review_reason).toContain('migrations/0001.sql')
-    expect(await remoteHas('main', 'migrations/0001.sql')).toBe(false)
+    expect(after.review_reason).toBe('step "Test" failed: exit 3')
+    expect(after.comments.at(-1)?.body).toContain('2 tests failed')
+    expect(await Bun.file(join(repo, 'deployed')).exists()).toBe(false)
   })
 
-  test('with a gate, Claude may not push to main itself', async () => {
-    await t.ctx.db.update(projects).set({ max_diff_lines: 50 }).where(eq(projects.id, projectId))
-    const { toolLists } = await import('../src/worker/runner')
-    const project = await getProject(t.ctx.db, projectId)
-    expect(toolLists(project, 'main', 1, []).allowed).not.toContain(
-      'Bash(git push origin HEAD:main)',
-    )
+  test('continue_on_error: a failing step is noted and the playbook goes on', async () => {
+    await playbook([
+      { kind: 'run', name: 'Lint', command: 'exit 1', continue_on_error: true },
+      { kind: 'run', name: 'Deploy', command: 'touch deployed' },
+    ])
+    const card = await newCard()
+    const { run: r } = await run('done', card.id)
+    expect(must(r).status).toBe('succeeded')
+    expect(await Bun.file(join(repo, 'deployed')).exists()).toBe(true)
+  })
+
+  test('when Claude hands the card over, the later steps wait', async () => {
+    await playbook([
+      { kind: 'claude', name: 'Claude' },
+      { kind: 'run', name: 'Deploy', command: 'touch deployed' },
+    ])
+    const card = await newCard()
+    const { run: r } = await run('review', card.id)
+    expect(must(r).status).toBe('review')
+    expect(await stepsOf(must(r).id)).toEqual([
+      ['Claude', 'succeeded'],
+      ['Deploy', 'skipped'],
+    ])
+    expect(await Bun.file(join(repo, 'deployed')).exists()).toBe(false)
+  })
+
+  test('stop reaches a run step too, and what it started', async () => {
+    await playbook([{ kind: 'run', name: 'Long', command: 'sleep 30; touch late' }])
+    const card = await newCard()
+    const scheduler = createScheduler(t.ctx.worker)
+    const started = Date.now()
+    const pending = run('done', card.id)
+    while (t.ctx.worker.handles.size === 0) await Bun.sleep(20)
+    expect(scheduler.stopRun(must([...t.ctx.worker.handles.keys()][0]))).toBe(true)
+    const { run: r } = await pending
+    expect(Date.now() - started).toBeLessThan(5000)
+    expect(must(r).status).toBe('stopped')
+    expect(await stepsOf(must(r).id)).toEqual([['Long', 'stopped']])
+    expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
+  })
+
+  test('the Claude step is told the steps around it', async () => {
+    const { workerRules } = await import('../src/worker/prompt')
+    const steps: PlaybookStep[] = [
+      { kind: 'claude', name: 'Claude' },
+      { kind: 'run', name: 'Deploy', command: "ssh app './deploy.sh'" },
+    ]
+    const rules = workerRules({
+      project: await getProject(t.ctx.db, projectId),
+      cardId: 1,
+      projectRules: null,
+      attachmentsDir: null,
+      steps,
+      index: 0,
+    })
+    expect(rules).toContain('step 1 of 2')
+    expect(rules).toContain("- Deploy: `ssh app './deploy.sh'`")
   })
 })
 
 describe('approve', () => {
-  test('rebases claude/<card> onto main and pushes it', async () => {
+  test('a card in review is done; nothing is merged or pushed', async () => {
     const card = await newCard()
-    await run('branch', card.id)
-    // main moves on meanwhile
-    await Bun.write(join(repo, 'other.txt'), 'someone else\n')
-    await git(repo, 'add', 'other.txt')
-    await git(repo, 'commit', '-qm', 'other work')
-    await git(repo, 'push', '-q', 'origin', 'main')
-    const approved = await approveCard(t.ctx.worker, card.id)
+    await run('review', card.id)
+    const approved = await t.json<{ status: string }>(
+      'POST',
+      `/api/cards/${String(card.id)}/approve`,
+    )
     expect(approved.status).toBe('done')
-    expect(await remoteHas('main', 'wip.txt')).toBe(true)
-    expect(await remoteHas('main', 'other.txt')).toBe(true)
   })
 })
 
@@ -275,70 +336,12 @@ describe('the scheduler', () => {
     expect(project.last_check_result).toBe('no cards')
     expect(must(project.next_run_at).getTime()).toBeGreaterThan(Date.now())
   })
-})
-
-describe('working in the directory itself (no worktree)', () => {
-  const direct = () =>
-    t.json('PATCH', `/api/projects/${String(projectId)}`, { use_worktree: false })
-  const head = () => git(repo, 'branch', '--show-current')
-
-  test('push: ships to the branch the directory is on and leaves it there, moved up', async () => {
-    await direct()
-    const card = await newCard()
-    const { run: r } = await run('push', card.id)
-    expect(must(r).status).toBe('succeeded')
-    expect(must(r).pushed_to).toBe('main')
-    expect(await remoteHas('main', 'fixed.txt')).toBe(true)
-    expect(await head()).toBe('main')
-    expect(await Bun.file(join(repo, 'fixed.txt')).exists()).toBe(true)
-    expect(await git(repo, 'status', '--porcelain')).toBe('')
-    expect(await Bun.file(join(t.dataDir, 'worktrees', 'demo', '.git')).exists()).toBe(false)
-  })
-
-  test('the branch is whatever the directory is on, not the default', async () => {
-    await direct()
-    await git(repo, 'checkout', '-qb', 'feature')
-    await git(repo, 'push', '-q', 'origin', 'feature')
-    const card = await newCard()
-    const { run: r } = await run('push', card.id)
-    expect(must(r).pushed_to).toBe('feature')
-    expect(await remoteHas('feature', 'fixed.txt')).toBe(true)
-    expect(await remoteHas('main', 'fixed.txt')).toBe(false)
-    expect(await head()).toBe('feature')
-  })
-
-  test('branch policy: the card waits in review and the directory is back on its branch', async () => {
-    await direct()
-    const card = await newCard()
-    await run('branch', card.id)
-    expect((await getCard(t.ctx.db, card.id)).status).toBe('review')
-    expect(await head()).toBe('main')
-    expect(await Bun.file(join(repo, 'wip.txt')).exists()).toBe(false)
-  })
-
-  test('uncommitted changes: the card is not touched, and neither are they', async () => {
-    await direct()
-    await Bun.write(join(repo, 'README.md'), '# mine, half done\n')
-    const card = await newCard()
-    const outcome = await run('push', card.id)
-    expect(outcome.run).toBeNull()
-    expect(outcome.skipped).toContain('uncommitted changes')
-    expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
-    expect(await Bun.file(join(repo, 'README.md')).text()).toBe('# mine, half done\n')
-  })
-
-  test('commits not on origin yet: skipped, so a push never carries them along', async () => {
-    await direct()
-    await Bun.write(join(repo, 'local.txt'), 'not pushed\n')
-    await git(repo, 'add', 'local.txt')
-    await git(repo, 'commit', '-qm', 'local only')
-    const outcome = await run('push', (await newCard()).id)
-    expect(outcome.skipped).toContain('1 commit not on origin')
-  })
 
   test('a round that skips says why, and alerts once while it stays so', async () => {
-    await direct()
-    await Bun.write(join(repo, 'README.md'), '# dirty\n')
+    await t.ctx.db
+      .update(projects)
+      .set({ repo_path: join(root, 'gone') })
+      .where(eq(projects.id, projectId))
     await newCard()
     const scheduler = createScheduler(t.ctx.worker)
     for (let i = 0; i < 2; i++) {
@@ -346,28 +349,19 @@ describe('working in the directory itself (no worktree)', () => {
       await scheduler.idle()
     }
     const project = await getProject(t.ctx.db, projectId)
-    expect(project.last_check_result).toBe('skipped: the directory has uncommitted changes on main')
+    expect(project.last_check_result).toBe(
+      `skipped: the directory ${join(root, 'gone')} does not exist`,
+    )
     const skips = (await listAlerts(t.ctx.db)).filter((a) => a.message.includes('round skipped'))
     expect(skips).toHaveLength(1)
   })
+})
 
+describe('the board', () => {
   test('GET /projects/:id/git: the branch, uncommitted changes, ahead and behind', async () => {
-    await direct()
-    type LocalGit = {
-      branch: string
-      dirty: boolean
-      ahead: number
-      behind: number
-      use_worktree: boolean
-    }
+    type LocalGit = { branch: string; dirty: boolean; ahead: number; behind: number }
     const clean = await t.json<LocalGit>('GET', `/api/projects/${String(projectId)}/git`)
-    expect(clean).toEqual({
-      branch: 'main',
-      dirty: false,
-      ahead: 0,
-      behind: 0,
-      use_worktree: false,
-    })
+    expect(clean).toEqual({ branch: 'main', dirty: false, ahead: 0, behind: 0 })
     await Bun.write(join(repo, 'new.txt'), 'x\n')
     const dirty = await t.json<LocalGit>('GET', `/api/projects/${String(projectId)}/git`)
     expect(dirty.dirty).toBe(true)

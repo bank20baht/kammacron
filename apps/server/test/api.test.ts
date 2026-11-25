@@ -220,7 +220,6 @@ describe('runs search', () => {
       await createRun(t.ctx.db, {
         project_id: projectId,
         card_id: card.id,
-        base_sha: null,
         log_path: null,
       })
     const found = await t.json<{ rows: { card_id: number }[]; total: number }>(
@@ -256,7 +255,6 @@ describe('calendar', () => {
     await createRun(t.ctx.db, {
       project_id: projectId,
       card_id: must(card).id,
-      base_sha: null,
       log_path: null,
     })
     const from = new Date(Date.now() - 86_400_000).toISOString()

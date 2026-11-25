@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm'
+import { and, eq, isNull, lte, or } from 'drizzle-orm'
 
 import { cards, projects, runs, schedules } from '../db/schema'
 import { addAlert } from '../services/alerts'
@@ -12,9 +12,8 @@ import { getProject, type Project } from '../services/projects'
 import { markInterruptedRuns, pruneRunEvents } from '../services/runs'
 import { getSettings } from '../services/settings'
 import { childEnv, type WorkerEnv } from './env'
-import { exec, gitIn, type Git } from './git'
+import { exec } from './git'
 import { runCard } from './runner'
-import { ensureWorktree, targetBranch, worktreeDir } from './workspace'
 
 const TICK_MS = 30_000
 
@@ -57,7 +56,7 @@ export const createScheduler = (env: WorkerEnv) => {
         await env.db
           .update(runs)
           .set({ status: 'stale', ended_at: new Date() })
-          .where(and(eq(runs.id, runId), inArray(runs.status, ['running', 'verifying'])))
+          .where(and(eq(runs.id, runId), eq(runs.status, 'running')))
       if (staleCount >= 2)
         await moveCard(env.db, card.id, {
           status: 'review',
@@ -77,7 +76,7 @@ export const createScheduler = (env: WorkerEnv) => {
 
   /**
    * Up to max cards, one at a time: how many ran, and why the round stopped short of a card it
-   * had (a dirty directory, no default branch); null when it must end without rescheduling.
+   * had (the directory is gone); null when it must end without rescheduling.
    */
   const runCards = async (project: Project) => {
     let done = 0
@@ -88,7 +87,7 @@ export const createScheduler = (env: WorkerEnv) => {
       const [card] = await pickableCards(env.db, project.id, 1)
       if (!card) break
       const outcome = await runCard(env, fresh, card.id)
-      const kind = outcome.result?.errorKind
+      const kind = outcome.errorKind
       if (kind === 'auth' || kind === 'rate_limit') return null
       if (outcome.skipped && outcome.skipped !== 'claimed by someone else')
         return { done, skipped: outcome.skipped }
@@ -130,22 +129,6 @@ export const createScheduler = (env: WorkerEnv) => {
       .where(eq(projects.id, project.id))
   }
 
-  /**
-   * Where a project's schedules run: in its worktree, reset to what origin has before each; in
-   * the directory itself, as it is (never touched). Null when there is no branch to go by.
-   */
-  const scheduleDir = async (project: Project, repo: Git) => {
-    const branch = await targetBranch(project, repo)
-    if (!branch) return null
-    if (!project.use_worktree) return { wt: repo, reset: () => Promise.resolve() }
-    const wt = await ensureWorktree(repo, worktreeDir(env, project), branch)
-    const reset = async () => {
-      await wt.out('fetch', 'origin', '--prune')
-      await wt.out('checkout', '-f', '--detach', `origin/${branch}`)
-    }
-    return { wt, reset }
-  }
-
   /** Schedules of a project that are due: a failing command opens (or comments on) a card. */
   const runSchedules = async (project: Project) => {
     const due = await env.db
@@ -160,13 +143,10 @@ export const createScheduler = (env: WorkerEnv) => {
       )
     if (due.length === 0 || !project.repo_path) return
     const childEnvironment = await childEnv(env)
-    const place = await scheduleDir(project, gitIn(project.repo_path, childEnvironment))
-    if (!place) return
-    const { wt } = place
+    // in the directory as it is: kammacron never resets or switches it
     for (const schedule of due) {
-      await place.reset()
       const r = await exec(['sh', '-c', schedule.command], {
-        cwd: wt.cwd,
+        cwd: project.repo_path,
         env: childEnvironment,
         timeoutMs: 30 * 60_000,
       })
@@ -316,7 +296,7 @@ export const createScheduler = (env: WorkerEnv) => {
       const running = await env.db
         .select({ run_id: runs.id, project_id: runs.project_id, card_id: runs.card_id })
         .from(runs)
-        .where(inArray(runs.status, ['running', 'verifying']))
+        .where(eq(runs.status, 'running'))
       return {
         running,
         queued: [...queue],

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Stands in for `claude -p` in the worker tests: reads the prompt, does what FAKE_SCENARIO says
- * in the worktree (commit, push, call kammacron's MCP), and prints stream-json like the real one.
+ * in the project directory (commit, push, call kammacron's MCP), and prints stream-json like the real one.
  */
 import { readFileSync } from 'node:fs'
 
@@ -9,7 +9,6 @@ const args = process.argv.slice(2)
 const prompt = await new Response(Bun.stdin.stream()).text()
 const cardId = Number(/# Card #(\d+)/.exec(prompt)?.[1])
 const scenario = process.env['FAKE_SCENARIO'] ?? 'push'
-const branch = /default branch: (\S+)/.exec(prompt)?.[1] ?? 'main'
 const mcpPath = args[args.indexOf('--mcp-config') + 1] ?? ''
 const mcp = (
   JSON.parse(readFileSync(mcpPath, 'utf8')) as {
@@ -96,51 +95,21 @@ out({
 switch (scenario) {
   case 'push':
     await commit('fixed.txt', `fixed ${String(cardId)}\n`)
-    sh(['git', 'push', 'origin', `HEAD:${branch}`])
+    sh(['git', 'push', 'origin', 'HEAD:main'])
     await tool('add_comment', { id: String(cardId), body: 'pushed the fix' })
     await tool('move_card', { id: String(cardId), status: 'done' })
     result()
     break
-  case 'breaks':
-    await commit('broken', 'this file makes verify fail\n')
-    sh(['git', 'push', 'origin', `HEAD:${branch}`])
+  case 'done':
+    await tool('add_comment', { id: String(cardId), body: 'did it' })
     await tool('move_card', { id: String(cardId), status: 'done' })
     result()
     break
-  case 'branch':
-    await commit('wip.txt', 'needs a person\n')
-    sh(['git', 'push', 'origin', `HEAD:claude/${String(cardId)}`])
-    await tool('move_card', {
-      id: String(cardId),
-      status: 'review',
-      reason: 'pre-push failed twice',
-    })
-    result()
-    break
-  case 'gated':
-    await commit('fixed.txt', `fixed ${String(cardId)}\n`)
-    sh(['git', 'push', 'origin', `HEAD:claude/${String(cardId)}`])
-    await tool('move_card', { id: String(cardId), status: 'done' })
-    result()
-    break
-  case 'gated-protected':
-    await commit('migrations/0001.sql', 'drop table users;\n')
-    sh(['git', 'push', 'origin', `HEAD:claude/${String(cardId)}`])
-    await tool('move_card', { id: String(cardId), status: 'done' })
-    result()
-    break
-  case 'done-without-push':
-    await commit('local.txt', 'never pushed\n')
-    await tool('move_card', { id: String(cardId), status: 'done' })
+  case 'review':
+    await tool('move_card', { id: String(cardId), status: 'review', reason: 'needs a person' })
     result()
     break
   case 'silent':
-    result()
-    break
-  case 'evil':
-    await commit('evil.txt', 'pushed where it may not\n')
-    sh(['git', 'push', 'origin', 'HEAD:refs/heads/somewhere-else'])
-    await tool('move_card', { id: String(cardId), status: 'done' })
     result()
     break
   case 'auth':

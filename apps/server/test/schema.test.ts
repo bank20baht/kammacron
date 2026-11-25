@@ -23,16 +23,36 @@ describe('optional choices stay unset when not sent', () => {
     expect(all.map((c) => c.status).sort()).toEqual(['review', 'todo'])
   })
 
-  test('a PATCH without mode or ship_policy leaves them', async () => {
-    await t.json('POST', '/api/projects', {
-      slug: 'p',
-      name: 'P',
-      mode: 'autopilot',
-      ship_policy: 'push',
-    })
-    const after = await t.json<{ mode: string; ship_policy: string }>('PATCH', '/api/projects/1', {
+  test('a PATCH without mode or playbook leaves them; a new project has the one Claude step', async () => {
+    await t.json('POST', '/api/projects', { slug: 'p', name: 'P', mode: 'watch' })
+    const after = await t.json<{ mode: string; playbook: unknown }>('PATCH', '/api/projects/1', {
       name: 'Q',
     })
-    expect([after.mode, after.ship_policy]).toEqual(['autopilot', 'push'])
+    expect(after.mode).toBe('watch')
+    expect(after.playbook).toEqual([{ kind: 'claude', name: 'Claude' }])
+  })
+
+  test('a playbook is checked: steps of a known kind, with what each needs', async () => {
+    await t.json('POST', '/api/projects', { slug: 'p', name: 'P' })
+    const good = [
+      { kind: 'run', name: 'Install', command: 'bun install' },
+      { kind: 'claude', name: 'Claude', max_turns: 40 },
+      { kind: 'run', name: 'Deploy', command: "ssh app './deploy.sh'", timeout_minutes: 10 },
+    ]
+    const saved = await t.json<{ playbook: unknown }>('PATCH', '/api/projects/1', {
+      playbook: good,
+    })
+    expect(saved.playbook).toEqual(good)
+    for (const bad of [
+      [],
+      [{ kind: 'run', name: 'No command' }],
+      [{ kind: 'shell', name: 'x', command: 'ls' }],
+    ])
+      expect((await t.call('PATCH', '/api/projects/1', { playbook: bad })).status).toBe(422)
+    // a key no step has is dropped, not kept
+    const stripped = await t.json<{ playbook: unknown }>('PATCH', '/api/projects/1', {
+      playbook: [{ kind: 'claude', name: 'x', surprise: true }],
+    })
+    expect(stripped.playbook).toEqual([{ kind: 'claude', name: 'x' }])
   })
 })

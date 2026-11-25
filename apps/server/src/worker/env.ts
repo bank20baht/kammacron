@@ -1,6 +1,8 @@
 import type { Db } from '../db'
 import { getSettings } from '../services/settings'
-import type { ClaudeHandle } from './claude'
+
+/** What Stop reaches of the step a run is in: `claude -p` or a shell command. */
+export type RunHandle = { stop: () => void; stoppedByUser: boolean }
 
 export type WorkerEnv = {
   db: Db
@@ -12,8 +14,8 @@ export type WorkerEnv = {
   /** The `claude` executable. */
   claudeBin: string
   notify: (title: string, message: string) => Promise<void>
-  /** Runs in flight, so Stop can reach them. */
-  handles: Map<number, ClaudeHandle & { stoppedByUser: boolean }>
+  /** Runs in flight (the step going now), so Stop can reach them. */
+  handles: Map<number, RunHandle>
 }
 
 /** The process environment of everything the worker starts: no API key, the saved PATH. */
@@ -46,5 +48,3 @@ export const childEnv = async (env: WorkerEnv) => {
   base['GIT_TERMINAL_PROMPT'] = '0'
   return base
 }
-
-export const cardBranch = (cardId: number) => `claude/${String(cardId)}`

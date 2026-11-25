@@ -48,6 +48,27 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
       font-size: var(--baht-text-lg);
       font-variant-numeric: tabular-nums;
     }
+    .facts {
+      display: grid;
+      grid-template-columns: max-content minmax(0, 1fr);
+      gap: var(--baht-space-2) var(--baht-space-4);
+      margin: 0;
+    }
+    .facts > div {
+      display: contents;
+    }
+    .facts dt {
+      color: var(--baht-color-text-muted);
+      font-size: var(--baht-text-sm);
+    }
+    .facts dd {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--baht-space-1);
+      min-width: 0;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
     .denied {
       display: flex;
       flex-direction: column;
@@ -161,7 +182,38 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
           </div>
         </baht-tabs>
 
-        <baht-accordion [items]="technical()"></baht-accordion>
+        <baht-accordion [items]="technical">
+          <dl class="facts" data-panel="technical">
+            <div>
+              <dt>Session</dt>
+              <dd><baht-code [code]="r.session_id ?? '—'"></baht-code></dd>
+            </div>
+            <div>
+              <dt>Log</dt>
+              <dd><baht-code [code]="r.log_path ?? '—'"></baht-code></dd>
+            </div>
+            <div>
+              <dt>Base</dt>
+              <dd><baht-code [code]="r.base_sha ?? '—'"></baht-code></dd>
+            </div>
+            <div>
+              <dt>Commits</dt>
+              <dd>
+                @for (c of r.commits; track c) {
+                  <baht-code [code]="c"></baht-code>
+                } @empty {
+                  —
+                }
+              </dd>
+            </div>
+            @if (r.revert_commit) {
+              <div>
+                <dt>Reverted in</dt>
+                <dd><baht-code [code]="r.revert_commit"></baht-code></dd>
+              </div>
+            }
+          </dl>
+        </baht-accordion>
       } @else if (run().error) {
         <baht-error-state
           heading="This run did not load"
@@ -207,18 +259,7 @@ export class RunComponent {
     ]
   })
 
-  protected readonly technical = computed<AccordionItem[]>(() => {
-    const r = this.run().data
-    if (!r) return []
-    const lines = [
-      `Session: ${r.session_id ?? '—'}`,
-      `Log: ${r.log_path ?? '—'}`,
-      `Commits: ${r.commits.join(', ') || '—'}`,
-      ...(r.revert_commit ? [`Reverted in: ${r.revert_commit}`] : []),
-      `Base: ${r.base_sha ?? '—'}`,
-    ]
-    return [{ title: 'Technical details', content: lines.join('\n') }]
-  })
+  protected readonly technical: AccordionItem[] = [{ key: 'technical', title: 'Technical details' }]
 
   protected readonly denials = computed(() =>
     (

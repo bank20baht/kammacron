@@ -38,12 +38,6 @@ const WEEK_COLUMNS: ColumnMap = {
       grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
       gap: var(--baht-space-4);
     }
-    .money {
-      margin: 0;
-      font-size: var(--baht-text-2xl);
-      font-weight: var(--baht-font-weight-label);
-      font-variant-numeric: tabular-nums;
-    }
     .muted {
       margin: 0;
       color: var(--baht-color-text-muted);
@@ -77,9 +71,12 @@ const WEEK_COLUMNS: ColumnMap = {
             <p class="muted">{{ s.total.review }} of {{ s.total.runs }}</p>
           </baht-card>
           <baht-card>
-            <!-- baht-stat formats currency without cents (LIB_GAP): $0.009 would read $0 -->
-            <p class="muted">Cost (API equivalent)</p>
-            <p class="money">{{ cost(s.total.cost) }}</p>
+            <baht-stat
+              label="Cost (API equivalent)"
+              [value]="s.total.cost"
+              format="currency"
+              currency="USD"
+            ></baht-stat>
             <p class="muted">
               An estimate Claude Code reports; a subscription token is not billed it.
             </p>
@@ -101,12 +98,13 @@ const WEEK_COLUMNS: ColumnMap = {
           <baht-card heading="Weekly cost">
             <baht-line-chart
               label="Cost per week"
-              format="number"
+              format="currency"
+              currency="USD"
               [categories]="categories()"
               [series]="costSeries()"
               empty-message="No runs yet"
             ></baht-line-chart>
-            <p class="muted">In US cents, API equivalent (the chart rounds to whole numbers).</p>
+            <p class="muted">API equivalent, in US dollars.</p>
           </baht-card>
         </div>
         <baht-table
@@ -151,8 +149,8 @@ export class StatsComponent {
   })
   protected readonly costSeries = computed<ChartSeries[]>(() => [
     {
-      name: 'Cost (US cents)',
-      values: (this.stats.value()?.weeks ?? []).map((w) => Math.round(w.cost * 100)),
+      name: 'Cost (USD)',
+      values: (this.stats.value()?.weeks ?? []).map((w) => w.cost),
     },
   ])
   protected readonly weekRows = computed(() =>

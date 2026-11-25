@@ -25,7 +25,7 @@
     "@20baht/elysia-oauth-provider": "^0.2.1",
     "@20baht/elysia-openapi-mcp": "^0.2.2",
     "@20baht/live": "^0.1.2",
-    "@20baht/table-query": "^0.4.1",
+    "@20baht/table-query": "^0.4.2",
     "@electric-sql/pglite": "^0.6.0",
     "@elysiajs/openapi": "^1.4.17",
     "drizzle-orm": "^0.45.4",

@@ -1,3 +1,4 @@
+import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
@@ -25,10 +26,12 @@ const ProjectFields = {
 
 export const projectRoutes = (ctx: AppContext) =>
   new Elysia()
+    .use(liveMacro(ctx.live))
     .get('/projects', ({ query }) => listProjects(ctx.db, { archived: query.archived ?? false }), {
       query: t.Object({
         archived: t.Optional(t.BooleanString({ description: 'true: archived projects instead' })),
       }),
+      live: liveRoute(ctx.live, { topics: () => ['projects'], key: 'id' }),
       detail: { operationId: 'list_projects', summary: 'The projects cards belong to', mcp: true },
     })
     .get('/projects/:id', ({ params }) => getProject(ctx.db, params.id), {

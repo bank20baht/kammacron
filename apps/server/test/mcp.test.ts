@@ -48,6 +48,7 @@ describe('mcp', () => {
       'list_projects',
       'move_card',
       'update_card',
+      'upload_image',
     ])
   })
 

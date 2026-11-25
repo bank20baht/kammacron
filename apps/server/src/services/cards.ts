@@ -24,6 +24,7 @@ import {
   type CardStatus,
   type CommentAuthor,
 } from '../db/schema'
+import { linkAttachments } from './attachments'
 import { invalid, notFound } from './errors'
 
 export type Card = typeof cards.$inferSelect
@@ -186,6 +187,7 @@ export const createCards = (db: Executor, input: readonly NewCard[]) =>
           .returning(),
       )
       created.push(row)
+      await linkAttachments(tx, row.id, row.body)
       if (c.ref !== undefined) refs.set(c.ref, row.id)
     }
     for (const [i, c] of input.entries()) {
@@ -218,6 +220,7 @@ export const updateCard = (db: Executor, id: number, patch: CardPatch) =>
     const set = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined))
     if (Object.keys(set).length > 0) await tx.update(cards).set(set).where(eq(cards.id, id))
     if (waits_on !== undefined) await setWaitsOn(tx, id, waits_on)
+    if (patch.body !== undefined) await linkAttachments(tx, id, patch.body)
     return cardRow(tx, id)
   })
 
@@ -264,6 +267,7 @@ export const addComment = async (
 ) => {
   if (!input.body.trim()) throw invalid('EMPTY_COMMENT', 'a comment needs a body')
   await cardRow(db, cardId)
+  await linkAttachments(db, cardId, input.body)
   return firstRow(
     await db
       .insert(comments)

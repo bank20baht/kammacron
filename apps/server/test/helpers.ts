@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { buildApp } from '../src/app'
 import type { AppContext } from '../src/context'
 import { openDatabase, type Database } from '../src/db'
+import { createLiveHub } from '../src/live'
 import { secretsPath } from '../src/secrets'
 import { ensureSecrets, getSettings } from '../src/services/settings'
 
@@ -29,13 +30,15 @@ export const testApp = async (options: { loopback?: boolean } = {}): Promise<Tes
   const path = secretsPath(dataDir)
   const secrets = await ensureSecrets(database.db, path)
   const row = await getSettings(database.db)
+  const auth = {
+    apiToken: secrets.api_token,
+    sessionSecret: secrets.session_secret,
+    allowedHosts: row.allowed_hosts,
+  }
   const ctx: AppContext = {
     db: database.db,
-    auth: {
-      apiToken: secrets.api_token,
-      sessionSecret: secrets.session_secret,
-      allowedHosts: row.allowed_hosts,
-    },
+    live: createLiveHub(database.client, auth),
+    auth,
     secrets,
     secretsPath: path,
     filesDir: join(dataDir, 'files'),
@@ -72,6 +75,7 @@ export const testApp = async (options: { loopback?: boolean } = {}): Promise<Tes
     call,
     json,
     close: async () => {
+      ctx.live.close()
       await database.close()
       await rm(dataDir, { recursive: true, force: true })
     },

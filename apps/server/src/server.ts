@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { buildApp } from './app'
 import type { AppContext } from './context'
 import { openDatabase } from './db'
+import { createLiveHub } from './live'
 import { secretsPath } from './secrets'
 import { ensureSecrets, getSettings } from './services/settings'
 
@@ -71,13 +72,15 @@ export const startServer = async (options: ServerOptions = {}) => {
 
   // filled once listening: `isLoopback` asks the Bun server for the peer address
   const listening: { server?: { requestIP: (r: Request) => { address: string } | null } } = {}
+  const auth = {
+    apiToken: secrets.api_token,
+    sessionSecret: secrets.session_secret,
+    allowedHosts: settings.allowed_hosts,
+  }
   const ctx: AppContext = {
     db: database.db,
-    auth: {
-      apiToken: secrets.api_token,
-      sessionSecret: secrets.session_secret,
-      allowedHosts: settings.allowed_hosts,
-    },
+    live: createLiveHub(database.client, auth),
+    auth,
     secrets,
     secretsPath: path,
     filesDir: join(dataDir, 'files'),
@@ -103,6 +106,7 @@ export const startServer = async (options: ServerOptions = {}) => {
     url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${String(actualPort)}`,
     stop: async () => {
       await app.stop()
+      ctx.live.close()
       await database.close()
       await rm(lockPath(dataDir), { force: true })
     },

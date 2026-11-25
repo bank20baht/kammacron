@@ -1,6 +1,7 @@
 import { idempotency } from '@20baht/elysia-idempotency'
 import { pgStore } from '@20baht/elysia-idempotency/pg'
 import { isToolCall } from '@20baht/elysia-openapi-mcp'
+import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
@@ -65,6 +66,7 @@ const NewCard = t.Object({
 export const cardRoutes = (ctx: AppContext) =>
   new Elysia()
     .use(idempotency({ store: pgStore({ db: ctx.db, table: idempotencyKeys }) }))
+    .use(liveMacro(ctx.live))
     .get('/cards', ({ query }) => listCards(ctx.db, query), {
       query: t.Object({
         project_id: t.Optional(
@@ -75,6 +77,10 @@ export const cardRoutes = (ctx: AppContext) =>
         q: t.Optional(t.String({ description: 'Text in the title or body' })),
         archived: t.Optional(t.BooleanString({ description: 'true: archived cards instead' })),
       }),
+      live: liveRoute(ctx.live, {
+        topics: () => ['cards', 'card_waits_on', 'runs@status=running'],
+        key: 'id',
+      }),
       detail: {
         operationId: 'list_cards',
         summary: 'Find cards by project, status, tag or text',
@@ -83,6 +89,19 @@ export const cardRoutes = (ctx: AppContext) =>
     })
     .get('/cards/:id', ({ params }) => getCard(ctx.db, params.id), {
       params: Id,
+      live: liveRoute(ctx.live, {
+        topics: ({ params }) => {
+          const id = params['id'] ?? ''
+          return [
+            `cards:${id}`,
+            `comments@card_id=${id}`,
+            `card_waits_on@card_id=${id}`,
+            `runs@card_id=${id}`,
+            `attachments@card_id=${id}`,
+            'cards', // the status of the cards it waits on
+          ]
+        },
+      }),
       detail: {
         operationId: 'get_card',
         summary: 'A card with its comments, what it waits on, its last run and its attachments',

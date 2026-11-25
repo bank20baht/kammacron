@@ -70,6 +70,7 @@ const api = async (method: string, path: string, body?: unknown) => {
 }
 
 const version = async () => {
+  // the npm package keeps package.json beside the bundle
   const pkg = Bun.file(join(import.meta.dir, 'package.json'))
   if (await pkg.exists()) return ((await pkg.json()) as { version?: string }).version ?? '0.0.0'
   return '0.0.0-dev'

@@ -207,6 +207,41 @@ describe('verify and revert', () => {
   })
 })
 
+describe('the diff gate', () => {
+  test('a small change on claude/<card> passes and kammacron pushes it to main', async () => {
+    await t.ctx.db.update(projects).set({ max_diff_lines: 50 }).where(eq(projects.id, projectId))
+    const card = await newCard()
+    const { run: r } = await run('gated', card.id)
+    expect(must(r).pushed_to).toBe('main')
+    expect(await remoteHas('main', 'fixed.txt')).toBe(true)
+    const after = await getCard(t.ctx.db, card.id)
+    expect(after.status).toBe('done')
+    expect(after.comments.at(-1)?.body).toContain('Passed the gate')
+  })
+
+  test('a protected path holds the card in review; main is untouched', async () => {
+    await t.ctx.db
+      .update(projects)
+      .set({ protected_paths: ['migrations/**'] })
+      .where(eq(projects.id, projectId))
+    const card = await newCard()
+    await run('gated-protected', card.id)
+    const after = await getCard(t.ctx.db, card.id)
+    expect(after.status).toBe('review')
+    expect(after.review_reason).toContain('migrations/0001.sql')
+    expect(await remoteHas('main', 'migrations/0001.sql')).toBe(false)
+  })
+
+  test('with a gate, Claude may not push to main itself', async () => {
+    await t.ctx.db.update(projects).set({ max_diff_lines: 50 }).where(eq(projects.id, projectId))
+    const { toolLists } = await import('../src/worker/runner')
+    const project = await getProject(t.ctx.db, projectId)
+    expect(toolLists(project, 'main', 1, []).allowed).not.toContain(
+      'Bash(git push origin HEAD:main)',
+    )
+  })
+})
+
 describe('approve', () => {
   test('rebases claude/<card> onto main and pushes it', async () => {
     const card = await newCard()

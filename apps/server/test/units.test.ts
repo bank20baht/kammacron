@@ -15,6 +15,8 @@ const project = (patch: Partial<Project> = {}) =>
     ship_policy: 'push',
     allowed_bash: ['Bash(bun test:*)'],
     web_tools: false,
+    max_diff_lines: null,
+    protected_paths: [],
     ...patch,
   }) as Project
 

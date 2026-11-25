@@ -10,3 +10,16 @@ export const idParams = (description?: string) =>
   t.Object({
     id: t.String({ pattern: '^[1-9][0-9]{0,9}$', ...(description ? { description } : {}) }),
   })
+
+/**
+ * One of fixed strings. Not `t.UnionEnum`: Elysia (1.4.32) fills an optional `UnionEnum` that was
+ * not sent with its first value, so a list with no `status` filter became `status=todo`, and a
+ * PATCH without `mode` would have set it.
+ */
+export const oneOf = <V extends string>(
+  values: readonly [V, ...V[]],
+  options: { description?: string } = {},
+) => {
+  type Lit = ReturnType<typeof t.Literal<V>>
+  return t.Union(values.map((v) => t.Literal(v)) as [Lit, ...Lit[]], options)
+}

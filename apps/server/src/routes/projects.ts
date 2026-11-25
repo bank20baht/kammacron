@@ -2,7 +2,7 @@ import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
-import { idParams } from './params'
+import { idParams, oneOf } from './params'
 import { createProject, getProject, listProjects, updateProject } from '../services/projects'
 
 const Id = idParams()
@@ -23,11 +23,13 @@ const ProjectFields = {
   verify_command: t.Optional(t.Nullable(t.String())),
   enabled_mcp_servers: t.Optional(t.Array(t.String())),
   web_tools: t.Optional(t.Boolean()),
-  mode: t.Optional(t.UnionEnum(['watch', 'autopilot'])),
-  ship_policy: t.Optional(t.UnionEnum(['push', 'branch'])),
+  mode: t.Optional(oneOf(['watch', 'autopilot'])),
+  ship_policy: t.Optional(oneOf(['push', 'branch'])),
   worktree_path: t.Optional(t.Nullable(t.String())),
   verify_timeout_minutes: t.Optional(t.Integer({ minimum: 1, maximum: 240 })),
   lock_files: t.Optional(t.Array(t.String())),
+  max_diff_lines: t.Optional(t.Nullable(t.Integer({ minimum: 1 }))),
+  protected_paths: t.Optional(t.Array(t.String())),
 }
 
 export const projectRoutes = (ctx: AppContext) =>

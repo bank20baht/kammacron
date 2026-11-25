@@ -287,6 +287,22 @@ export const projectForm = defineForm({
       label: 'Files copied into the worktree',
       width: '1/2',
     },
+    {
+      order: 15.5,
+      type: 'number',
+      key: 'max_diff_lines',
+      label: 'Gate: most lines per change',
+      width: '1/3',
+      help: 'With a gate, Claude ships to claude/<card> and kammacron pushes it on when it passes',
+    },
+    {
+      order: 15.6,
+      type: 'tags',
+      key: 'protected_paths',
+      label: 'Gate: protected paths',
+      width: '2/3',
+      help: 'Globs a change may not touch: migrations/**, .github/**',
+    },
     { order: 16, type: 'toggle', key: 'web_tools', label: 'WebSearch and WebFetch' },
     {
       order: 17,

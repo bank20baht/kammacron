@@ -88,3 +88,22 @@ what the library could do instead.
 - **Workaround:** `answer()` in `packages/kit/src/answer.ts` narrows the type (over HTTP the body is always parsed).
 - **Fix in the lib:** type the macro's `beforeHandle` so it does not add to the route's response, e.g. return
   the replay through `status(...)` with the route's own type, or document `response:` on idempotent routes.
+
+### Elysia 1.4.32: an optional `t.UnionEnum` that was not sent gets its first value
+
+- **Seen:** `query: t.Object({ status: t.Optional(t.UnionEnum(['todo', 'done'])) })` hands the handler
+  `{ status: 'todo' }` when no `status` was sent. The board's "all cards" list became "todo only", and a
+  PATCH body with an optional `UnionEnum` (`mode`) would reset the field. `t.Union` of `t.Literal`s does not.
+- **Workaround:** `oneOf()` in `apps/server/src/routes/params.ts`; `test/schema.test.ts` guards both cases.
+- **For 20baht:** worth a line in the `@20baht/cli` scaffold's notes (or a lint rule in `@20baht/strict`
+  against `t.Optional(t.UnionEnum(...))`), since nothing fails until the data is wrong.
+
+## @20baht/elysia-openapi-mcp
+
+### A description on a union (`anyOf`) is not read
+
+- **Seen:** `status: t.Optional(t.Union([t.Literal('todo'), …], { description: '…' }))` emits
+  `{ description, anyOf: [...] }`, yet mcpify warns `no description for status` and the tool's input schema
+  carries none. Descriptions on plain types and on nullable unions are read.
+- **Workaround:** none; Claude sees the allowed values, only the sentence is lost.
+- **Fix in the lib:** read `description` from the union itself, as it already does for `t.Nullable`.

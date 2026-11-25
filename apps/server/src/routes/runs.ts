@@ -13,7 +13,7 @@ import { getSettings } from '../services/settings'
 import { approveCard } from '../worker/approve'
 import { checkRepo } from '../worker/git'
 import { childEnv } from '../worker/env'
-import { idParams } from './params'
+import { idParams, oneOf } from './params'
 
 const Id = idParams()
 
@@ -24,7 +24,7 @@ export const runRoutes = (ctx: AppContext) =>
       query: t.Object({
         project_id: t.Optional(t.Numeric()),
         card_id: t.Optional(t.Numeric()),
-        status: t.Optional(t.UnionEnum([...RUN_STATUSES])),
+        status: t.Optional(oneOf(RUN_STATUSES)),
         limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200 })),
         before: t.Optional(t.Numeric({ description: 'Runs older than this run id' })),
       }),

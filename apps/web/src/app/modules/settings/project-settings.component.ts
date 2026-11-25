@@ -118,6 +118,9 @@ export class ProjectSettingsComponent {
           setup_command: text(d['setup_command']),
           verify_command: text(d['verify_command']),
           extra_prompt: typeof d['extra_prompt'] === 'string' ? d['extra_prompt'] : '',
+          max_diff_lines:
+            Number(d['max_diff_lines']) > 0 ? Math.round(Number(d['max_diff_lines'])) : null,
+          protected_paths: list(d['protected_paths']),
         }),
       )
       this.project.reload()

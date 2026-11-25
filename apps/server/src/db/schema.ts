@@ -64,6 +64,12 @@ export const projects = pgTable('projects', {
     .default(['bun.lock', 'bun.lockb', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']),
   setup_hash: text('setup_hash'),
   verify_timeout_minutes: integer('verify_timeout_minutes').notNull().default(15),
+  /**
+   * The gate before the default branch: with either set, Claude pushes only to claude/<card>, and
+   * kammacron pushes it on when the diff is at most this many lines and touches no protected path.
+   */
+  max_diff_lines: integer('max_diff_lines'),
+  protected_paths: text('protected_paths').array().notNull().default([]),
   interval_minutes: integer('interval_minutes').notNull().default(30),
   next_run_at: timestamp('next_run_at', { withTimezone: true }),
   last_checked_at: timestamp('last_checked_at', { withTimezone: true }),

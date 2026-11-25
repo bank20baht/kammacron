@@ -6,12 +6,13 @@ import { eq } from 'drizzle-orm'
 import { cards, projects } from '../db/schema'
 import { addAlert } from '../services/alerts'
 import { attachmentPath, cardAttachments } from '../services/attachments'
-import { claimCard, getCard, moveCard, type Card } from '../services/cards'
+import { addComment, claimCard, getCard, moveCard, type Card } from '../services/cards'
 import type { Project } from '../services/projects'
 import { addRunEvent, createRun, getRun, previousRuns, updateRun, type Run } from '../services/runs'
 import { getSettings, updateSettings } from '../services/settings'
 import { spawnClaude, type ClaudeResult } from './claude'
 import { cardBranch, childEnv, type WorkerEnv } from './env'
+import { checkGate, isGated, shipBranch } from './gate'
 import { defaultBranch, exclude, exec, gitIn, hashFiles, remoteHeads, type Git } from './git'
 import { taskPrompt, workerRules } from './prompt'
 import { verifyAndRevert } from './verify'
@@ -68,7 +69,9 @@ export const toolLists = (
     ].map((cmd) => `Bash(git ${cmd}:*)`),
     'Bash(git branch --show-current)',
     `Bash(git push origin HEAD:${branch})`,
-    ...(project.ship_policy === 'push' ? [`Bash(git push origin HEAD:${defaultBranchName})`] : []),
+    ...(project.ship_policy === 'push' && !isGated(project)
+      ? [`Bash(git push origin HEAD:${defaultBranchName})`]
+      : []),
     ...project.allowed_bash,
     ...(project.web_tools ? ['WebSearch', 'WebFetch'] : []),
   ]
@@ -391,7 +394,10 @@ const inspectRemote = async (stage: Stage) => {
     commits.length > 0 &&
     (await wt.run('merge-base', '--is-ancestor', headSha, defaultTip)).code === 0
   const onBranch = after[branch] !== undefined && after[branch] === headSha
-  const allowedRefs = new Set([branch, ...(project.ship_policy === 'push' ? [branchName] : [])])
+  const allowedRefs = new Set([
+    branch,
+    ...(project.ship_policy === 'push' && !isGated(project) ? [branchName] : []),
+  ])
   // a ref counts as the run's only when it now holds one of the run's commits: the owner may push
   // their own branches while a run goes
   const first = commits[0]
@@ -417,7 +423,7 @@ const inspectRemote = async (stage: Stage) => {
 const settleCard = async (
   stage: Stage,
   result: ClaudeResult,
-  remote: { commits: string[]; onDefault: boolean },
+  remote: { commits: string[]; onDefault: boolean; onBranch: boolean },
 ) => {
   const { env, project, card, branchName } = stage
   const [now] = await env.db.select().from(cards).where(eq(cards.id, card.id))
@@ -430,14 +436,48 @@ const settleCard = async (
     await moveCard(env.db, card.id, { status: 'review', reason })
     return 'review'
   }
-  if (status === 'done' && remote.commits.length > 0 && !remote.onDefault) {
+  const shipped = isGated(project) ? remote.onBranch : remote.onDefault
+  if (status === 'done' && remote.commits.length > 0 && !shipped) {
+    const where = isGated(project) ? `origin/${cardBranch(card.id)}` : `origin/${branchName}`
     await moveCard(env.db, card.id, {
       status: 'review',
-      reason: `the card was moved to done, but its commits are not on origin/${branchName}`,
+      reason: `the card was moved to done, but its commits are not on ${where}`,
     })
     return 'review'
   }
   return status
+}
+
+/** The diff gate, then the push on: the new tip and its commits, or null (the card went to review). */
+const throughGate = async (stage: Stage, run: Run, base: string, head: string) => {
+  const { env, project, card, wt, branchName } = stage
+  const verdict = await checkGate(wt, project, base, head)
+  if (!verdict.ok) {
+    await moveCard(env.db, card.id, {
+      status: 'review',
+      reason: `held at the gate: ${verdict.reason ?? ''}`,
+    })
+    return null
+  }
+  try {
+    const sha = await shipBranch(wt, await childEnv(env), cardBranch(card.id), branchName)
+    const commits = (await wt.out('rev-list', '--reverse', `${base}..${sha}`))
+      .split('\n')
+      .filter(Boolean)
+    await addComment(env.db, card.id, {
+      author: 'claude-worker',
+      run_id: run.id,
+      body: `Passed the gate (${String(verdict.lines)} lines, ${String(verdict.files.length)} files): kammacron pushed ${cardBranch(card.id)} to ${branchName} at ${sha.slice(0, 8)}.`,
+    })
+    return { sha, commits }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    await moveCard(env.db, card.id, {
+      status: 'review',
+      reason: `passed the gate, but the push on failed: ${message.slice(0, 500)}`,
+    })
+    return null
+  }
 }
 
 const pauseForRefs = async (stage: Stage, run: Run, outside: string[]) => {
@@ -472,6 +512,58 @@ const openStage = async (env: WorkerEnv, project: Project & { repo_path: string 
   await exclude(wt, ['.kammacron/'])
   const before = await remoteHeads(wt)
   return { childEnvironment, branchName, dir, wt, before, baseSha: before[branchName] ?? null }
+}
+
+/** After a clean end: what reached the remote, the card's state, the gate, then verify. */
+const finish = async (stage: Stage, started: Run, result: ClaudeResult): Promise<Run> => {
+  const { env, project, card, baseSha, branchName } = stage
+  const remote = await inspectRemote(stage)
+  let run = await updateRun(env.db, started.id, {
+    head_sha: remote.headSha,
+    commits: remote.commits,
+    pushed_to: remote.pushedTo,
+  })
+  if (remote.onBranch)
+    await env.db.update(cards).set({ branch: remote.branch }).where(eq(cards.id, card.id))
+  if (remote.outside.length > 0) await pauseForRefs(stage, run, remote.outside)
+
+  let status = await settleCard(stage, result, remote)
+  let shipped = { sha: remote.headSha, commits: remote.commits, onDefault: remote.onDefault }
+  // gated: kammacron checks the diff, then rebases claude/<card> and pushes it on itself
+  if (status === 'done' && isGated(project) && remote.onBranch && remote.headSha && baseSha) {
+    const passed = await throughGate(stage, run, baseSha, remote.headSha)
+    if (passed) {
+      shipped = { ...passed, onDefault: true }
+      run = await updateRun(env.db, run.id, {
+        pushed_to: branchName,
+        head_sha: passed.sha,
+        commits: passed.commits,
+      })
+    } else status = 'review'
+  }
+  run = await updateRun(env.db, run.id, {
+    status: status === 'review' ? 'review' : result.errorKind ? 'failed' : 'succeeded',
+  })
+  if (status === 'review')
+    await env.notify(`#${String(card.id)} needs review`, `${project.name}: ${card.title}`)
+  if (
+    status !== 'done' ||
+    !shipped.onDefault ||
+    !project.verify_command ||
+    !shipped.sha ||
+    !baseSha
+  )
+    return run
+  return verifyAndRevert(env, {
+    project,
+    run,
+    cardId: card.id,
+    git: stage.wt,
+    defaultBranch: branchName,
+    baseSha,
+    headSha: shipped.sha,
+    commits: shipped.commits,
+  })
 }
 
 /**
@@ -540,37 +632,5 @@ export const runCard = async (
   )
   if (interrupted) return { run: interrupted, result }
 
-  const remote = await inspectRemote(stage)
-  run = await updateRun(env.db, run.id, {
-    head_sha: remote.headSha,
-    commits: remote.commits,
-    pushed_to: remote.pushedTo,
-  })
-  if (remote.onBranch)
-    await env.db.update(cards).set({ branch: remote.branch }).where(eq(cards.id, stage.card.id))
-  if (remote.outside.length > 0) await pauseForRefs(stage, run, remote.outside)
-
-  const status = await settleCard(stage, result, remote)
-  run = await updateRun(env.db, run.id, {
-    status: status === 'review' ? 'review' : result.errorKind ? 'failed' : 'succeeded',
-  })
-  if (status === 'review')
-    await env.notify(
-      `#${String(stage.card.id)} needs review`,
-      `${project.name}: ${stage.card.title}`,
-    )
-
-  const { headSha } = remote
-  if (status === 'done' && remote.onDefault && project.verify_command && headSha && opened.baseSha)
-    run = await verifyAndRevert(env, {
-      project,
-      run,
-      cardId: stage.card.id,
-      git: stage.wt,
-      defaultBranch: opened.branchName,
-      baseSha: opened.baseSha,
-      headSha,
-      commits: remote.commits,
-    })
-  return { run, result }
+  return { run: await finish(stage, run, result), result }
 }

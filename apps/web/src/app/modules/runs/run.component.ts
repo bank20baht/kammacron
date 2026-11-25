@@ -66,7 +66,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
             subtitle="Add what the project needs to its allowed Bash commands"
           >
             @for (d of denials(); track $index) {
-              <baht-code [code]="d"></baht-code>
+              <baht-code variant="block" [code]="d"></baht-code>
             }
           </baht-card>
         }

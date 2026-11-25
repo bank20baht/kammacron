@@ -5,7 +5,7 @@ import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
-import { idParams } from './params'
+import { idParams, oneOf } from './params'
 import { CARD_STATUSES, idempotencyKeys, type CommentAuthor } from '../db/schema'
 import {
   addComment,
@@ -24,7 +24,7 @@ Tag a card "claude" only when the work is reversible, stays inside the repo, and
 Work that touches security, data or migrations, release or deploy, a breaking API, money, or a product decision is for a person: set human=true.
 When a task is mostly a person's, split what Claude can do alone into small "claude" cards and make the big card wait on them (waits_on).`
 
-const Status = t.UnionEnum([...CARD_STATUSES], { description: 'todo, doing, review or done' })
+const Status = oneOf(CARD_STATUSES, { description: 'todo, doing, review or done' })
 const Id = idParams('Card number, as in #12')
 const IdempotencyHeader = t.Object({
   'idempotency-key': t.Optional(

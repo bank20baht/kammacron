@@ -5,10 +5,9 @@ import { addComment, moveCard } from '../services/cards'
 import { conflict, invalid } from '../services/errors'
 import { getProject } from '../services/projects'
 import { cardBranch, childEnv, type WorkerEnv } from './env'
-import { defaultBranch, exec, gitIn, remoteHeads } from './git'
+import { shipBranch } from './gate'
+import { defaultBranch, gitIn, remoteHeads } from './git'
 import { ensureWorktree, worktreeDir } from './runner'
-
-const COMMITTER = { GIT_COMMITTER_NAME: 'kammacron', GIT_COMMITTER_EMAIL: 'kammacron@localhost' }
 
 /**
  * Approve: rebase `claude/<card>` onto the default branch and push it there (an ordinary push, so
@@ -49,28 +48,7 @@ export const approveCard = async (env: WorkerEnv, cardId: number) => {
     await env.db.update(cards).set({ branch: null }).where(eq(cards.id, cardId))
     return moveCard(env.db, cardId, { status: 'done' })
   }
-  await wt.out('checkout', '-f', '-B', branch, `origin/${branch}`)
-  const rebase = await exec(['git', 'rebase', `origin/${branchName}`], {
-    cwd: wt.cwd,
-    env: { ...childEnvironment, ...COMMITTER },
-  })
-  if (rebase.code !== 0) {
-    await wt.run('rebase', '--abort')
-    throw conflict(
-      'REBASE_CONFLICT',
-      `${branch} does not rebase cleanly onto ${branchName}: ${(rebase.stdout + rebase.stderr).trim().slice(-800)}`,
-    )
-  }
-  const push = await exec(['git', 'push', 'origin', `HEAD:${branchName}`], {
-    cwd: wt.cwd,
-    env: childEnvironment,
-  })
-  if (push.code !== 0)
-    throw conflict(
-      'PUSH_REFUSED',
-      `push to ${branchName} refused: ${(push.stderr || push.stdout).trim().slice(-1500)}`,
-    )
-  const sha = await wt.out('rev-parse', 'HEAD')
+  const sha = await shipBranch(wt, childEnvironment, branch, branchName)
   await addComment(env.db, cardId, {
     author: 'user',
     body: `Approved: ${branch} rebased and pushed to ${branchName} at ${sha.slice(0, 8)}.`,

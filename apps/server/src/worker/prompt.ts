@@ -10,8 +10,12 @@ export const workerRules = (input: {
 }) => {
   const { project, defaultBranch, cardId } = input
   const branch = `claude/${String(cardId)}`
-  const ship =
-    project.ship_policy === 'push'
+  const gated =
+    project.ship_policy === 'push' &&
+    (project.max_diff_lines !== null || project.protected_paths.length > 0)
+  const ship = gated
+    ? `Commit, push to your branch (\`git push origin HEAD:${branch}\`), and move the card to done. kammacron then checks the diff (${project.max_diff_lines === null ? 'no size limit' : `at most ${String(project.max_diff_lines)} lines`}${project.protected_paths.length ? `, none of: ${project.protected_paths.join(', ')}` : ''}) and pushes it to ${defaultBranch} itself, through the pre-push hook. Keep the change small and away from those paths; if it cannot be, move the card to review with the reason instead.`
+    : project.ship_policy === 'push'
       ? `When the work is done and the checks pass, commit and run \`git push origin HEAD:${defaultBranch}\`. The repo's pre-push hook is the gate: fix what it reports, at most twice. If it still fails, or a rebase conflicts, push to your branch instead (\`git push origin HEAD:${branch}\`) and move the card to review with the reason.`
       : `Do not push to ${defaultBranch}. Commit, push to your branch (\`git push origin HEAD:${branch}\`), and move the card to review: a person merges it.`
   return `# kammacron worker: rules for this run

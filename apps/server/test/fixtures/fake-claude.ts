@@ -117,6 +117,18 @@ switch (scenario) {
     })
     result()
     break
+  case 'gated':
+    await commit('fixed.txt', `fixed ${String(cardId)}\n`)
+    sh(['git', 'push', 'origin', `HEAD:claude/${String(cardId)}`])
+    await tool('move_card', { id: String(cardId), status: 'done' })
+    result()
+    break
+  case 'gated-protected':
+    await commit('migrations/0001.sql', 'drop table users;\n')
+    sh(['git', 'push', 'origin', `HEAD:claude/${String(cardId)}`])
+    await tool('move_card', { id: String(cardId), status: 'done' })
+    result()
+    break
   case 'done-without-push':
     await commit('local.txt', 'never pushed\n')
     await tool('move_card', { id: String(cardId), status: 'done' })

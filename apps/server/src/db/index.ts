@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { PGlite } from '@electric-sql/pglite'
@@ -31,7 +33,13 @@ export type Database = {
   close: () => Promise<void>
 }
 
-const MIGRATIONS = fileURLToPath(new URL('../../drizzle', import.meta.url))
+/** The migrations: beside the bundle in the npm package (`./drizzle`), at the app root in the repo. */
+const MIGRATIONS =
+  [
+    fileURLToPath(new URL('./drizzle', import.meta.url)),
+    fileURLToPath(new URL('../../drizzle', import.meta.url)),
+  ].find((dir) => existsSync(join(dir, 'meta', '_journal.json'))) ??
+  fileURLToPath(new URL('../../drizzle', import.meta.url))
 
 /**
  * Every write to these tables notifies `@20baht/live` on commit (`<table>`, `<table>:<id>`, and

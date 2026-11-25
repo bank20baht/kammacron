@@ -31,8 +31,11 @@
   }
 
   @if ((projects().data ?? []).length === 0 && projects().data) {
-    <baht-empty-state message="No project yet" hint="Add one in Settings, then link its repo.">
-      <baht-button variant="primary" (click)="go('/settings')">Settings</baht-button>
+    <baht-empty-state
+      message="No project yet"
+      hint="Three steps: the tools, a Claude token, a repo."
+    >
+      <baht-button variant="primary" (click)="go('/welcome')">Get started</baht-button>
     </baht-empty-state>
   } @else {
     <div class="columns">

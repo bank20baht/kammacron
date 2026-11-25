@@ -15,6 +15,13 @@
       "when": 1795580151594,
       "tag": "0001_worker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795582533776,
+      "tag": "0002_gate",
+      "breakpoints": true
     }
   ]
 }

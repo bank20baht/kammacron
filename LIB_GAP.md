@@ -4,6 +4,18 @@ Things the `@20baht/*` libraries lack or get wrong, found while building kammacr
 what happened, the workaround in this repo (so it can be removed once the library is fixed), and
 what the library could do instead.
 
+## @20baht/cli
+
+### `create` still writes `@20baht/table-query` `^0.3.0`
+
+- **Seen:** `20baht create` with cli 0.3.33 writes `"@20baht/table-query": "^0.3.0"` in `apps/server/package.json`,
+  while the latest is 0.4.1. A caret range on a 0.x version stays inside 0.3, so a new app starts on the older
+  minor: no aggregate queries (`aggregateQuery`, `aggregateRows`, `parseAggregateQuery`, added in 0.4) until someone runs `20baht update` by hand. The engine and
+  validator pins of the same template are already current (0.3.33).
+- **Workaround:** none needed here; kammacron depends on `^0.4.1` directly.
+- **Fix in the lib:** have `create` write the published version of `@20baht/table-query` as it does for engine and
+  validator, or run its own `update` step for every `@20baht/*` it writes.
+
 ## @20baht/ui
 
 ### A navigator link with an icon and no badge puts its label at the far end

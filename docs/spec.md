@@ -2,6 +2,8 @@
 
 Nov 25, 2026 · @bank20baht
 
+> **อัปเดต 25 พ.ย. 2026:** เป้าหมายเปลี่ยนเป็น "Ansible ฉบับเรียบง่าย": โปรเจกต์มี playbook (step ของ Claude และคำสั่ง shell) และ kammacron เลิกจัดการ git (worktree, gate, verify, การตรวจ ref, Approve ที่ rebase) ส่วนที่เกี่ยวกับ git ข้างล่างจึงเป็นประวัติ ดูรายละเอียดที่ [`playbook.md`](playbook.md)
+
 ## สรุป
 
 kammacron คือเว็บแอปบน localhost ที่รวม Kanban, MCP server และ worker ที่เรียก `claude -p` ไว้ใน process เดียว เป้าหมายคือให้ Claude แก้บัคเล็กๆ แล้ว push ขึ้น default branch เองโดยไม่ต้องรอคน คนเข้ามาเฉพาะการ์ดที่ต้องตัดสินใจจริง

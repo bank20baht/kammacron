@@ -24,24 +24,28 @@ bunx kammacron start          # http://127.0.0.1:7420
 
 <CardGrid>
   <Card title="A board Claude reads" icon="list-format">
-    Four columns, live. Cards tagged `claude` are picked up on each project's interval: one `claude
-    -p` per card, which fixes the bug, pushes through your pre-push hook and comments on the card.
+    Four columns, live. Cards tagged `claude` are picked up on each project's interval and run
+    through the project's playbook: Claude does the card, your commands do the rest.
+  </Card>
+  <Card title="A playbook per project" icon="seti:shell">
+    Steps in order, in the project's directory: a Claude step, then tests, `ssh` to a server, a
+    deploy, a migration. A step that fails stops the rest and sends the card to Review.
   </Card>
   <Card title="No --dangerously-skip-permissions" icon="approve-check">
-    An exact tool allowlist, no force push, no `--no-verify`, a check of what really reached the
-    remote, and an optional gate and `verify_command` that reverts a bad push.
+    Claude gets a tool allowlist: no force push, no `--no-verify`, nothing that loses work. Git and
+    shipping follow your project's own instructions; kammacron does not meddle.
   </Card>
   <Card title="You decide" icon="comment-alt">
-    A card that cannot ship waits in Review with its reason and diff. Approve it, send it back with
-    a note for the next run, or take it yourself.
+    A card Claude hands over, or whose step failed, waits in Review with its reason and output.
+    Approve it, send it back with a note for the next run, or take it yourself.
   </Card>
   <Card title="Your subscription, your machine" icon="laptop">
     `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`. One process, PGlite by default, and Claude
     is only called when there is a card to work.
   </Card>
   <Card title="Every run, on the record" icon="document">
-    The live event stream, turns, cost, commits and where they went, and every command the allowlist
-    refused. Week-by-week stats, and a calendar of what runs when.
+    Each step and how it ended, Claude's live event stream, turns and cost, and every command the
+    allowlist refused. Week-by-week stats, and a calendar of what runs when.
   </Card>
   <Card title="Claude Code drives the board" icon="puzzle">
     The board is an MCP server: Claude Code, Claude Desktop and claude.ai can list, create, move and

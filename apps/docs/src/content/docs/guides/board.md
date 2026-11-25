@@ -24,8 +24,8 @@ On a project's round, a card is picked when it is in **To do**, tagged `claude`,
 
 A card Claude cannot finish alone comes back in one of three ways:
 
-- moved to **Review** with a reason (it could not ship, it hit a limit, it was held at the gate);
+- moved to **Review** with a reason (Claude handed it over, a step of the playbook failed, it hit a limit);
 - moved back to **To do** and marked human, with a question in a comment;
 - split: Claude creates small `claude` cards for the parts it can do, makes this card wait on them, and marks this one human.
 
-See [shipping and review](/guides/shipping/) for what to do with a card in Review.
+See [review](/guides/review/) for what to do with a card in Review.

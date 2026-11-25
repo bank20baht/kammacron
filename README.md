@@ -1,34 +1,35 @@
 # kammacron
 
-A Kanban board, an MCP server and an unattended Claude Code worker in one process on your own
-machine. Cards tagged `claude` are picked up on a schedule: one `claude -p` per card, in your repo
-folder (or a worktree of its own, if you turn that on), which fixes the bug, pushes through your repo's pre-push hook, and comments on the card.
-You only see the cards that need a decision.
+A Kanban board, an MCP server and an unattended worker in one process on your own machine: a
+small Ansible for your backlog. Each project points at a directory and has a **playbook**: steps in
+order, such as a Claude step (`claude -p` on the card), then your commands (tests, `ssh` to a
+server, a deploy, a migration). Cards tagged `claude` are run through it on a schedule. You only
+see the cards that need a decision.
 
-- **Runs without `--dangerously-skip-permissions`.** An exact tool allowlist (no force push, no
-  `--no-verify`, no pushing to other branches), the repo's own pre-push as the gate, a check of what
-  actually reached the remote after every run, and an optional `verify_command` that reverts a push
-  that breaks the branch.
+- **Runs without `--dangerously-skip-permissions`.** Claude steps get a tool allowlist (no force
+  push, no `--no-verify`, nothing that loses work). Git and shipping follow the project's own
+  instructions (`CLAUDE.md`): kammacron points at the directory and does not meddle.
 - **Uses your subscription.** `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, and a pre-check
   that calls Claude only when there is a card to work.
 - **Cards triaged before Claude works.** `claude` / `human`, `waits_on`, splitting a person's task
-  into small Claude cards, and review only for what could not ship.
+  into small Claude cards, and review only for what a person should decide.
 
 ## What it does
 
-| Area          | In short                                                                                                                                                                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Board**     | Four columns (To do, Doing, Review, Done) per project or all together, live. Drag or Alt+arrows to move; one-line quick add. A card has a markdown body with pasted images, an owner (Claude or a person), tags, a priority, and cards it waits on.                |
-| **Worker**    | On each project's interval it picks the next card Claude may take and runs one `claude -p` on it, in the repo folder or a worktree of its own. Modes `autopilot` / `watch`; shipping `push` / `branch`; an optional diff gate and a `verify_command` that reverts. |
-| **Review**    | The cards waiting for you, with the reason and the diff of `claude/<card>`. Approve (rebased and pushed for you) or send back with a comment for the next run.                                                                                                     |
-| **Runs**      | Every run with its live event stream, turns, cost, commits and where they went; stop one that is going.                                                                                                                                                            |
-| **Calendar**  | What runs on its own and when: each project's worker round, its schedules and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                                       |
-| **Stats**     | Week by week: runs shipped, sent to review, reverted, failed, and what they cost.                                                                                                                                                                                  |
-| **Schedules** | A shell command per project on an interval (tests, audits); when it fails it opens a card for Claude, or comments on the one already open.                                                                                                                         |
-| **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                                         |
-| **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a run was reverted, a project paused, a round skipped.                                                                                                                                 |
-| **Settings**  | The Claude token (with a test run), the worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), each project's repo checklist and limits, and the language.                                                                             |
-| **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                                         |
+| Area          | In short                                                                                                                                                                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Playbook**  | Per project, the steps of a run: Claude steps and shell commands (`ssh`, tests, deploys), in order; a failing step stops the rest. Edited in the project's settings, with templates.                                                                |
+| **Board**     | Four columns (To do, Doing, Review, Done) per project or all together, live. Drag or Alt+arrows to move; one-line quick add. A card has a markdown body with pasted images, an owner (Claude or a person), tags, a priority, and cards it waits on. |
+| **Worker**    | On each project's interval it picks the next card Claude may take and runs the project's playbook on it, in the project's directory as it is. Modes `autopilot` / `watch`.                                                                          |
+| **Review**    | The cards waiting for you: handed over by Claude, or stopped by a failing step, with the reason and the step's output. Approve, or send back with a comment for the next run.                                                                       |
+| **Runs**      | Every run with its steps, Claude's live event stream, turns and cost; stop one that is going.                                                                                                                                                       |
+| **Calendar**  | What runs on its own and when: each project's worker round, its schedules and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                        |
+| **Stats**     | Week by week: runs done, sent to review, failed, and what they cost.                                                                                                                                                                                |
+| **Schedules** | A shell command per project on an interval (tests, audits); when it fails it opens a card for Claude, or comments on the one already open.                                                                                                          |
+| **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                          |
+| **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a project paused, a round skipped.                                                                                                                                      |
+| **Settings**  | The Claude token (with a test run), the worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), each project's directory, playbook and limits, and the language.                                                         |
+| **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                          |
 
 Documentation: **[kammacron.pages.dev](https://kammacron.pages.dev)** (the Starlight site in `apps/docs`: `bun run --filter docs dev`, and `bun run --filter docs deploy` to publish it). The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
 lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
@@ -53,40 +54,33 @@ Or one file with nothing to install: `bun run compile` builds `dist/bin/kammacro
 
 1. **Token**: `claude setup-token`, then Settings → Claude → Keep (or set `CLAUDE_CODE_OAUTH_TOKEN`).
    **Test** runs one short `claude -p`.
-2. **Project**: Settings → Projects → add one, set its repo path, turn the worker on. The checklist
-   says whether the path is a repo with `origin`, a default branch and a pre-push hook.
+2. **Project**: Settings → Projects → add one, set its directory, turn the worker on. Its
+   **Playbook** is one Claude step; add commands around it as you need.
 3. **Cards**: on the board, or from Claude Code itself:
 
    ```sh
    kammacron token   # prints: claude mcp add --transport http kammacron http://127.0.0.1:7420/mcp --header "Authorization: Bearer …"
    ```
 
-Project rules for the worker live in the repo at `.claude-worker/prompt.md` (the same file the
-`~/claude-worker/run.sh` setup used), plus **Extra rules** in the project's settings.
+Project rules for Claude live in the directory: `CLAUDE.md`, and `.claude-worker/prompt.md` (the
+same file the `~/claude-worker/run.sh` setup used), plus **Extra rules** in the project's settings.
 
 ## How a card is worked
 
 Every project is checked on its interval. With a pickable card (tagged `claude`, not `human`, in
-`todo`, everything it `waits_on` done) the worker:
+`todo`, everything it `waits_on` done) the worker claims it and runs the project's playbook:
 
-1. prepares where Claude works, on `claude/<card>`, and copies the card's images into it, then runs
-   `setup_command` when a lock file changed. By default that is the repo folder itself, branched
-   from the branch it is on: a round is skipped (with one alert) while the folder has uncommitted
-   changes or commits not on origin, and afterwards the folder goes back to its branch, moved up to
-   what was pushed. With **Separate worktree** on (project settings), it is
-   `~/.kammacron/worktrees/<project>`, from `origin/<default>`, and your folder is never touched.
-   The board shows the folder's branch, and whether it has uncommitted changes;
-2. runs `claude -p` with the card, its comments and earlier runs, the rules, and only the
-   kammacron MCP tools plus the project's enabled servers;
-3. reads what happened: the card's status, which refs moved on the remote. A push anywhere else
-   pauses the project; a card left in `doing`, or `done` without its commits on the default branch,
-   goes to review;
-4. with `verify_command`, runs it on what was pushed (twice) and reverts with an ordinary push when
-   it fails;
-5. with a **gate** (`max_diff_lines` or `protected_paths`), Claude only pushes `claude/<card>` and
-   kammacron pushes it on when the diff passes.
+| Step        | What it does                                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude**  | `claude -p` with the card, its comments and earlier runs, the rules, and only the kammacron MCP tools plus the project's enabled servers. Goes on when Claude moves the card to done. |
+| **Command** | `sh -c` in the directory, with `KAMMACRON_CARD_ID`, `_CARD_TITLE`, `_CARD_FILE` (the card as markdown), `_RUN_ID`, `_PROJECT_DIR`. `ssh` uses this machine's keys. Passes on exit 0.  |
 
-**Shipping**: `push` (Claude pushes to the default branch) or `branch` (you approve each one).
+A failing step stops the rest: the card goes to review with the step's name and output. Claude
+handing the card to a person (review, or a question) ends the run there. All steps passed: done.
+
+kammacron does not branch, reset, check or push the directory: that is the playbook's and the
+project's instructions' business. The board shows the directory's git branch, read-only.
+
 **Mode**: `autopilot` (decides reversible things, says so) or `watch` (asks when unsure).
 
 ## CLI
@@ -110,7 +104,7 @@ registration; the consent page needs your session).
 ## Data
 
 `~/.kammacron/`: `db/` (PGlite), `secrets.json` (API token, session secret, Claude token; mode 600),
-`files/` (images), `logs/` (server and one `.jsonl` per run), `mcp/`, `worktrees/`. Set
+`files/` (images), `logs/` (server and one `.jsonl` per run), `mcp/`, `runs/` (a run's card file and images, while it goes). Set
 `DATABASE_URL` to use Postgres instead of PGlite.
 
 ## Development

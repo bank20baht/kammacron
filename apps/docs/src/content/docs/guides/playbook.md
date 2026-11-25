@@ -1,0 +1,77 @@
+---
+title: Playbooks
+description: What a run does with a card, step by step, in the project's directory.
+---
+
+A project points kammacron at a **directory** on this machine. kammacron does not branch, reset, check or push it: what happens there is the project's **playbook**, and the project's own instructions (`CLAUDE.md`, `.claude-worker/prompt.md`).
+
+A playbook is a list of steps, run in order for each card the worker picks:
+
+| Step        | What it does                                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Claude**  | One `claude -p` on the card, with the rules of the run and the allowlist. See [how a card is worked](/guides/worker/). |
+| **Command** | `sh -c <command>` in the directory: tests, a build, `ssh` to another machine, a deploy, anything.                      |
+
+A new project has one step, **Claude**: the card goes to `claude -p` and nothing else. Edit it under **Settings → Projects → (a project) → Playbook**, where **Claude step**, **Command** and **Command over SSH** add a step from a template.
+
+## An example
+
+A playbook that has Claude do the card, tests it, then deploys and migrates over SSH:
+
+| #   | Step    | Kind    | Command                                                       |
+| --- | ------- | ------- | ------------------------------------------------------------- |
+| 1   | Install | Command | `bun install`                                                 |
+| 2   | Claude  | Claude  |                                                               |
+| 3   | Test    | Command | `bun test`                                                    |
+| 4   | Deploy  | Command | `ssh deploy@app-1 'cd /srv/shop && git pull && ./restart.sh'` |
+| 5   | Migrate | Command | `ssh db-1 ./migrate.sh`                                       |
+
+SSH uses this machine's keys, agent (`SSH_AUTH_SOCK`) and `~/.ssh/config`, as you would from a terminal. Or leave the SSH to Claude: allow `Bash(ssh app-1:*)` on its step and say what to do in the step's words.
+
+## How the steps go
+
+- Steps run one after another, in the directory as it is.
+- A **Claude** step goes on only when Claude moves the card to **Done**. When it moves the card to **Review**, or back to **To do** with a question, the rest of the playbook waits: the card is a person's now. A Claude step that ends with the card still in **Doing** has failed.
+- A **Command** step passes on exit 0. With **Go on when it fails**, a failure is noted on the run and the playbook goes on.
+- A step that fails stops the playbook: the card goes to **Review** with the reason (`step "Test" failed: exit 1`), the end of the step's output is commented on the card, and the steps after it are marked skipped.
+- When every step passes and nothing moved the card, it is moved to **Done** with a comment naming the steps.
+- **Stop** on a run reaches the step going now, and whatever that step started.
+
+Each run's page shows the steps, how each ended, its exit code, and the end of what it printed.
+
+## What a command gets
+
+Commands run with the worker's PATH (**Settings → Worker**) and these variables:
+
+| Variable                | Value                                                       |
+| ----------------------- | ----------------------------------------------------------- |
+| `KAMMACRON_CARD_ID`     | The card's number                                           |
+| `KAMMACRON_CARD_TITLE`  | Its title                                                   |
+| `KAMMACRON_CARD_FILE`   | A markdown file with the card and its comments, for the run |
+| `KAMMACRON_RUN_ID`      | The run's id                                                |
+| `KAMMACRON_PROJECT_DIR` | The project's directory                                     |
+
+The card reaches a command only through these variables, never pasted into the command line, so a card's title cannot become shell.
+
+A command step times out after 15 minutes unless the step says otherwise.
+
+## Step options
+
+| Step    | Option                     | What it does                                             |
+| ------- | -------------------------- | -------------------------------------------------------- |
+| both    | Name                       | Shown on the run, and in the reason when it fails        |
+| Command | Command                    | `sh -c`, in the project directory                        |
+| Command | Timeout (minutes)          | 15 by default                                            |
+| Command | Go on when it fails        | A failure does not stop the playbook                     |
+| Claude  | Words for this step        | Added after the card, such as "only write the changelog" |
+| Claude  | Model                      | This step's `--model`; empty: the project's              |
+| Claude  | Max turns                  | This step's `--max-turns`; empty: the project's          |
+| Claude  | More allowed Bash commands | Added to the project's allowlist for this step only      |
+
+A playbook may have more than one Claude step: one to do the card, one later to write the changelog, for example. Each is told which steps run before and after it.
+
+## Git
+
+kammacron never touches git in the directory. Branches, worktrees, commits and pushes are whatever the project's instructions say: `CLAUDE.md` can tell Claude to work in a worktree, push to a branch and open a pull request, or push straight to `main`. Where the instructions say nothing, Claude is told not to push or deploy.
+
+The board shows the directory's branch, how far it is from `origin`, and whether it has uncommitted changes, read-only.

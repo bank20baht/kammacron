@@ -7,7 +7,7 @@ description: Commands that run on an interval and open cards when they fail, and
 
 A schedule is a shell command a project runs on an interval: tests, an audit, a link check. Add one under **Project settings → Schedules**: a name, the command (`bun run test`) and how often (once a day by default).
 
-Schedules run inside the project's round. With a worktree they run at what `origin` has; in the repo folder they run on the folder as it is, without switching branch.
+Schedules run inside the project's round, in the project's directory as it is.
 
 When the command fails, kammacron opens a card titled `<name> fails`, tagged `claude`, with the output, so the worker picks it up. While that card is open, later failures add a comment to it instead of opening another.
 

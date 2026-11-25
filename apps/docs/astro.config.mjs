@@ -36,8 +36,8 @@ export default defineConfig({
           items: [
             { slug: 'guides/board', label: 'The board' },
             { slug: 'guides/worker', label: 'How a card is worked' },
-            { slug: 'guides/working-copy', label: 'Repo folder or worktree' },
-            { slug: 'guides/shipping', label: 'Shipping and review' },
+            { slug: 'guides/playbook', label: 'Playbooks' },
+            { slug: 'guides/review', label: 'Review' },
             { slug: 'guides/permissions', label: 'Permissions and safety' },
             { slug: 'guides/schedules', label: 'Schedules and the calendar' },
             { slug: 'guides/mcp', label: 'Claude Code and MCP' },

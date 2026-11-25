@@ -11,16 +11,17 @@ import type { ChartSeries, ColumnMap } from '@20baht/ui'
 import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { currentLocale, I18n, type Translate } from '../../core/i18n/i18n.service'
 import { cost } from '../../shared/format'
 
-const WEEK_COLUMNS: ColumnMap = {
-  week: 'Week',
-  runs: { label: 'Runs', numeric: true },
-  done: { label: 'Shipped', numeric: true },
-  review: { label: 'Review', numeric: true },
-  reverted: { label: 'Reverted', numeric: true },
-  cost: { label: 'Cost (API equivalent)', align: 'end' },
-}
+const columnsOf = (t: Translate): ColumnMap => ({
+  week: t('stats.column.week'),
+  runs: { label: t('stats.column.runs'), numeric: true },
+  done: { label: t('stats.column.done'), numeric: true },
+  review: { label: t('stats.column.review'), numeric: true },
+  reverted: { label: t('stats.column.reverted'), numeric: true },
+  cost: { label: t('stats.column.cost'), align: 'end' },
+})
 
 /** What the worker did, week by week: shipped, handed back, reverted, and what it cost. */
 @Component({
@@ -46,73 +47,79 @@ const WEEK_COLUMNS: ColumnMap = {
   `,
   template: `
     <div class="app-page">
-      <baht-page-header heading="Stats" description="What the worker did, week by week.">
+      <baht-page-header [heading]="t('stats.heading')" [description]="t('stats.description')">
         <baht-tabs
           variant="pill"
-          label="Weeks"
-          [tabs]="ranges"
+          [label]="t('stats.weeksLabel')"
+          [tabs]="ranges()"
           [value]="String(weeks())"
           (bahtChange)="weeks.set(Number($any($event).value))"
         ></baht-tabs>
       </baht-page-header>
       @if (stats.value(); as s) {
         <div class="stats">
-          <baht-card><baht-stat label="Runs" [value]="s.total.runs"></baht-stat></baht-card>
           <baht-card
-            ><baht-stat label="Shipped by Claude" [value]="s.total.done"></baht-stat
+            ><baht-stat [label]="t('stats.runs')" [value]="s.total.runs"></baht-stat
+          ></baht-card>
+          <baht-card
+            ><baht-stat [label]="t('stats.shippedByClaude')" [value]="s.total.done"></baht-stat
           ></baht-card>
           <baht-card>
             <baht-stat
-              label="Sent to review"
+              [label]="t('stats.sentToReview')"
               [value]="s.total.review_rate"
               format="percent"
               [upIsGood]="false"
             ></baht-stat>
-            <p class="muted">{{ s.total.review }} of {{ s.total.runs }}</p>
+            <p class="muted">
+              {{ t('stats.reviewOf', { review: s.total.review, runs: s.total.runs }) }}
+            </p>
           </baht-card>
           <baht-card>
             <baht-stat
-              label="Cost (API equivalent)"
+              [label]="t('stats.cost')"
               [value]="s.total.cost"
               format="currency"
               currency="USD"
             ></baht-stat>
             <p class="muted">
-              An estimate Claude Code reports; a subscription token is not billed it.
+              {{ t('stats.costNote') }}
             </p>
           </baht-card>
         </div>
         @if (s.total.runs <= 1) {
-          <baht-alert tone="info" message="Only one run in this period: no trend yet."></baht-alert>
+          <baht-alert tone="info" [message]="t('stats.noTrend')"></baht-alert>
         }
         <div class="charts">
-          <baht-card heading="Weekly outcomes">
+          <baht-card [heading]="t('stats.outcomes')">
             <baht-bar-chart
-              label="Runs per week"
+              [label]="t('stats.runsPerWeek')"
               stacked
               [categories]="categories()"
               [series]="series()"
-              empty-message="No runs yet"
+              [emptyMessage]="t('stats.empty')"
+              [locale]="locale()"
             ></baht-bar-chart>
           </baht-card>
-          <baht-card heading="Weekly cost">
+          <baht-card [heading]="t('stats.weeklyCost')">
             <baht-line-chart
-              label="Cost per week"
+              [label]="t('stats.costPerWeek')"
               format="currency"
               currency="USD"
               [categories]="categories()"
               [series]="costSeries()"
-              empty-message="No runs yet"
+              [emptyMessage]="t('stats.empty')"
+              [locale]="locale()"
             ></baht-line-chart>
-            <p class="muted">API equivalent, in US dollars.</p>
+            <p class="muted">{{ t('stats.costUnit') }}</p>
           </baht-card>
         </div>
         <baht-table
           [showIndex]="false"
-          [columns]="weekColumns"
+          [columns]="weekColumns()"
           [items]="weekRows()"
           [total]="weekRows().length"
-          empty-message="No runs yet"
+          [emptyMessage]="t('stats.empty')"
         ></baht-table>
       } @else {
         <baht-skeleton variant="text"></baht-skeleton>
@@ -123,14 +130,15 @@ const WEEK_COLUMNS: ColumnMap = {
 export class StatsComponent {
   private readonly api = inject(Api).client.api
   protected readonly weeks = signal(8)
-  protected readonly ranges = [4, 8, 26, 52].map((n) => ({
-    key: String(n),
-    label: `${String(n)} weeks`,
-  }))
+  protected readonly t = inject(I18n).t
+  protected readonly locale = currentLocale
+  protected readonly ranges = computed(() =>
+    [4, 8, 26, 52].map((n) => ({ key: String(n), label: this.t('stats.weeks', { count: n }) })),
+  )
   protected readonly String = String
   protected readonly Number = Number
   protected readonly cost = cost
-  protected readonly weekColumns = WEEK_COLUMNS
+  protected readonly weekColumns = computed(() => columnsOf(this.t))
   protected readonly stats = resource({
     params: () => this.weeks(),
     loader: ({ params }) => firstValueFrom(this.api.stats.get({ query: { weeks: params } })),
@@ -141,15 +149,15 @@ export class StatsComponent {
   protected readonly series = computed<ChartSeries[]>(() => {
     const weeks = this.stats.value()?.weeks ?? []
     return [
-      { name: 'Shipped', values: weeks.map((w) => w.done) },
-      { name: 'Review', values: weeks.map((w) => w.review) },
-      { name: 'Reverted', values: weeks.map((w) => w.reverted) },
-      { name: 'Failed or stopped', values: weeks.map((w) => w.failed) },
+      { name: this.t('stats.series.shipped'), values: weeks.map((w) => w.done) },
+      { name: this.t('stats.series.review'), values: weeks.map((w) => w.review) },
+      { name: this.t('stats.series.reverted'), values: weeks.map((w) => w.reverted) },
+      { name: this.t('stats.series.failed'), values: weeks.map((w) => w.failed) },
     ]
   })
   protected readonly costSeries = computed<ChartSeries[]>(() => [
     {
-      name: 'Cost (USD)',
+      name: this.t('stats.series.cost'),
       values: (this.stats.value()?.weeks ?? []).map((w) => w.cost),
     },
   ])

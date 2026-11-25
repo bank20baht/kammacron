@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import type { BahtForm } from '@20baht/ui'
 
+import { I18n } from '../../core/i18n/i18n.service'
 import { SessionService } from '../../services/session.service'
 import { loginForm } from '../../shared/forms'
 
@@ -37,26 +38,25 @@ import { loginForm } from '../../shared/forms'
   `,
   template: `
     <div class="center">
-      <baht-card
-        heading="Open kammacron"
-        subtitle="Enter the API token of the machine kammacron runs on."
-      >
+      <baht-card [heading]="t('login.heading')" [subtitle]="t('login.subtitle')">
         <div class="box">
-          <p class="muted">On that machine, run:</p>
+          <p class="muted">{{ t('login.run') }}</p>
           <div class="row">
             <baht-code code="kammacron token"></baht-code>
-            <baht-copy-button text="kammacron token" label="Copy command"></baht-copy-button>
+            <baht-copy-button text="kammacron token" [label]="t('login.copy')"></baht-copy-button>
           </div>
           @if (error()) {
-            <baht-alert tone="danger" message="That token is not this install's."></baht-alert>
+            <baht-alert tone="danger" [message]="t('login.wrong')"></baht-alert>
           }
           <baht-form
             #f="bahtForm"
-            [form]="form"
+            [form]="form()"
             submit-on-enter
             (bahtSubmit)="submit(f.element)"
           ></baht-form>
-          <baht-button variant="primary" block (click)="submit(f.element)">Open</baht-button>
+          <baht-button variant="primary" block (click)="submit(f.element)">{{
+            t('login.open')
+          }}</baht-button>
         </div>
       </baht-card>
     </div>
@@ -67,7 +67,8 @@ export class LoginComponent {
   private readonly router = inject(Router)
   readonly next = input<string>()
   protected readonly error = signal(false)
-  protected readonly form = loginForm
+  protected readonly t = inject(I18n).t
+  protected readonly form = computed(() => loginForm(this.t))
 
   protected async submit(form: BahtForm): Promise<void> {
     const token = form.getData()['token']

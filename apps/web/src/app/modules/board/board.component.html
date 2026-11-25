@@ -1,11 +1,13 @@
 <div class="layout">
   <div class="app-page board-page">
     @if (project(); as p) {
-      <baht-page-header heading="Board / {{ p.name }}">
-        <baht-button variant="secondary" icon="play" [disabled]="!p.repo_path" (click)="runNow()"
-          >Run now</baht-button
-        >
-        <baht-button variant="primary" icon="plus" (click)="startNew()">New card</baht-button>
+      <baht-page-header [heading]="t('board.headingProject', { name: p.name })">
+        <baht-button variant="secondary" icon="play" [disabled]="!p.repo_path" (click)="runNow()">{{
+          t('board.runNow')
+        }}</baht-button>
+        <baht-button variant="primary" icon="plus" (click)="startNew()">{{
+          t('board.newCard')
+        }}</baht-button>
       </baht-page-header>
       <div class="meta">
         <baht-badge
@@ -13,30 +15,34 @@
           [label]="workerLine()"
         ></baht-badge>
         @if (p.last_checked_at) {
-          <span class="muted"
-            >Last check {{ ago(p.last_checked_at) }}: {{ p.last_check_result }}</span
-          >
+          <span class="muted">{{
+            t('board.lastCheck', { ago: ago(p.last_checked_at), result: p.last_check_result ?? '' })
+          }}</span>
         }
         @if (p.worker_enabled && p.next_run_at) {
-          <span class="muted">· Next check {{ ago(p.next_run_at) }}</span>
+          <span class="muted">{{ t('board.nextCheck', { ago: ago(p.next_run_at) }) }}</span>
         }
-        <a class="link" [routerLink]="['/settings/projects', p.id]">Project settings</a>
+        <a class="link" [routerLink]="['/settings/projects', p.id]">{{
+          t('board.projectSettings')
+        }}</a>
       </div>
       @if (p.paused_reason) {
         <baht-alert
           tone="warning"
-          heading="This project is paused"
+          [heading]="t('board.paused')"
           [message]="p.paused_reason"
         ></baht-alert>
       }
     } @else {
-      <baht-page-header heading="Board" description="All projects">
-        <baht-button variant="primary" icon="plus" (click)="startNew()">New card</baht-button>
+      <baht-page-header [heading]="t('board.heading')" [description]="t('board.allProjects')">
+        <baht-button variant="primary" icon="plus" (click)="startNew()">{{
+          t('board.newCard')
+        }}</baht-button>
       </baht-page-header>
     }
 
     <baht-segmented-nav
-      label="Project"
+      [label]="t('board.projectNav')"
       [items]="nav()"
       [current]="slug() ?? ''"
       (baht-navigate)="navigate($event)"
@@ -46,14 +52,11 @@
       <div class="banner">
         <baht-alert
           tone="warning"
-          [heading]="
-            byColumn().review.length +
-            (byColumn().review.length === 1 ? ' card needs review' : ' cards need review')
-          "
+          [heading]="t('board.needsReview', { count: byColumn().review.length })"
         ></baht-alert>
-        <baht-button variant="secondary" icon="arrow-right" (click)="go('/review')"
-          >Open review</baht-button
-        >
+        <baht-button variant="secondary" icon="arrow-right" (click)="go('/review')">{{
+          t('board.openReview')
+        }}</baht-button>
       </div>
     }
     @if (error(); as message) {
@@ -66,16 +69,15 @@
     }
 
     @if ((projects().data ?? []).length === 0 && projects().data) {
-      <baht-empty-state
-        message="No project yet"
-        hint="Three steps: the tools, a Claude token, a repo."
-      >
-        <baht-button variant="primary" (click)="go('/welcome')">Get started</baht-button>
+      <baht-empty-state [message]="t('board.noProject')" [hint]="t('board.noProjectHint')">
+        <baht-button variant="primary" (click)="go('/welcome')">{{
+          t('board.getStarted')
+        }}</baht-button>
       </baht-empty-state>
     } @else {
       <app-kanban
-        label="Cards"
-        [columns]="kanbanColumns"
+        [label]="t('board.cards')"
+        [columns]="kanbanColumns()"
         [lanes]="byColumn()"
         [selected]="openCard()"
         (move)="move($event)"
@@ -89,18 +91,21 @@
                 <span class="muted">{{ projectName()(card.project_id) }}</span>
               }
               @if (card.priority !== 0) {
-                <baht-badge tone="mono" [label]="'P' + card.priority"></baht-badge>
+                <baht-badge
+                  tone="mono"
+                  [label]="t('board.priority', { priority: card.priority })"
+                ></baht-badge>
               }
             </div>
             <div class="title">{{ card.title }}</div>
             <div class="badges">
               @if (card.status === 'doing' && card.claimed_by_run) {
-                <baht-badge tone="info" busy label="Claude is working"></baht-badge>
+                <baht-badge tone="info" busy [label]="t('board.claudeWorking')"></baht-badge>
               }
               @if (card.human) {
-                <baht-badge tone="info" label="Human"></baht-badge>
+                <baht-badge tone="info" [label]="t('card.human')"></baht-badge>
               } @else if (card.tags.includes(claude)) {
-                <baht-badge tone="neutral" label="Claude"></baht-badge>
+                <baht-badge tone="neutral" [label]="t('card.claude')"></baht-badge>
               }
               @for (tag of card.tags; track tag) {
                 @if (tag !== claude) {
@@ -115,7 +120,7 @@
                   size="sm"
                   variant="primary"
                   (click)="open(card.id); $event.stopPropagation()"
-                  >Review</baht-button
+                  >{{ t('board.review') }}</baht-button
                 >
               </div>
             }
@@ -126,7 +131,7 @@
             <div class="quick">
               <baht-form
                 #qa="bahtForm"
-                [form]="quickAddForm"
+                [form]="quickAddForm()"
                 submit-on-enter
                 [busy]="busy()"
                 (bahtSubmit)="quickAdd(qa.element)"
@@ -140,7 +145,7 @@
 
   <baht-panel
     size="lg"
-    [heading]="openCard() ? 'Card #' + openCard() : ''"
+    [heading]="openCard() ? t('card.heading', { id: openCard() ?? '' }) : ''"
     [open]="openCard() !== null"
     (bahtClose)="open(null)"
   >
@@ -151,8 +156,8 @@
 </div>
 
 <baht-form-modal
-  heading="New card"
-  submit-label="Create card"
+  [heading]="t('board.newCard')"
+  [submitLabel]="t('board.createCard')"
   [open]="creating()"
   [form]="newForm()"
   [value]="newValue()"

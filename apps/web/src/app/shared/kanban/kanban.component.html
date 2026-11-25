@@ -1,4 +1,4 @@
-<div class="columns" role="group" [attr.aria-label]="label()">
+<div class="columns" role="group" [attr.aria-label]="label() ?? t('kanban.label')">
   @for (column of columns(); track column.key) {
     <section
       class="column"
@@ -26,12 +26,12 @@
           (click)="opened.emit(item.id)"
           (keydown)="key($event, column.key, item.id)"
         >
-          @if (tile(); as t) {
-            <ng-container *ngTemplateOutlet="t.template; context: { $implicit: item }" />
+          @if (tile(); as tileDef) {
+            <ng-container *ngTemplateOutlet="tileDef.template; context: { $implicit: item }" />
           }
         </article>
       } @empty {
-        <p class="empty">{{ emptyText() }}</p>
+        <p class="empty">{{ emptyText() ?? t('kanban.empty') }}</p>
       }
       @if (footer(); as f) {
         <ng-container *ngTemplateOutlet="f.template; context: { $implicit: column }" />

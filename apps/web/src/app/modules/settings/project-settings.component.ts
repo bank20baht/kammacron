@@ -14,6 +14,7 @@ import type { BahtForm, Crumb, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { projectForm, scheduleForm } from '../../shared/forms'
@@ -24,14 +25,7 @@ type Check = {
   default_branch: string | null
 }
 
-const SECTIONS: TabItem[] = [
-  { key: 'general', label: 'General' },
-  { key: 'worker', label: 'Worker & limits' },
-  { key: 'shipping', label: 'Shipping & verification' },
-  { key: 'permissions', label: 'Permissions' },
-  { key: 'schedules', label: 'Schedules' },
-  { key: 'advanced', label: 'Advanced' },
-]
+const SECTIONS = ['general', 'worker', 'shipping', 'permissions', 'schedules', 'advanced'] as const
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const count = (v: unknown, fallback: number) => {
@@ -73,12 +67,15 @@ export class ProjectSettingsComponent {
   /** `?section=permissions` opens that section (the run page links there). */
   readonly section = input<string>()
   private readonly router = inject(Router)
-  protected readonly sections = SECTIONS
+  protected readonly t = inject(I18n).t
+  protected readonly sections = computed<TabItem[]>(() =>
+    SECTIONS.map((key) => ({ key, label: this.t(`project.sections.${key}`) })),
+  )
   protected readonly picked = signal<string | null>(null)
   protected readonly current = computed(() => this.picked() ?? this.section() ?? 'general')
   protected readonly dirty = signal(false)
   protected readonly crumbs = computed<Crumb[]>(() => [
-    { label: 'Settings' },
+    { label: this.t('nav.settings') },
     { label: this.project.value()?.name ?? '…' },
   ])
 
@@ -93,8 +90,8 @@ export class ProjectSettingsComponent {
   protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
   protected readonly busy = signal(false)
   protected readonly ago = ago
-  protected readonly projectForm = projectForm
-  protected readonly scheduleForm = scheduleForm
+  protected readonly projectForm = computed(() => projectForm(this.t))
+  protected readonly scheduleForm = computed(() => scheduleForm(this.t))
   protected readonly scheduleValue = { interval_minutes: 1440 }
 
   protected readonly value = computed(() => {
@@ -164,7 +161,7 @@ export class ProjectSettingsComponent {
       this.dirty.set(false)
       this.project.reload()
       if (text(d['repo_path'])) await this.runCheck()
-    }, 'Saved')
+    }, this.t('project.messages.saved'))
   }
 
   protected async runCheck(): Promise<void> {
@@ -180,7 +177,7 @@ export class ProjectSettingsComponent {
   protected runNow(): Promise<void> {
     return this.act(
       () => firstValueFrom(this.api.projects({ id: this.id() })['run-now'].post()),
-      'A round is queued: watch the board and Runs',
+      this.t('project.messages.queued'),
     )
   }
 
@@ -188,7 +185,7 @@ export class ProjectSettingsComponent {
     return this.act(async () => {
       await firstValueFrom(this.api.projects({ id: this.id() }).resume.post())
       this.project.reload()
-    }, 'Resumed')
+    }, this.t('project.messages.resumed'))
   }
 
   protected addSchedule(form: BahtForm): Promise<void> {
@@ -203,13 +200,13 @@ export class ProjectSettingsComponent {
         }),
       )
       form.reset()
-    }, 'Schedule added')
+    }, this.t('project.messages.scheduleAdded'))
   }
 
   protected toggleSchedule(id: number, enabled: boolean): Promise<void> {
     return this.act(
       () => firstValueFrom(this.api.schedules({ id: String(id) }).patch({ enabled })),
-      enabled ? 'On' : 'Off',
+      enabled ? this.t('project.messages.on') : this.t('project.messages.off'),
     )
   }
 }

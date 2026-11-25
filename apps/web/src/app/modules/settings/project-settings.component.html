@@ -2,13 +2,15 @@
   @if (project.value(); as p) {
     <baht-breadcrumbs [items]="crumbs()" (bahtNavigate)="go('/settings')"></baht-breadcrumbs>
     <baht-page-header [heading]="p.name">
-      <baht-button variant="secondary" (click)="go('/board/' + p.slug)">Open board</baht-button>
+      <baht-button variant="secondary" (click)="go('/board/' + p.slug)">{{
+        t('project.openBoard')
+      }}</baht-button>
       <baht-button
         variant="primary"
         icon="play"
         [disabled]="busy() || !p.repo_path"
         (click)="runNow()"
-        >Run now</baht-button
+        >{{ t('project.runNow') }}</baht-button
       >
     </baht-page-header>
     <div class="row">
@@ -17,26 +19,33 @@
           p.paused_reason ? 'warning' : p.worker_enabled && p.repo_path ? 'success' : 'neutral'
         "
         [label]="
-          p.paused_reason ? 'Paused' : p.worker_enabled && p.repo_path ? 'Worker on' : 'Board only'
+          p.paused_reason
+            ? t('project.badge.paused')
+            : p.worker_enabled && p.repo_path
+              ? t('project.badge.workerOn')
+              : t('project.badge.boardOnly')
         "
       ></baht-badge>
       @if (p.last_checked_at) {
-        <span class="muted"
-          >Last check {{ ago(p.last_checked_at) }}: {{ p.last_check_result }}</span
-        >
+        <span class="muted">{{
+          t('project.lastCheck', {
+            when: ago(p.last_checked_at),
+            result: p.last_check_result ?? '',
+          })
+        }}</span>
       }
       @if (p.worker_enabled && p.next_run_at) {
-        <span class="muted">· Next check {{ ago(p.next_run_at) }}</span>
+        <span class="muted">{{ t('project.nextCheck', { when: ago(p.next_run_at) }) }}</span>
       }
     </div>
     @if (p.paused_reason) {
       <baht-alert
         tone="warning"
-        heading="Paused by kammacron"
+        [heading]="t('project.pausedBy')"
         [message]="p.paused_reason"
       ></baht-alert>
       <div class="row">
-        <baht-button variant="primary" (click)="resume()">Resume this project</baht-button>
+        <baht-button variant="primary" (click)="resume()">{{ t('project.resume') }}</baht-button>
       </div>
     }
     @if (message(); as m) {
@@ -49,7 +58,7 @@
     }
 
     <baht-tabs
-      [tabs]="sections"
+      [tabs]="sections()"
       [value]="current()"
       (bahtChange)="picked.set($any($event).value)"
     ></baht-tabs>
@@ -64,19 +73,23 @@
                 [label]="item.name"
               ></baht-badge>
             }
-            <span class="muted">{{ c.ok ? 'Ready to run' : 'Not ready yet' }}</span>
+            <span class="muted">{{
+              c.ok ? t('project.checks.ready') : t('project.checks.notReady')
+            }}</span>
           </div>
         } @else if (p.repo_path) {
           <div class="row">
-            <span class="muted">Repo checks not run</span>
-            <baht-button size="sm" variant="ghost" (click)="runCheck()">Check the repo</baht-button>
+            <span class="muted">{{ t('project.checks.notRun') }}</span>
+            <baht-button size="sm" variant="ghost" (click)="runCheck()">{{
+              t('project.checks.run')
+            }}</baht-button>
           </div>
         }
       }
       <baht-card>
         <baht-form
           #pf="bahtForm"
-          [form]="projectForm"
+          [form]="projectForm()"
           [value]="value()"
           [view]="current()"
           (bahtDirtyChange)="dirty.set($any($event).dirty)"
@@ -84,7 +97,7 @@
       </baht-card>
       <baht-save-bar
         [open]="dirty()"
-        message="Unsaved changes to this project"
+        [message]="t('project.unsaved')"
         warn-on-leave
         [loading]="busy()"
         (bahtSave)="save(pf.element)"
@@ -94,34 +107,37 @@
 
     @if (current() === 'schedules') {
       <baht-card
-        heading="Schedules"
-        subtitle="A command on a timer; when it fails, a card opens (or the open one gets a comment)"
+        [heading]="t('project.schedules.heading')"
+        [subtitle]="t('project.schedules.subtitle')"
       >
         @for (s of schedules().data ?? []; track s.id) {
           <div class="row">
             <strong>{{ s.name }}</strong>
             <baht-code [code]="s.command"></baht-code>
-            <span class="muted"
-              >every {{ s.interval_minutes }} min · last {{ ago(s.last_run_at) }} · exit
-              {{ s.last_exit_code ?? '—' }}</span
-            >
+            <span class="muted">{{
+              t('project.schedules.line', {
+                minutes: s.interval_minutes,
+                last: ago(s.last_run_at),
+                exit: s.last_exit_code ?? t('common.none'),
+              })
+            }}</span>
             <baht-button size="sm" variant="ghost" (click)="toggleSchedule(s.id, !s.enabled)">{{
-              s.enabled ? 'Turn off' : 'Turn on'
+              s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
             }}</baht-button>
           </div>
         } @empty {
-          <p class="muted">No schedule yet.</p>
+          <p class="muted">{{ t('project.schedules.empty') }}</p>
         }
-        <baht-form #sf="bahtForm" [form]="scheduleForm" [value]="scheduleValue"></baht-form>
-        <baht-button variant="secondary" [disabled]="busy()" (click)="addSchedule(sf.element)"
-          >Add schedule</baht-button
-        >
+        <baht-form #sf="bahtForm" [form]="scheduleForm()" [value]="scheduleValue"></baht-form>
+        <baht-button variant="secondary" [disabled]="busy()" (click)="addSchedule(sf.element)">{{
+          t('project.schedules.add')
+        }}</baht-button>
       </baht-card>
     }
   } @else if (project.error()) {
     <baht-error-state
-      heading="This project did not load"
-      [message]="'Project ' + id()"
+      [heading]="t('project.loadError')"
+      [message]="t('project.id', { id: id() })"
     ></baht-error-state>
   } @else {
     <baht-skeleton variant="text"></baht-skeleton>

@@ -12,6 +12,7 @@ import type { BahtForm } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { I18n } from '../../core/i18n/i18n.service'
 import { claudeTokenForm } from '../../shared/forms'
 
 /** First start, finished on this page: the tools, a Claude token (kept and tested here), a repo. */
@@ -52,40 +53,45 @@ import { claudeTokenForm } from '../../shared/forms'
   template: `
     <div class="app-page">
       <baht-page-header
-        heading="Welcome to kammacron"
-        description="Connect Claude and a repository to start."
+        [heading]="t('welcome.heading')"
+        [description]="t('welcome.description')"
       ></baht-page-header>
       <div class="split">
         <baht-card
-          heading="Setup progress"
-          [subtitle]="remaining() === 0 ? 'All set' : remaining() + ' left'"
+          [heading]="t('welcome.progress')"
+          [subtitle]="
+            remaining() === 0 ? t('welcome.allSet') : t('welcome.left', { count: remaining() })
+          "
         >
           <div class="steps">
             <div class="row">
               <baht-badge
                 [tone]="toolsOk() ? 'success' : 'warning'"
-                [label]="toolsOk() ? 'done' : 'missing'"
+                [label]="toolsOk() ? t('welcome.step.done') : t('welcome.step.missing')"
               ></baht-badge>
-              Tools
+              {{ t('welcome.steps.tools') }}
             </div>
             <div class="row">
               <baht-badge
                 [tone]="hasToken() ? 'success' : 'warning'"
-                [label]="hasToken() ? 'done' : 'to do'"
+                [label]="hasToken() ? t('welcome.step.done') : t('welcome.step.toDo')"
               ></baht-badge>
-              Claude token
+              {{ t('welcome.steps.token') }}
             </div>
             <div class="row">
               <baht-badge
                 [tone]="hasRepo() ? 'success' : 'warning'"
-                [label]="hasRepo() ? 'done' : 'to do'"
+                [label]="hasRepo() ? t('welcome.step.done') : t('welcome.step.toDo')"
               ></baht-badge>
-              A project with its repo
+              {{ t('welcome.steps.repo') }}
             </div>
           </div>
         </baht-card>
         <div class="stack">
-          <baht-card heading="Tools" subtitle="On the PATH the worker uses">
+          <baht-card
+            [heading]="t('welcome.tools.heading')"
+            [subtitle]="t('welcome.tools.subtitle')"
+          >
             <div class="row">
               @for (tool of system.value()?.tools ?? []; track tool.name) {
                 <baht-badge
@@ -96,45 +102,52 @@ import { claudeTokenForm } from '../../shared/forms'
             </div>
           </baht-card>
           <baht-card
-            heading="Claude token"
-            subtitle="It uses your Claude subscription. Kept on this machine, in secrets.json."
+            [heading]="t('welcome.token.heading')"
+            [subtitle]="t('welcome.token.subtitle')"
           >
             @if (hasToken()) {
-              <p class="muted">A token is set. Replace it here if it stops working.</p>
+              <p class="muted">{{ t('welcome.token.isSet') }}</p>
             }
-            <p class="muted">1. Run this in a terminal:</p>
+            <p class="muted">{{ t('welcome.token.step1') }}</p>
             <div class="row">
               <baht-code code="claude setup-token"></baht-code>
-              <baht-copy-button text="claude setup-token" label="Copy"></baht-copy-button>
+              <baht-copy-button
+                text="claude setup-token"
+                [label]="t('common.copy')"
+              ></baht-copy-button>
             </div>
-            <p class="muted">2. Paste the token it prints:</p>
-            <baht-form #tf="bahtForm" [form]="tokenForm"></baht-form>
+            <p class="muted">{{ t('welcome.token.step2') }}</p>
+            <baht-form #tf="bahtForm" [form]="tokenForm()"></baht-form>
             <div class="row">
-              <baht-button variant="primary" [loading]="busy()" (click)="saveAndTest(tf.element)"
-                >Save and test</baht-button
-              >
+              <baht-button variant="primary" [loading]="busy()" (click)="saveAndTest(tf.element)">{{
+                t('welcome.token.saveAndTest')
+              }}</baht-button>
               @if (result(); as r) {
                 <baht-badge [tone]="r.ok ? 'success' : 'danger'" [label]="r.text"></baht-badge>
               }
             </div>
           </baht-card>
           <baht-card
-            heading="Project"
-            subtitle="Settings → Projects: add one, set its repo path, turn the worker on"
+            [heading]="t('welcome.project.heading')"
+            [subtitle]="t('welcome.project.subtitle')"
           >
             <div class="row">
               <baht-badge
                 [tone]="hasRepo() ? 'success' : 'warning'"
-                [label]="hasRepo() ? 'linked' : 'none yet'"
+                [label]="hasRepo() ? t('welcome.project.linked') : t('welcome.project.noneYet')"
               ></baht-badge>
               <baht-button variant="secondary" (click)="go('/settings')">{{
-                hasRepo() ? 'Edit' : 'Add a project'
+                hasRepo() ? t('welcome.project.edit') : t('welcome.project.add')
               }}</baht-button>
             </div>
           </baht-card>
           <div class="row">
-            <baht-button variant="primary" (click)="go('/board')">Go to the board</baht-button>
-            <span class="muted">{{ remaining() === 0 ? 'Ready.' : remaining() + ' left' }}</span>
+            <baht-button variant="primary" (click)="go('/board')">{{
+              t('welcome.goBoard')
+            }}</baht-button>
+            <span class="muted">{{
+              remaining() === 0 ? t('welcome.ready') : t('welcome.left', { count: remaining() })
+            }}</span>
           </div>
         </div>
       </div>
@@ -149,10 +162,11 @@ export class WelcomeComponent {
   private readonly projects = resource({
     loader: () => firstValueFrom(this.api.projects.get({ query: {} })),
   })
-  protected readonly tokenForm = claudeTokenForm
+  protected readonly t = inject(I18n).t
+  protected readonly tokenForm = computed(() => claudeTokenForm(this.t))
   /** `git version 2.39.5` → `2.39.5`. */
   protected readonly versionOf = (line: string | null) =>
-    /\d+(\.\d+)+/.exec(line ?? '')?.[0] ?? 'not found'
+    /\d+(\.\d+)+/.exec(line ?? '')?.[0] ?? this.t('welcome.tools.notFound')
   protected readonly busy = signal(false)
   protected readonly result = signal<{ ok: boolean; text: string } | null>(null)
 
@@ -170,7 +184,7 @@ export class WelcomeComponent {
   protected async saveAndTest(form: BahtForm): Promise<void> {
     const token = form.getData()['token']
     if (typeof token !== 'string' || !token.trim()) {
-      this.result.set({ ok: false, text: 'Paste a token first' })
+      this.result.set({ ok: false, text: this.t('welcome.token.pasteFirst') })
       return
     }
     this.busy.set(true)
@@ -181,7 +195,7 @@ export class WelcomeComponent {
       const test = await firstValueFrom(this.api.settings['claude-test'].post())
       this.result.set({
         ok: test.ok,
-        text: test.ok ? 'Claude answered' : test.message.slice(0, 80),
+        text: test.ok ? this.t('welcome.token.answered') : test.message.slice(0, 80),
       })
     } catch (error) {
       this.result.set({ ok: false, text: describeError(error) })

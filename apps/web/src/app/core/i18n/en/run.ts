@@ -1,0 +1,27 @@
+/** One run's page: the facts, the summary, the events and what the allowlist blocked. */
+export const run = {
+  heading: 'Run {id}',
+  runs: 'Runs',
+  stop: 'Stop',
+  card: 'Card #{id}',
+  error: 'Error',
+  duration: 'Duration',
+  turns: 'Turns',
+  cost: 'Cost (API equivalent)',
+  branch: 'Branch',
+  started: 'Started',
+  denied: {
+    heading: 'Commands blocked by the allowlist',
+    subtitle: 'What the worker tried and was refused. Allow only what this project needs.',
+    permissions: 'Open project permissions',
+  },
+  tab: { summary: 'Summary', events: 'Events', verify: 'Verify output' },
+  noSummary: 'No summary yet.',
+  technical: 'Technical details',
+  session: 'Session',
+  log: 'Log',
+  base: 'Base',
+  commits: 'Commits',
+  revertedIn: 'Reverted in',
+  loadFailed: 'This run did not load',
+} as const

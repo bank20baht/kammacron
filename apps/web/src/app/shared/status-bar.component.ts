@@ -6,6 +6,7 @@ import type { NotificationItem } from '@20baht/ui'
 import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { I18n } from '../core/i18n/i18n.service'
 import { LiveService } from '../services/live.service'
 import { ago } from './format'
 
@@ -27,7 +28,7 @@ import { ago } from './format'
   template: `
     @if (status().data; as s) {
       @if (s.paused) {
-        <baht-badge tone="danger" label="Worker: paused"></baht-badge>
+        <baht-badge tone="danger" [label]="t('statusBar.paused')"></baht-badge>
       } @else if (s.running.length > 0) {
         @for (run of s.running; track run.run_id) {
           <a [routerLink]="['/runs', run.run_id]">
@@ -39,26 +40,32 @@ import { ago } from './format'
           </a>
         }
       } @else {
-        <baht-badge tone="success" label="Worker: idle"></baht-badge>
+        <baht-badge tone="success" [label]="t('statusBar.idle')"></baht-badge>
       }
       @for (p of s.paused_projects; track p.id) {
-        <baht-badge tone="warning" [label]="p.name + ' paused'"></baht-badge>
+        <baht-badge
+          tone="warning"
+          [label]="t('statusBar.projectPaused', { name: p.name })"
+        ></baht-badge>
       }
       @if (s.review > 0) {
         <a routerLink="/review">
-          <baht-badge tone="warning" [label]="'Review ' + s.review"></baht-badge>
+          <baht-badge
+            tone="warning"
+            [label]="t('statusBar.review', { count: s.review })"
+          ></baht-badge>
         </a>
       }
       <baht-button
         size="sm"
         variant="secondary"
-        [label]="s.paused ? 'Resume' : 'Pause'"
+        [label]="s.paused ? t('statusBar.resume') : t('statusBar.pause')"
         (click)="setPaused(!s.paused)"
       ></baht-button>
     }
     <baht-notification-bell
-      label="Alerts"
-      empty-message="Nothing needs you"
+      [label]="t('statusBar.alerts')"
+      [emptyMessage]="t('statusBar.noAlerts')"
       [items]="items()"
       [count]="status().data?.unread_alerts ?? 0"
       (bahtMarkAll)="readAll()"
@@ -68,6 +75,7 @@ import { ago } from './format'
 export class StatusBarComponent {
   private readonly live = inject(LiveService).live
   private readonly api = inject(Api).client.api
+  protected readonly t = inject(I18n).t
 
   protected readonly status = liveSignal(() => this.live.subscribe('GET', '/api/status'))
   private readonly alerts = liveSignal(() =>
@@ -81,7 +89,7 @@ export class StatusBarComponent {
       time: ago(alert.created_at),
       unread: !alert.read,
       tag: {
-        label: alert.level,
+        label: this.t(`statusBar.level.${alert.level}`),
         tone: alert.level === 'error' ? 'danger' : alert.level === 'warning' ? 'warning' : 'info',
       },
       ...(alert.run_id === null ? {} : { href: `/runs/${String(alert.run_id)}` }),

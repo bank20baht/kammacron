@@ -1,3 +1,4 @@
+import { t } from '../core/i18n/i18n.service'
 import { daysWith, every, occurrences } from './cron'
 
 const at = (s: string) => new Date(s)
@@ -33,7 +34,7 @@ describe('cron', () => {
     expect(
       daysWith([at('2026-11-25T10:00:00'), at('2026-11-25T11:00:00'), at('2026-11-26T01:00:00')]),
     ).toEqual(['2026-11-25', '2026-11-26'])
-    expect([30, 60, 360, 1440, 4320].map(every)).toEqual([
+    expect([30, 60, 360, 1440, 4320].map((m) => every(t, m))).toEqual([
       'every 30 min',
       'hourly',
       'every 6 h',

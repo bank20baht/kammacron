@@ -110,3 +110,17 @@ packages/kit  the typed client the web app uses
 
 The worker tests use a fake `claude` (`apps/server/test/fixtures/fake-claude.ts`) against real git
 repos with a local bare remote. `TEST_DATABASE_URL=postgres://…` runs the server suite on Postgres.
+
+### Words on the page (i18n)
+
+Every word the web app shows comes from a catalog in `apps/web/src/app/core/i18n/`: English
+(`en/`, one file per page) is the source. A component reads them with `t = inject(I18n).t` and
+`t('board.newCard')` / `t('review.count', { count })` in its template; keys are type-checked, plurals
+go through `Intl.PluralRules`. Forms and table columns are built from `t`, so they follow the
+locale too, as do the dates, durations and money (`@20baht/formats`), and the library's own
+validation messages.
+
+To add a language, say Thai: write `th/` with the same shape as `en` (`ShapeOf<typeof en>`, so a
+missing key fails the build), add it to `CATALOGS` and `ENGINE_LOCALE` in `i18n.service.ts`, and it
+shows up in Settings → Language. What the server writes (alerts, run summaries, error messages) is
+not translated.

@@ -11,6 +11,7 @@ import {
   type ColumnMap,
 } from '@20baht/ui'
 
+import { dateLocale, I18n, type Translate } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import {
   dayKey,
@@ -21,14 +22,10 @@ import {
   type CronJobLike,
 } from '../../shared/cron'
 import { ago } from '../../shared/format'
+import { runStatusLabel } from '../runs/runs.component'
 
 type Layer = 'worker' | 'schedule' | 'housekeeping' | 'runs'
-const LAYERS: { key: Layer; label: string }[] = [
-  { key: 'worker', label: 'Worker rounds' },
-  { key: 'schedule', label: 'Schedules' },
-  { key: 'housekeeping', label: 'Housekeeping' },
-  { key: 'runs', label: 'Runs' },
-]
+const LAYERS: readonly Layer[] = ['worker', 'schedule', 'housekeeping', 'runs']
 const VIEWS: readonly CalendarView[] = ['month', 'week', 'day']
 const JOB_TONE: Record<string, CalendarTone> = {
   worker: 'primary',
@@ -46,19 +43,20 @@ const RUN_TONE: Record<string, CalendarTone> = {
   stale: 'neutral',
 }
 
-const JOB_COLUMNS: ColumnMap = {
-  job: 'Job',
-  project: 'Project',
-  every: 'Runs',
-  next: 'Next',
-  last: 'Last',
-  result: 'Last result',
+const columnsOf = (t: Translate): ColumnMap => ({
+  job: t('calendar.column.job'),
+  project: t('calendar.column.project'),
+  every: t('calendar.column.every'),
+  next: t('calendar.column.next'),
+  last: t('calendar.column.last'),
+  result: t('calendar.column.result'),
   state: {
-    label: 'State',
+    label: t('calendar.column.state'),
     cell: 'badge',
-    tone: (value: unknown) => (value === 'on' ? 'success' : 'neutral'),
+    tone: (_value: unknown, row: Record<string, unknown>) =>
+      row['on'] === true ? 'success' : 'neutral',
   },
-}
+})
 
 type Drawn = { event: CalendarEvent; target: string }
 
@@ -105,21 +103,21 @@ const validDay = (key: string | undefined): key is string =>
   template: `
     <div class="app-page">
       <baht-page-header
-        heading="Calendar"
-        description="What runs on its own and when: worker rounds, schedules and housekeeping ahead (dashed), the runs that happened (solid)."
+        [heading]="t('calendar.heading')"
+        [description]="t('calendar.description')"
       ></baht-page-header>
       <div class="tools">
-        <span class="muted">Show</span>
+        <span class="muted">{{ t('calendar.show') }}</span>
         <baht-filter
-          label="Show"
-          [options]="layers"
+          [label]="t('calendar.show')"
+          [options]="layers()"
           [selected]="shown()"
           (bahtChange)="shown.set($any($event).selected)"
         ></baht-filter>
         @if (projectOptions().length > 1) {
-          <span class="muted">Project</span>
+          <span class="muted">{{ t('calendar.project') }}</span>
           <baht-filter
-            label="Project"
+            [label]="t('calendar.project')"
             [options]="projectOptions()"
             [selected]="project()"
             (bahtChange)="project.set($any($event).selected.slice(-1))"
@@ -127,28 +125,26 @@ const validDay = (key: string | undefined): key is string =>
         }
       </div>
       @if (calendar().error) {
-        <baht-alert
-          tone="danger"
-          message="The calendar did not load. Try again in a moment."
-        ></baht-alert>
+        <baht-alert tone="danger" [message]="t('calendar.loadFailed')"></baht-alert>
       }
       <baht-calendar
-        label="Cron calendar"
+        [label]="t('calendar.label')"
+        [locale]="locale()"
         [view]="view()"
         [date]="date()"
         [events]="events()"
         (bahtNavigate)="navigate($event)"
         (bahtEventOpen)="open($event.id)"
       ></baht-calendar>
-      <baht-card heading="Jobs" subtitle="Everything on a timer, and why a job that is off is off">
+      <baht-card [heading]="t('calendar.jobs')" [subtitle]="t('calendar.jobsSubtitle')">
         <baht-table
           [showIndex]="false"
-          [columns]="jobColumns"
+          [columns]="jobColumns()"
           [items]="jobRows()"
           [total]="jobRows().length"
           [loading]="!calendar().data"
           clickable
-          empty-message="No jobs"
+          [emptyMessage]="t('calendar.noJobs')"
           (bahtRowClick)="open($any($event).row.id)"
         ></baht-table>
       </baht-card>
@@ -163,9 +159,14 @@ export class CalendarComponent {
   readonly viewParam = input<string>(undefined, { alias: 'view' })
   readonly dateParam = input<string>(undefined, { alias: 'date' })
 
-  protected readonly layers = LAYERS
-  protected readonly jobColumns = JOB_COLUMNS
-  protected readonly shown = signal<string[]>(LAYERS.map((l) => l.key))
+  protected readonly t = inject(I18n).t
+  /** Dates as Intl writes them for the locale (`en` → `en-GB`, the calendar's own default). */
+  protected readonly locale = dateLocale
+  protected readonly layers = computed(() =>
+    LAYERS.map((key) => ({ key, label: this.t(`calendar.layer.${key}`) })),
+  )
+  protected readonly jobColumns = computed(() => columnsOf(this.t))
+  protected readonly shown = signal<string[]>([...LAYERS])
   protected readonly project = signal<string[]>([])
   private readonly picked = signal<{ view: CalendarView; date: string } | null>(null)
 
@@ -225,13 +226,17 @@ export class CalendarComponent {
   protected readonly jobRows = computed(() =>
     this.jobs().map((j) => ({
       id: j.key,
-      job: j.command ? `${j.name} (${j.command})` : j.name,
+      job: j.command
+        ? this.t('calendar.jobWithCommand', { name: this.nameOf(j), command: j.command })
+        : this.nameOf(j),
       project: j.project_name ?? '—',
-      every: every(j.every_minutes),
+      every: every(this.t, j.every_minutes),
       next: j.off ? '—' : ago(j.next_at),
       last: ago(j.last_at),
       result: j.last_result ?? '—',
-      state: j.off ? `off: ${j.off}` : 'on',
+      // the reason a job is off is the server's words
+      state: j.off ? this.t('calendar.off', { reason: j.off }) : this.t('calendar.on'),
+      on: !j.off,
     })),
   )
 
@@ -246,7 +251,10 @@ export class CalendarComponent {
         target,
         event: {
           id: `${job.key}@${day}`,
-          title: `${job.name} · ${every(job.every_minutes)}`,
+          title: this.t('calendar.frequentTitle', {
+            name: this.nameOf(job),
+            every: every(this.t, job.every_minutes),
+          }),
           start: day,
           allDay: true,
           outline: true,
@@ -258,7 +266,7 @@ export class CalendarComponent {
       target,
       event: {
         id: `${job.key}@${at.toISOString()}`,
-        title: job.name,
+        title: this.nameOf(job),
         start: at.toISOString(),
         outline: true,
         tone,
@@ -281,9 +289,20 @@ export class CalendarComponent {
           start: new Date(run.started_at).toISOString(),
           end: new Date(run.ended_at ?? Date.now()).toISOString(),
           tone: RUN_TONE[run.status] ?? 'neutral',
-          meta: `${name(run.project_id)} · run ${String(run.id)} · ${run.status}`,
+          meta: this.t('calendar.runMeta', {
+            project: name(run.project_id),
+            id: run.id,
+            status: runStatusLabel(this.t, run.status),
+          }),
         },
       }))
+  }
+
+  /** A job's name: the worker round and housekeeping in the locale's words, a schedule its own. */
+  private nameOf(job: { kind: string; name: string }): string {
+    if (job.kind === 'worker') return this.t('calendar.job.worker')
+    if (job.kind === 'housekeeping') return this.t('calendar.job.housekeeping')
+    return job.name
   }
 
   private targetOf(job: {

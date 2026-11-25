@@ -3,6 +3,7 @@ import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 
+import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { CardDialogComponent } from '../board/card-dialog.component'
@@ -61,20 +62,18 @@ import { CardDialogComponent } from '../board/card-dialog.component'
   template: `
     <div class="app-page">
       <baht-page-header
-        heading="Review"
-        [description]="
-          count() === 1 ? '1 card needs a decision.' : count() + ' cards need a decision.'
-        "
+        [heading]="t('review.heading')"
+        [description]="t('review.count', { count: count() })"
       ></baht-page-header>
       @if (cards().data; as all) {
         @if (all.length === 0) {
           <baht-empty-state
-            message="Nothing to review"
-            hint="Cards the worker hands back show up here."
+            [message]="t('review.empty')"
+            [hint]="t('review.emptyHint')"
           ></baht-empty-state>
         } @else {
           <div class="split">
-            <div class="queue" role="listbox" aria-label="To review">
+            <div class="queue" role="listbox" [attr.aria-label]="t('review.queue')">
               @for (card of all; track card.id) {
                 <div
                   class="item"
@@ -89,7 +88,7 @@ import { CardDialogComponent } from '../board/card-dialog.component'
                   <span class="muted"
                     >{{ projectName()(card.project_id) }} · {{ ago(card.updated_at) }}</span
                   >
-                  <span class="muted">{{ card.review_reason ?? 'No reason given' }}</span>
+                  <span class="muted">{{ card.review_reason ?? t('card.noReason') }}</span>
                 </div>
               }
             </div>
@@ -109,6 +108,7 @@ import { CardDialogComponent } from '../board/card-dialog.component'
 export class ReviewComponent {
   private readonly live = inject(LiveService).live
   private readonly router = inject(Router)
+  protected readonly t = inject(I18n).t
   /** `?card=12` picks a card; the first one otherwise. */
   readonly card = input<string>()
 

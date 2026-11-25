@@ -5,6 +5,7 @@ import { BAHT_UI } from '@20baht/angular'
 import { filter, map } from 'rxjs'
 import { liveSignal } from '@20baht/angular/live'
 
+import { I18n } from './core/i18n/i18n.service'
 import { currentKey, navWith } from './core/navigation/navigation'
 import { LiveService } from './services/live.service'
 import { SessionService } from './services/session.service'
@@ -21,6 +22,7 @@ import { StatusBarComponent } from './shared/status-bar.component'
 export class App {
   private readonly router = inject(Router)
   protected readonly session = inject(SessionService)
+  private readonly t = inject(I18n).t
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -41,7 +43,7 @@ export class App {
 
   /** No navigator before the session exists (the token page). */
   protected readonly items = computed(() =>
-    this.open() ? navWith(this.status().data?.review ?? 0, this.projects().data ?? []) : [],
+    this.open() ? navWith(this.t, this.status().data?.review ?? 0, this.projects().data ?? []) : [],
   )
 
   protected readonly current = computed(() =>

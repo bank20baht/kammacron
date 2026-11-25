@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.service'
 import { NAV, currentKey } from './navigation'
 
 describe('currentKey', () => {
@@ -21,7 +22,7 @@ describe('currentKey', () => {
 
 describe('NAV', () => {
   it('is the four pages of the spec, the calendar and stats, each at its own path', () => {
-    expect(NAV.map((item) => item.key)).toEqual([
+    expect(NAV(t).map((item) => item.key)).toEqual([
       'board',
       'review',
       'runs',
@@ -29,6 +30,6 @@ describe('NAV', () => {
       'stats',
       'settings',
     ])
-    for (const item of NAV) expect(item.href).toBe(`/${item.key}`)
+    for (const item of NAV(t)) expect(item.href).toBe(`/${item.key}`)
   })
 })

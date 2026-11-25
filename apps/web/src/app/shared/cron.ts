@@ -1,3 +1,5 @@
+import type { Translate } from '../core/i18n/i18n.service'
+
 /** A job that runs on a timer, as `GET /api/calendar` lists it. */
 export type CronJobLike = {
   every_minutes: number
@@ -37,10 +39,9 @@ export const dayKey = (d: Date): string => {
 /** The local days, `YYYY-MM-DD`, a job runs on in `[from, to)`. */
 export const daysWith = (times: Date[]): string[] => [...new Set(times.map(dayKey))]
 
-/** `every 30 min`, `every 6 h`, `daily`, `every 3 days`. */
-export const every = (minutes: number): string => {
-  if (minutes % 1440 === 0)
-    return minutes === 1440 ? 'daily' : `every ${String(minutes / 1440)} days`
-  if (minutes % 60 === 0) return minutes === 60 ? 'hourly' : `every ${String(minutes / 60)} h`
-  return `every ${String(minutes)} min`
+/** `every 30 min`, `every 6 h`, `daily`, `every 3 days`, in the locale's words. */
+export const every = (t: Translate, minutes: number): string => {
+  if (minutes % 1440 === 0) return t('calendar.every.days', { count: minutes / 1440 })
+  if (minutes % 60 === 0) return t('calendar.every.hours', { count: minutes / 60 })
+  return t('calendar.every.minutes', { count: minutes })
 }

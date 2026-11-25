@@ -4,29 +4,48 @@ import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import type { ColumnMap } from '@20baht/ui'
 
+import { I18n, type Translate } from '../../core/i18n/i18n.service'
+import { status } from '../../core/i18n/en/status'
 import { LiveService } from '../../services/live.service'
 import { cost, duration, stamp } from '../../shared/format'
 import { RUN_TONE } from '../../shared/tones'
 
 const PAGE_SIZE = 50
 
-const COLUMNS: ColumnMap = {
-  id: { label: 'Run', numeric: true, sortable: true },
-  card: 'Card',
+/** A run status the catalog names (`status.run.*`). */
+const isRunStatus = (value: unknown): value is keyof typeof status.run =>
+  typeof value === 'string' && Object.hasOwn(status.run, value)
+
+/** A run status in the locale's words; one the catalog lacks shows as it is. */
+export const runStatusLabel = (t: Translate, value: unknown): string =>
+  isRunStatus(value) ? t(`status.run.${value}`) : String(value)
+
+const runColumns = (t: Translate): ColumnMap => ({
+  id: { label: t('runs.column.id'), numeric: true, sortable: true },
+  card: t('runs.column.card'),
   status: {
-    label: 'Status',
+    label: t('runs.column.status'),
     cell: 'badge',
     tone: RUN_TONE,
+    labels: (value) => runStatusLabel(t, value),
     busy: { running: true, verifying: true },
   },
-  started: { label: 'Started', sortable: true },
-  took: 'Duration',
-  turns: { label: 'Turns', align: 'end', sortable: true },
-  cost: { label: 'Cost (API equivalent)', align: 'end', sortable: true },
-  pushed: 'Branch',
-}
+  started: { label: t('runs.column.started'), sortable: true },
+  took: t('runs.column.took'),
+  turns: { label: t('runs.column.turns'), align: 'end', sortable: true },
+  cost: { label: t('runs.column.cost'), align: 'end', sortable: true },
+  pushed: t('runs.column.pushed'),
+})
 
-const STATUSES = ['running', 'succeeded', 'review', 'reverted', 'failed', 'stopped', 'stale']
+const STATUSES: (keyof typeof status.run)[] = [
+  'running',
+  'succeeded',
+  'review',
+  'reverted',
+  'failed',
+  'stopped',
+  'stale',
+]
 
 type Condition = { field: string; op: 'eq'; value: string }
 type Query = {
@@ -63,26 +82,26 @@ type Query = {
   template: `
     <div class="app-page">
       <baht-page-header
-        heading="Runs"
-        description="Every claude -p, newest first. Open one to watch it live or stop it."
+        [heading]="t('runs.heading')"
+        [description]="t('runs.description')"
       ></baht-page-header>
       <div class="tools">
         <baht-search
-          placeholder="Search cards, summaries or errors"
-          label="Search runs"
+          [placeholder]="t('runs.searchPlaceholder')"
+          [label]="t('runs.searchLabel')"
           (bahtSearch)="search($any($event).value)"
         ></baht-search>
-        <span class="muted">Status</span>
+        <span class="muted">{{ t('runs.status') }}</span>
         <baht-filter
-          label="Status"
-          [options]="statusOptions"
+          [label]="t('runs.status')"
+          [options]="statusOptions()"
           [selected]="status()"
           (bahtChange)="setStatus($any($event).selected)"
         ></baht-filter>
         @if (projectOptions().length > 1) {
-          <span class="muted">Project</span>
+          <span class="muted">{{ t('runs.project') }}</span>
           <baht-filter
-            label="Project"
+            [label]="t('runs.project')"
             [options]="projectOptions()"
             [selected]="project()"
             (bahtChange)="setProject($any($event).selected)"
@@ -91,7 +110,7 @@ type Query = {
       </div>
       <baht-table
         [showIndex]="false"
-        [columns]="columns"
+        [columns]="columns()"
         [items]="rows()"
         [total]="total()"
         [page]="query().page"
@@ -99,7 +118,7 @@ type Query = {
         [loading]="!runs().data"
         sortable
         clickable
-        empty-message="No runs match"
+        [emptyMessage]="t('runs.empty')"
         (bahtRowClick)="open($any($event).row.id)"
         (bahtSortChange)="sort($any($event))"
         (bahtPageChange)="go($any($event).page)"
@@ -110,8 +129,12 @@ type Query = {
 export class RunsComponent {
   private readonly live = inject(LiveService).live
   private readonly router = inject(Router)
-  protected readonly columns = COLUMNS
-  protected readonly statusOptions = STATUSES.map((key) => ({ key, label: key }))
+  protected readonly t = inject(I18n).t
+  protected readonly columns = computed(() => runColumns(this.t))
+  /** The raw status is the filter's value, sent to the server; the label is the locale's. */
+  protected readonly statusOptions = computed(() =>
+    STATUSES.map((key) => ({ key, label: this.t(`status.run.${key}`) })),
+  )
   protected readonly query = signal<Query>({ page: 1, pageSize: PAGE_SIZE })
   /** One of each at a time: the filter's conditions must all hold. */
   protected readonly status = signal<string[]>([])

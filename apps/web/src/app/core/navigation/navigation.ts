@@ -1,27 +1,41 @@
-import type { ShellNavItem } from '@20baht/ui'
+import type { IconName, ShellNavItem } from '@20baht/ui'
 
-/** The navigator: one entry per page. `key` is the page's path, without the leading slash. */
-export const NAV: ShellNavItem[] = [
-  { key: 'board', label: 'Board', href: '/board', icon: 'columns' },
-  { key: 'review', label: 'Review', href: '/review', icon: 'file-check' },
-  { key: 'runs', label: 'Runs', href: '/runs', icon: 'play' },
-  { key: 'calendar', label: 'Calendar', href: '/calendar', icon: 'calendar' },
-  { key: 'stats', label: 'Stats', href: '/stats', icon: 'chart' },
-  { key: 'settings', label: 'Settings', href: '/settings', icon: 'settings' },
-]
+import type { Translate } from '../i18n/i18n.service'
+
+/** The pages of the navigator, in order: `key` is the page's path, without the leading slash. */
+const PAGES = [
+  { key: 'board', icon: 'columns' },
+  { key: 'review', icon: 'file-check' },
+  { key: 'runs', icon: 'play' },
+  { key: 'calendar', icon: 'calendar' },
+  { key: 'stats', icon: 'chart' },
+  { key: 'settings', icon: 'settings' },
+] as const satisfies readonly { key: string; icon: IconName }[]
+
+/** The navigator: one entry per page, in the locale's words. */
+export const NAV = (t: Translate): ShellNavItem[] =>
+  PAGES.map((page) => ({
+    key: page.key,
+    label: t(`nav.${page.key}`),
+    href: `/${page.key}`,
+    icon: page.icon,
+  }))
 
 /** The navigator with the live numbers: the review count, and one entry per project's board. */
 export const navWith = (
+  t: Translate,
   review: number,
   projects: readonly { slug: string; name: string }[],
 ): ShellNavItem[] => [
-  ...NAV.map((item) => (item.key === 'review' && review > 0 ? { ...item, badge: review } : item)),
+  ...NAV(t).map((item) =>
+    item.key === 'review' && review > 0 ? { ...item, badge: review } : item,
+  ),
   ...projects.map((p) => ({
     key: `board/${p.slug}`,
     label: p.name,
     href: `/board/${p.slug}`,
     icon: 'folder' as const,
-    group: 'Projects',
+    group: t('nav.projects'),
   })),
 ]
 

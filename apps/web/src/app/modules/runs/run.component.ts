@@ -6,9 +6,11 @@ import type { AccordionItem, Crumb, TabItem, TimelineItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { cost, duration, stamp } from '../../shared/format'
 import { RUN_TONE } from '../../shared/tones'
+import { runStatusLabel } from './runs.component'
 
 const EVENT_TONE: Record<string, TimelineItem['tone']> = {
   assistant: 'primary',
@@ -88,69 +90,71 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
     <div class="app-page">
       @if (run().data; as r) {
         <baht-breadcrumbs [items]="crumbs()" (bahtNavigate)="go('/runs')"></baht-breadcrumbs>
-        <baht-page-header [heading]="'Run ' + r.id">
+        <baht-page-header [heading]="t('run.heading', { id: r.id })">
           @if (r.status === 'running') {
-            <baht-button variant="danger" [loading]="busy()" (click)="stop()">Stop</baht-button>
+            <baht-button variant="danger" [loading]="busy()" (click)="stop()">{{
+              t('run.stop')
+            }}</baht-button>
           }
         </baht-page-header>
         <div class="row">
           <baht-badge
             [tone]="tone[r.status] ?? 'neutral'"
-            [label]="r.status"
+            [label]="runStatusLabel(t, r.status)"
             [busy]="r.status === 'running' || r.status === 'verifying'"
           ></baht-badge>
           @if (r.error_kind) {
             <baht-badge tone="danger" [label]="r.error_kind"></baht-badge>
           }
-          <a [routerLink]="['/review']" [queryParams]="{ card: r.card_id }"
-            >Card #{{ r.card_id }}</a
-          >
+          <a [routerLink]="['/review']" [queryParams]="{ card: r.card_id }">{{
+            t('run.card', { id: r.card_id })
+          }}</a>
         </div>
         @if (error(); as message) {
           <baht-alert tone="danger" [message]="message"></baht-alert>
         }
         @if (r.error) {
-          <baht-alert tone="danger" heading="Error" [message]="r.error"></baht-alert>
+          <baht-alert tone="danger" [heading]="t('run.error')" [message]="r.error"></baht-alert>
         }
 
         <dl class="strip">
           <div>
-            <dt>Duration</dt>
+            <dt>{{ t('run.duration') }}</dt>
             <dd>{{ took() }}</dd>
           </div>
           <div>
-            <dt>Turns</dt>
+            <dt>{{ t('run.turns') }}</dt>
             <dd>{{ r.num_turns ?? '—' }}</dd>
           </div>
           <div>
-            <dt>Cost (API equivalent)</dt>
+            <dt>{{ t('run.cost') }}</dt>
             <dd>{{ cost(r.cost_usd) }}</dd>
           </div>
           <div>
-            <dt>Branch</dt>
+            <dt>{{ t('run.branch') }}</dt>
             <dd class="row">
               {{ r.pushed_to ?? '—' }}
               @if (r.pushed_to) {
-                <baht-copy-button [text]="r.pushed_to" label="Copy"></baht-copy-button>
+                <baht-copy-button
+                  [text]="r.pushed_to"
+                  [label]="t('common.copy')"
+                ></baht-copy-button>
               }
             </dd>
           </div>
           <div>
-            <dt>Started</dt>
+            <dt>{{ t('run.started') }}</dt>
             <dd>{{ stamp(r.started_at) }}</dd>
           </div>
         </dl>
 
         @if (denials().length > 0) {
-          <baht-card
-            heading="Commands blocked by the allowlist"
-            subtitle="What the worker tried and was refused. Allow only what this project needs."
-          >
+          <baht-card [heading]="t('run.denied.heading')" [subtitle]="t('run.denied.subtitle')">
             <div class="denied">
               @for (d of denials(); track $index) {
                 <div class="command">
                   <baht-code variant="block" [code]="d"></baht-code>
-                  <baht-copy-button [text]="d" label="Copy"></baht-copy-button>
+                  <baht-copy-button [text]="d" [label]="t('common.copy')"></baht-copy-button>
                 </div>
               }
               <div class="row">
@@ -159,7 +163,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
                   icon="settings"
                   (click)="go('/settings/projects/' + r.project_id + '?section=permissions')"
                 >
-                  Open project permissions
+                  {{ t('run.denied.permissions') }}
                 </baht-button>
               </div>
             </div>
@@ -171,7 +175,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
             @if (r.summary) {
               <baht-markdown-view [source]="r.summary"></baht-markdown-view>
             } @else {
-              <p>No summary yet.</p>
+              <p>{{ t('run.noSummary') }}</p>
             }
           </div>
           <div data-tab="events">
@@ -182,22 +186,22 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
           </div>
         </baht-tabs>
 
-        <baht-accordion [items]="technical">
+        <baht-accordion [items]="technical()">
           <dl class="facts" data-panel="technical">
             <div>
-              <dt>Session</dt>
+              <dt>{{ t('run.session') }}</dt>
               <dd><baht-code [code]="r.session_id ?? '—'"></baht-code></dd>
             </div>
             <div>
-              <dt>Log</dt>
+              <dt>{{ t('run.log') }}</dt>
               <dd><baht-code [code]="r.log_path ?? '—'"></baht-code></dd>
             </div>
             <div>
-              <dt>Base</dt>
+              <dt>{{ t('run.base') }}</dt>
               <dd><baht-code [code]="r.base_sha ?? '—'"></baht-code></dd>
             </div>
             <div>
-              <dt>Commits</dt>
+              <dt>{{ t('run.commits') }}</dt>
               <dd>
                 @for (c of r.commits; track c) {
                   <baht-code [code]="c"></baht-code>
@@ -208,7 +212,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
             </div>
             @if (r.revert_commit) {
               <div>
-                <dt>Reverted in</dt>
+                <dt>{{ t('run.revertedIn') }}</dt>
                 <dd><baht-code [code]="r.revert_commit"></baht-code></dd>
               </div>
             }
@@ -216,8 +220,8 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
         </baht-accordion>
       } @else if (run().error) {
         <baht-error-state
-          heading="This run did not load"
-          [message]="'Run ' + id()"
+          [heading]="t('run.loadFailed')"
+          [message]="t('run.heading', { id: id() })"
         ></baht-error-state>
       } @else {
         <baht-skeleton variant="text"></baht-skeleton>
@@ -233,6 +237,8 @@ export class RunComponent {
   protected readonly run = liveSignal(() =>
     this.live.subscribe('GET', '/api/runs/:id', { params: { id: this.id() }, query: {} }),
   )
+  protected readonly t = inject(I18n).t
+  protected readonly runStatusLabel = runStatusLabel
   protected readonly tone = RUN_TONE
   protected readonly cost = cost
   protected readonly stamp = stamp
@@ -241,8 +247,8 @@ export class RunComponent {
   protected readonly tab = signal('summary')
 
   protected readonly crumbs = computed<Crumb[]>(() => [
-    { label: 'Runs' }, // no href: `baht-navigate`, so the router moves without a reload
-    { label: `Run ${this.id()}` },
+    { label: this.t('run.runs') }, // no href: `baht-navigate`, so the router moves without a reload
+    { label: this.t('run.heading', { id: this.id() }) },
   ])
 
   protected readonly took = computed(() => {
@@ -253,13 +259,15 @@ export class RunComponent {
   protected readonly tabs = computed<TabItem[]>(() => {
     const r = this.run().data
     return [
-      { key: 'summary', label: 'Summary' },
-      { key: 'events', label: 'Events', badge: String(r?.events.length ?? 0) },
-      ...(r?.verify_output ? [{ key: 'verify', label: 'Verify output' }] : []),
+      { key: 'summary', label: this.t('run.tab.summary') },
+      { key: 'events', label: this.t('run.tab.events'), badge: String(r?.events.length ?? 0) },
+      ...(r?.verify_output ? [{ key: 'verify', label: this.t('run.tab.verify') }] : []),
     ]
   })
 
-  protected readonly technical: AccordionItem[] = [{ key: 'technical', title: 'Technical details' }]
+  protected readonly technical = computed<AccordionItem[]>(() => [
+    { key: 'technical', title: this.t('run.technical') },
+  ])
 
   protected readonly denials = computed(() =>
     (

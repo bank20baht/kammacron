@@ -1,0 +1,31 @@
+/** The first-start page: the setup steps, the tools, the Claude token, a project. */
+export const welcome = {
+  heading: 'Welcome to kammacron',
+  description: 'Connect Claude and a repository to start.',
+  progress: 'Setup progress',
+  allSet: 'All set',
+  left: { one: '{count} left', other: '{count} left' },
+  ready: 'Ready.',
+  step: { done: 'done', missing: 'missing', toDo: 'to do' },
+  steps: { tools: 'Tools', token: 'Claude token', repo: 'A project with its repo' },
+  tools: { heading: 'Tools', subtitle: 'On the PATH the worker uses', notFound: 'not found' },
+  token: {
+    heading: 'Claude token',
+    subtitle: 'It uses your Claude subscription. Kept on this machine, in secrets.json.',
+    isSet: 'A token is set. Replace it here if it stops working.',
+    step1: '1. Run this in a terminal:',
+    step2: '2. Paste the token it prints:',
+    saveAndTest: 'Save and test',
+    pasteFirst: 'Paste a token first',
+    answered: 'Claude answered',
+  },
+  project: {
+    heading: 'Project',
+    subtitle: 'Settings → Projects: add one, set its repo path, turn the worker on',
+    linked: 'linked',
+    noneYet: 'none yet',
+    edit: 'Edit',
+    add: 'Add a project',
+  },
+  goBoard: 'Go to the board',
+} as const

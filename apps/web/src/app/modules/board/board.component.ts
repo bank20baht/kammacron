@@ -7,10 +7,11 @@ import type { BahtForm, FormDefinition, NavItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { newCardForm, quickAddForm, REGISTRY } from '../../shared/forms'
-import { STATUS_LABEL, type CardStatus } from '../../shared/tones'
+import { statusLabel, type CardStatus } from '../../shared/tones'
 import {
   KanbanComponent,
   KanbanFooterDirective,
@@ -49,6 +50,7 @@ export class BoardComponent {
   private readonly live = inject(LiveService).live
   private readonly api = inject(Api).client.api
   private readonly router = inject(Router)
+  protected readonly t = inject(I18n).t
 
   /** `/board/:slug`; all projects without one. */
   readonly slug = input<string>()
@@ -69,11 +71,9 @@ export class BoardComponent {
     })
   })
 
-  protected readonly kanbanColumns: KanbanColumn[] = COLUMNS.map((key) => ({
-    key,
-    label: STATUS_LABEL[key],
-    accent: ACCENT[key],
-  }))
+  protected readonly kanbanColumns = computed<KanbanColumn[]>(() =>
+    COLUMNS.map((key) => ({ key, label: statusLabel(this.t, key), accent: ACCENT[key] })),
+  )
   protected readonly ago = ago
   protected readonly claude = CLAUDE
   protected readonly openCard = computed(() => {
@@ -82,7 +82,7 @@ export class BoardComponent {
   })
 
   protected readonly nav = computed<NavItem[]>(() => [
-    { key: '', label: 'All', href: '/board' },
+    { key: '', label: this.t('board.all'), href: '/board' },
     ...(this.projects().data ?? []).map((p) => ({
       key: p.slug,
       label: p.name,
@@ -117,9 +117,9 @@ export class BoardComponent {
   protected readonly workerLine = computed(() => {
     const p = this.project()
     if (!p) return ''
-    if (p.paused_reason) return 'Worker: paused'
-    if (!p.repo_path || !p.worker_enabled) return 'Worker: board only'
-    return `Worker: every ${String(p.interval_minutes)} min`
+    if (p.paused_reason) return this.t('board.workerPaused')
+    if (!p.repo_path || !p.worker_enabled) return this.t('board.workerBoardOnly')
+    return this.t('board.workerEvery', { minutes: p.interval_minutes })
   })
 
   // a new card
@@ -128,22 +128,25 @@ export class BoardComponent {
   protected readonly createError = signal('')
   protected readonly busy = signal(false)
   protected readonly registry = REGISTRY
-  protected readonly quickAddForm = quickAddForm
+  protected readonly quickAddForm = computed(() => quickAddForm(this.t))
   protected readonly newValue = signal<Record<string, unknown>>({})
-  protected readonly newForm = computed<FormDefinition>(() => ({
-    ...newCardForm,
-    fields: newCardForm.fields.map((f) =>
-      f.key === 'project_id'
-        ? {
-            ...f,
-            options: (this.projects().data ?? []).map((p) => ({
-              key: String(p.id),
-              label: p.name,
-            })),
-          }
-        : f,
-    ),
-  }))
+  protected readonly newForm = computed<FormDefinition>(() => {
+    const form = newCardForm(this.t)
+    return {
+      ...form,
+      fields: form.fields.map((f) =>
+        f.key === 'project_id'
+          ? {
+              ...f,
+              options: (this.projects().data ?? []).map((p) => ({
+                key: String(p.id),
+                label: p.name,
+              })),
+            }
+          : f,
+      ),
+    }
+  })
 
   protected navigate(event: Event): void {
     const { href } = (event as CustomEvent<{ href?: string }>).detail

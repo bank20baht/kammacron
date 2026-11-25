@@ -10,32 +10,45 @@ import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import type { BahtForm, ColumnMap, TabItem } from '@20baht/ui'
+import { defineForm } from '@20baht/ui/engine'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { I18n, type AppLocale, type Translate } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { accessForm, claudeTokenForm, newProjectForm, workerForm } from '../../shared/forms'
 
-const PROJECT_COLUMNS: ColumnMap = {
-  name: 'Name',
-  slug: { label: 'Slug', cell: 'code' },
+const projectColumns = (t: Translate): ColumnMap => ({
+  name: t('settings.projects.columns.name'),
+  slug: { label: t('settings.projects.columns.slug'), cell: 'code' },
   worker: {
-    label: 'Worker',
+    label: t('settings.projects.columns.worker'),
     cell: 'badge',
-    tone: (value) =>
-      value === 'paused' ? 'warning' : value === 'board only' ? 'neutral' : 'success',
+    // by the row's state, not its words: the words change with the locale
+    tone: (_value, row) =>
+      row['state'] === 'paused' ? 'warning' : row['state'] === 'board' ? 'neutral' : 'success',
   },
-  checked: 'Last checked',
-}
+  checked: t('settings.projects.columns.checked'),
+})
 
-const TABS: TabItem[] = [
-  { key: 'projects', label: 'Projects' },
-  { key: 'claude', label: 'Claude connection' },
-  { key: 'worker', label: 'Worker' },
-  { key: 'access', label: 'Access & notifications' },
-  { key: 'machine', label: 'This machine' },
-]
+const TABS = ['projects', 'claude', 'worker', 'access', 'machine'] as const
+
+/** The language of this browser's pages: one option per locale the app speaks. */
+const languageForm = (t: Translate, locales: readonly AppLocale[]) =>
+  defineForm({
+    form_id: 'language',
+    form_name: t('settings.language.form'),
+    fields: [
+      {
+        order: 1,
+        type: 'dropdown',
+        key: 'locale',
+        label: t('settings.language.label'),
+        options: locales.map((key) => ({ key, label: t(`settings.languages.${key}`) })),
+      },
+    ],
+  })
 
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 
@@ -62,28 +75,35 @@ export class SettingsComponent {
   protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
   protected readonly busy = signal(false)
   protected readonly ago = ago
-  protected readonly tabs = TABS
+  protected readonly i18n = inject(I18n)
+  protected readonly t = this.i18n.t
+  protected readonly tabs = computed<TabItem[]>(() =>
+    TABS.map((key) => ({ key, label: this.t(`settings.tabs.${key}`) })),
+  )
   protected readonly tab = signal('projects')
-  protected readonly projectColumns = PROJECT_COLUMNS
+  protected readonly projectColumns = computed(() => projectColumns(this.t))
   protected readonly projectRows = computed(() =>
     (this.projects().data ?? []).map((p) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,
+      state: p.paused_reason ? 'paused' : p.worker_enabled && p.repo_path ? 'on' : 'board',
       worker: p.paused_reason
-        ? 'paused'
+        ? this.t('settings.projects.paused')
         : p.worker_enabled && p.repo_path
-          ? `every ${String(p.interval_minutes)} min`
-          : 'board only',
-      checked: p.last_checked_at ? ago(p.last_checked_at) : 'not yet',
+          ? this.t('settings.projects.every', { minutes: p.interval_minutes })
+          : this.t('settings.projects.boardOnly'),
+      checked: p.last_checked_at ? ago(p.last_checked_at) : this.t('settings.projects.notYet'),
     })),
   )
-  protected readonly forms = {
-    claudeToken: claudeTokenForm,
-    worker: workerForm,
-    access: accessForm,
-    newProject: newProjectForm,
-  }
+  protected readonly forms = computed(() => ({
+    claudeToken: claudeTokenForm(this.t),
+    worker: workerForm(this.t),
+    access: accessForm(this.t),
+    newProject: newProjectForm(this.t),
+    language: languageForm(this.t, this.i18n.locales),
+  }))
+  protected readonly languageValue = computed(() => ({ locale: this.i18n.locale() }))
 
   protected readonly workerValue = computed(() => {
     const s = this.settings.value()
@@ -127,7 +147,10 @@ export class SettingsComponent {
   }
 
   protected save(patch: Parameters<typeof this.api.settings.patch>[0]): Promise<void> {
-    return this.act(() => firstValueFrom(this.api.settings.patch(patch)), 'Saved')
+    return this.act(
+      () => firstValueFrom(this.api.settings.patch(patch)),
+      this.t('settings.messages.saved'),
+    )
   }
 
   protected saveToken(form: BahtForm): Promise<void> {
@@ -137,7 +160,7 @@ export class SettingsComponent {
         await firstValueFrom(this.api.settings['claude-token'].put({ token }))
         form.reset()
       },
-      token ? 'Token kept' : 'Token cleared',
+      token ? this.t('settings.messages.tokenKept') : this.t('settings.messages.tokenCleared'),
     )
   }
 
@@ -147,7 +170,7 @@ export class SettingsComponent {
       const r = await firstValueFrom(this.api.settings['claude-test'].post())
       this.message.set({
         tone: r.ok ? 'success' : 'danger',
-        text: r.ok ? `Claude answered: ${r.message}` : r.message,
+        text: r.ok ? this.t('settings.messages.claudeAnswered', { message: r.message }) : r.message,
       })
     } catch (error) {
       this.message.set({ tone: 'danger', text: describeError(error) })
@@ -180,7 +203,7 @@ export class SettingsComponent {
     return this.act(async () => {
       await firstValueFrom(this.api.token.rotate.post())
       this.token.reload()
-    }, 'New token: update every `claude mcp add` that used the old one')
+    }, this.t('settings.messages.rotated'))
   }
 
   protected async addProject(form: BahtForm): Promise<void> {
@@ -198,6 +221,11 @@ export class SettingsComponent {
     } finally {
       this.busy.set(false)
     }
+  }
+
+  protected setLocale(value: unknown): void {
+    const next = this.i18n.locales.find((l) => l === value)
+    if (next) this.i18n.setLocale(next)
   }
 
   protected openProject(id: number): void {

@@ -12,6 +12,8 @@ import {
 import { NgTemplateOutlet } from '@angular/common'
 import { BAHT_UI } from '@20baht/angular'
 
+import { I18n } from '../../core/i18n/i18n.service'
+
 /** One column of the board; `accent` colours its top edge (a CSS colour, a token). */
 export type KanbanColumn = { key: string; label: string; accent?: string }
 
@@ -48,13 +50,16 @@ export class KanbanFooterDirective {
 })
 export class KanbanComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef)
+  protected readonly t = inject(I18n).t
 
   readonly columns = input.required<readonly KanbanColumn[]>()
   /** The items of each column, in order. */
   readonly lanes = input.required<Record<string, readonly KanbanItem[]>>()
   readonly selected = input<number | null>(null)
-  readonly label = input('Board')
-  readonly emptyText = input('Drop a card here')
+  /** The board's name for assistive tech; the catalog's `kanban.label` when unset. */
+  readonly label = input<string>()
+  /** What an empty column says; the catalog's `kanban.empty` when unset. */
+  readonly emptyText = input<string>()
 
   readonly move = output<KanbanMove>()
   readonly opened = output<number>()

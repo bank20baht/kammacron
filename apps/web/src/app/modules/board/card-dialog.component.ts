@@ -15,23 +15,37 @@ import type { BahtForm, ChoiceOption, CommentEntry, MenuItem, PreviewImage } fro
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { I18n, type Translate } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago, cost, stamp } from '../../shared/format'
 import { cardForm, REGISTRY, sameOriginImage, sendBackForm } from '../../shared/forms'
-import { RUN_TONE, STATUS_LABEL } from '../../shared/tones'
+import { RUN_TONE, statusLabel, type CardStatus } from '../../shared/tones'
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
 const CLAUDE = 'claude'
 
+type CardData = NonNullable<ReturnType<CardDialogComponent['card']>['data']>
+type RunStatus = NonNullable<CardData['last_run']>['status']
+
 type Decision = 'send-back' | 'approve' | 'take'
 
-const DECISIONS: ChoiceOption[] = [
-  { key: 'send-back', label: 'Send back', description: 'Claude tries again with your note' },
-  { key: 'approve', label: 'Approve', description: 'Rebase the branch and push it' },
-  { key: 'take', label: "I'll take it", description: 'Mark it human: the worker leaves it' },
+const decisions = (t: Translate): ChoiceOption[] => [
+  {
+    key: 'send-back',
+    label: t('card.decision.sendBack'),
+    description: t('card.decision.sendBackHelp'),
+  },
+  {
+    key: 'approve',
+    label: t('card.decision.approve'),
+    description: t('card.decision.approveHelp'),
+  },
+  { key: 'take', label: t('card.decision.take'), description: t('card.decision.takeHelp') },
 ]
 
-const MENU: MenuItem[] = [{ value: 'archive', label: 'Archive', danger: true }]
+const menu = (t: Translate): MenuItem[] => [
+  { value: 'archive', label: t('card.archive'), danger: true },
+]
 
 /**
  * One card, always editable: its fields (saved with Save), its review decision when it waits on
@@ -47,6 +61,7 @@ const MENU: MenuItem[] = [{ value: 'archive', label: 'Archive', danger: true }]
 export class CardDialogComponent {
   private readonly live = inject(LiveService).live
   private readonly api = inject(Api).client.api
+  protected readonly t = inject(I18n).t
 
   readonly cardId = input.required<number>()
   readonly closed = output()
@@ -63,14 +78,15 @@ export class CardDialogComponent {
   protected readonly start = signal<Record<string, unknown> | null>(null)
   private loadedFor: number | null = null
 
-  protected readonly cardForm = cardForm
-  protected readonly sendBackForm = sendBackForm
+  protected readonly cardForm = computed(() => cardForm(this.t))
+  protected readonly sendBackForm = computed(() => sendBackForm(this.t))
   protected readonly registry = REGISTRY
   protected readonly allowImage = sameOriginImage
-  protected readonly decisions = DECISIONS
-  protected readonly menu = MENU
-  protected readonly label = STATUS_LABEL
+  protected readonly decisions = computed(() => decisions(this.t))
+  protected readonly menu = computed(() => menu(this.t))
+  protected readonly label = (status: CardStatus) => statusLabel(this.t, status)
   protected readonly runTone = RUN_TONE
+  protected readonly runLabel = (status: RunStatus) => this.t(`status.run.${status}`)
   protected readonly ago = ago
   protected readonly cost = cost
 
@@ -79,10 +95,10 @@ export class CardDialogComponent {
       id: c.id,
       author:
         c.author === 'claude-worker'
-          ? `Claude (run ${String(c.run_id ?? '')})`
+          ? this.t('card.authorRun', { run: c.run_id ?? '' })
           : c.author === 'mcp'
-            ? 'Claude (MCP)'
-            : 'You',
+            ? this.t('card.authorMcp')
+            : this.t('card.authorYou'),
       time: stamp(c.created_at),
       body: c.body,
     })),
@@ -122,7 +138,7 @@ export class CardDialogComponent {
   private async loadDiff(id: number): Promise<void> {
     try {
       const diff = await firstValueFrom(this.api.cards({ id: String(id) }).diff.get())
-      this.diff.set(diff.stat || '(no changes against the default branch)')
+      this.diff.set(diff.stat || this.t('card.noChanges'))
     } catch (error) {
       this.diff.set(describeError(error))
     }

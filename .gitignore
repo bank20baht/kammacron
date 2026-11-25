@@ -13,3 +13,6 @@ bun.lockb
 
 # local screenshots of the web app (dark/ and light/)
 docs/screenshots/
+
+# Astro's generated types (apps/docs)
+.astro

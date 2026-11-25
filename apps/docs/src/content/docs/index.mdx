@@ -1,0 +1,49 @@
+---
+title: kammacron
+description: A Kanban board, an MCP server and an unattended Claude Code worker in one process on your own machine.
+template: splash
+hero:
+  tagline: Your backlog, on the clock. Write a card, hand it to Claude, and only look at what needs a decision.
+  actions:
+    - text: Get started
+      link: /start/install/
+      icon: right-arrow
+    - text: How a card is worked
+      link: /guides/worker/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+```sh
+bunx kammacron start          # http://127.0.0.1:7420
+```
+
+![The board of one project: To do, Doing, Review and Done](../../assets/board.png)
+
+<CardGrid>
+  <Card title="A board Claude reads" icon="list-format">
+    Four columns, live. Cards tagged `claude` are picked up on each project's interval: one `claude
+    -p` per card, which fixes the bug, pushes through your pre-push hook and comments on the card.
+  </Card>
+  <Card title="No --dangerously-skip-permissions" icon="approve-check">
+    An exact tool allowlist, no force push, no `--no-verify`, a check of what really reached the
+    remote, and an optional gate and `verify_command` that reverts a bad push.
+  </Card>
+  <Card title="You decide" icon="comment-alt">
+    A card that cannot ship waits in Review with its reason and diff. Approve it, send it back with
+    a note for the next run, or take it yourself.
+  </Card>
+  <Card title="Your subscription, your machine" icon="laptop">
+    `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`. One process, PGlite by default, and Claude
+    is only called when there is a card to work.
+  </Card>
+  <Card title="Every run, on the record" icon="document">
+    The live event stream, turns, cost, commits and where they went, and every command the allowlist
+    refused. Week-by-week stats, and a calendar of what runs when.
+  </Card>
+  <Card title="Claude Code drives the board" icon="puzzle">
+    The board is an MCP server: Claude Code, Claude Desktop and claude.ai can list, create, move and
+    comment on cards.
+  </Card>
+</CardGrid>

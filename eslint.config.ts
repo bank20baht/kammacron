@@ -1,4 +1,4 @@
-import { defineConfig } from 'eslint/config'
+import { defineConfig, globalIgnores } from 'eslint/config'
 
 import { angular, bahtui, base } from '@20baht/strict/eslint'
 
@@ -8,6 +8,8 @@ const WEB = ['apps/web/src/**', 'packages/kit/src/**']
 // Every rule is an error. Add app overrides below, each with a reason:
 //   // eslint-disable-next-line <rule> -- <why>
 export default defineConfig([
+  // Astro's generated types (apps/docs)
+  globalIgnores(['**/.astro/']),
   ...base,
   ...angular({
     files: WEB,

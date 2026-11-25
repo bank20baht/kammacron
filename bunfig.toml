@@ -1,0 +1,4 @@
+[install]
+# Astro bundles satteri (its Markdown compiler) into the build output, which then requires the
+# platform binary from there: hoist them so the isolated install can still resolve them.
+publicHoistPattern = ["satteri", "@bruits/*"]

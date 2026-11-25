@@ -30,7 +30,7 @@ You only see the cards that need a decision.
 | **Settings**  | The Claude token (with a test run), the worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), each project's repo checklist and limits, and the language.                                                                             |
 | **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                                         |
 
-The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
+The full documentation is a Starlight site in `apps/docs` (`bun run --filter docs dev`). The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
 lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
 
 ## Install
@@ -126,6 +126,7 @@ bun run compile    # dist/bin: the single-file binary
 ```
 apps/server   Elysia API, MCP, live, worker, scheduler, CLI (bun test)
 apps/web      Angular + @20baht/ui pages
+apps/docs     the documentation site (Astro + Starlight)
 packages/kit  the typed client the web app uses
 ```
 

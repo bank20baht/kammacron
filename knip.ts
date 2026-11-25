@@ -13,6 +13,10 @@ export default knip({
     'dompurify',
     'flatpickr',
     'marked',
+    // apps/docs: Astro's image service, and fonts named only as CSS paths in astro.config.mjs
+    'sharp',
+    '@fontsource/anuphan',
+    '@fontsource/jetbrains-mono',
   ],
   workspaces: {
     '.': { entry: ['scripts/*.ts'], project: ['scripts/**/*.ts'] },
@@ -22,5 +26,7 @@ export default knip({
     },
     'apps/web': { project: SRC },
     'packages/kit': tested,
+    // Astro finds its own entries: astro.config.mjs, content.config.ts and the pages
+    'apps/docs': { project: ['src/**/*.ts'] },
   },
 })

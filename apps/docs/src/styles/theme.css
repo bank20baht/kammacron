@@ -1,0 +1,47 @@
+/*
+ * The app's own look: konmek's blue as the accent, the worker's orange for asides,
+ * Anuphan (the @20baht/ui face) for text and JetBrains Mono for code.
+ */
+:root {
+  --sl-font: 'Anuphan', 'Archivo', system-ui, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --sl-color-accent-low: #121d40;
+  --sl-color-accent: #5b79e4;
+  --sl-color-accent-high: #c9d4f7;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e8edf2;
+  --sl-color-gray-2: #c4ccd8;
+  --sl-color-gray-3: #9aa6bb;
+  --sl-color-gray-4: #5d6877;
+  --sl-color-gray-5: #2a3243;
+  --sl-color-gray-6: #1b212d;
+  --sl-color-black: #0d1017;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #e9eefb;
+  --sl-color-accent: #2449c4;
+  --sl-color-accent-high: #15203b;
+  --sl-color-white: #15203b;
+  --sl-color-gray-1: #1b2a4a;
+  --sl-color-gray-2: #2f3c55;
+  --sl-color-gray-3: #5b6980;
+  --sl-color-gray-4: #8b97ab;
+  --sl-color-gray-5: #d7e2f4;
+  --sl-color-gray-6: #f2f5fb;
+  --sl-color-gray-7: #f8fafd;
+  --sl-color-black: #ffffff;
+}
+
+.sl-markdown-content img {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+}
+
+.hero .tagline {
+  text-wrap: balance;
+}
+
+.sl-markdown-content img[src*='board'] {
+  box-shadow: 0.5rem 0.5rem 0 var(--sl-color-accent);
+}

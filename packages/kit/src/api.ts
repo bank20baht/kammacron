@@ -8,7 +8,7 @@ import type { App } from 'server'
  */
 export const API_BASE = new InjectionToken<string>('API_BASE', {
   providedIn: 'root',
-  factory: () => (isDevMode() ? 'http://localhost:3001' : globalThis.location.origin),
+  factory: () => (isDevMode() ? 'http://localhost:7420' : globalThis.location.origin),
 })
 
 /**

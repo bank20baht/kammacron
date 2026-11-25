@@ -1,11 +1,14 @@
-import { buildApp } from './app'
+import { startServer } from './server'
 
-const app = buildApp().listen(Number(process.env['PORT'] ?? 3001))
+const handle = await startServer()
+console.log(`kammacron on ${handle.url}`)
 
-console.log(`server on http://localhost:${String(app.server?.port)}`)
+const stop = async () => {
+  await handle.stop()
+  process.exit(0)
+}
+process.on('SIGTERM', () => void stop())
+process.on('SIGINT', () => void stop())
 
-/** What the web apps type their client with (through `dist/types`, `bun run build:types`). */
-export type App = typeof app
-
-/** The data of the forms the web apps send, derived from their schemas. */
-export type { ContactMessage, ContactRow } from './forms/contact.form'
+/** What the web app types its client with (through `dist/types`, `bun run build:types`). */
+export type { App } from './app'

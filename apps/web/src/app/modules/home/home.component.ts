@@ -22,8 +22,8 @@ import { HelloService } from '../../services/hello.service'
             retry-label="Try again"
             (bahtRetry)="hello.reload()"
           ></baht-error-state>
-        } @else if (hello.value(); as body) {
-          <p [textContent]="body.message"></p>
+        } @else if (hello.value(); as projects) {
+          <p [textContent]="projects.length + ' projects'"></p>
         } @else {
           <baht-skeleton variant="text"></baht-skeleton>
         }
@@ -32,6 +32,6 @@ import { HelloService } from '../../services/hello.service'
   `,
 })
 export class HomeComponent {
-  protected readonly hello = inject(HelloService).hello()
+  protected readonly hello = inject(HelloService).projects()
   protected readonly describeError = describeError
 }

@@ -1,43 +1,61 @@
-import { cors } from '@elysiajs/cors'
-import { queryRows } from '@20baht/table-query'
-import { tableRoute } from '@20baht/table-query/elysia'
-import { formRoute } from '@20baht/validator/elysia'
+import { openapi } from '@elysiajs/openapi'
+import { mcpify } from '@20baht/elysia-openapi-mcp'
 import { Elysia } from 'elysia'
-import { contactForm, contactTable, type ContactRow } from './forms/contact.form'
 
-/** In dev the host and the remotes run on their own localhost ports; deployed, all share one origin. */
-const DEV_ORIGIN = /^http:\/\/localhost:\d+$/
+import { authGuard, isAuthenticated } from './auth'
+import type { AppContext } from './context'
+import { cardRoutes, CARD_RULES } from './routes/cards'
+import { projectRoutes } from './routes/projects'
+import { systemRoutes } from './routes/system'
+import { ServiceError } from './services/errors'
+
+const MCP_INSTRUCTIONS = `kammacron is a Kanban board whose "claude"-tagged cards are worked by an unattended Claude worker.
+Cards are numbered (#12). Use list_projects for project ids, list_cards to find cards, get_card for one card in full.
+${CARD_RULES}
+Moving a card to review needs a reason. Nothing is ever deleted: archive_card instead.`
 
 /**
- * The API under `/api`. Keep imports extensionless (`./x`, never `./x.ts`): the web apps compile
+ * The whole HTTP surface. Keep imports extensionless (`./x`, never `./x.ts`): the web app compiles
  * this file's declarations, and Angular's compiler rejects `.ts` specifiers.
  */
-export const buildApp = () => {
-  // Kept in memory, so the starter needs no database. A real app inserts a row in `POST /contact`
-  // and answers `/contact/search` with SQL: `tableQueryOf(sql, contactTable, { … })`.
-  const received: ContactRow[] = []
-
-  return (
-    new Elysia({ prefix: '/api' })
-      .use(cors({ origin: DEV_ORIGIN, credentials: true }))
-      .get('/hello', () => ({ message: 'Hello from the server' }))
-      // A form: the schema the browser renders, and the same schema checking what comes back.
-      .get('/contact/form', () => contactForm)
-      // `formRoute` is the form as the route's body: a refused one answers `422 { issues }` before
-      // the handler; `body` is what to keep (defaults filled, unknown keys dropped), typed from the form.
-      .post(
-        '/contact',
-        ({ body }) => {
-          // `2026-11-22 09:30`: text that reads as a time and still sorts and filters as a date
-          const received_at = new Date().toISOString().slice(0, 16).replace('T', ' ')
-          received.push({ ...body, received_at })
-          return { received: body }
+export const buildApp = (ctx: AppContext) =>
+  new Elysia()
+    .use(authGuard(ctx.auth))
+    // global, and by `instanceof`: the route modules are plugins, where neither a local hook nor
+    // a code registered with `.error()` on this instance would reach
+    .onError({ as: 'global' }, ({ error }) => {
+      if (error instanceof ServiceError)
+        return Response.json(
+          { code: error.code, message: error.message },
+          { status: error.httpStatus },
+        )
+      return undefined
+    })
+    .use(
+      openapi({
+        path: '/api/docs',
+        specPath: '/openapi/json',
+        documentation: { info: { title: 'kammacron', version: '0.0.0' } },
+      }),
+    )
+    .use(
+      mcpify({
+        name: 'kammacron',
+        instructions: MCP_INSTRUCTIONS,
+        allRoutes: false, // a route is a tool only when it says `detail.mcp: true`
+        headerParams: true, // so a tool call can send Idempotency-Key
+        auth: { verify: (request) => isAuthenticated(request, ctx.auth) },
+        headers: (incoming) => {
+          // what reaches the route: the caller's credentials and the worker's run id
+          const out = new Headers()
+          for (const name of ['authorization', 'cookie', 'x-kammacron-run', 'host']) {
+            const value = incoming.get(name)
+            if (value !== null) out.set(name, value)
+          }
+          return out
         },
-        formRoute(contactForm),
-      )
-      // A table: its columns for the browser, and a page of its rows for a query (search, filter,
-      // sort, page). `tableRoute` refuses a query that names a column the table does not have.
-      .get('/contact/table', () => contactTable)
-      .post('/contact/search', ({ body }) => queryRows(received, body), tableRoute(contactTable))
-  )
-}
+      }),
+    )
+    .group('/api', (api) => api.use(projectRoutes(ctx)).use(cardRoutes(ctx)).use(systemRoutes(ctx)))
+
+export type App = ReturnType<typeof buildApp>

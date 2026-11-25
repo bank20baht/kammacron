@@ -7,8 +7,8 @@ import { edenResource } from '@20baht/ngx-eden'
 export class HelloService {
   private readonly api = inject(Api).client.api
 
-  /** `GET /api/hello` as a resource; create it in an injection context (a field initializer). */
-  hello() {
-    return edenResource(() => this.api.hello.get.$request())
+  /** `GET /api/projects` as a resource; create it in an injection context (a field initializer). */
+  projects() {
+    return edenResource(() => this.api.projects.get.$request({ query: {} }))
   }
 }

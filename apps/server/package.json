@@ -20,14 +20,17 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
-    "@20baht/engine": "0.3.32",
-    "@20baht/table-query": "^0.4.0",
-    "@20baht/validator": "^0.3.32",
-    "@elysiajs/cors": "^1.4.3",
+    "@20baht/elysia-idempotency": "^0.1.2",
+    "@20baht/elysia-openapi-mcp": "^0.2.1",
+    "@20baht/live": "^0.1.1",
+    "@electric-sql/pglite": "^0.6.0",
+    "@elysiajs/openapi": "^1.4.17",
+    "drizzle-orm": "^0.45.4",
     "elysia": "^1.4.31"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^5.9.3"
   }
 }

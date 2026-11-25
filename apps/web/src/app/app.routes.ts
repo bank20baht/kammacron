@@ -9,12 +9,6 @@ export const routes: Routes = [
     loadComponent: () => import('./modules/home/home.component').then((m) => m.HomeComponent),
   },
   {
-    path: 'contact',
-    title: 'Contact · kammacron',
-    loadComponent: () =>
-      import('./modules/contact/contact.component').then((m) => m.ContactComponent),
-  },
-  {
     path: '**',
     title: 'Not found · kammacron',
     loadComponent: () =>

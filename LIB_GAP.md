@@ -30,3 +30,12 @@ what the library could do instead.
   triggers, commit heard, rollback not heard, 20 parallel transactions all heard).
 - **Fix in the lib:** a short "which source do I pick" table in the README: `memorySource` + `emit`
   (one process, code-only writes) vs `pgSource` + `changed`/triggers (heard on commit, any writer).
+
+### The web app's lint reads server types that `lint` never builds
+
+- **Seen:** `apps/web` and `packages/kit` type their Eden client from `apps/server/dist/types`, which only
+  `build:types` writes (as `pretypecheck` / `prebuild` of `web`). `bun run check` and CI's `lint` job run
+  `eslint .` first, with the type-aware rules, so on a fresh clone (no `dist/`) or after a server route
+  changes, lint fails with `Unsafe call of a type that could not be resolved` on every `api.*` call.
+- **Workaround:** root `package.json` has `"prelint": "bun run --filter server build:types"`.
+- **Fix in the lib:** have `create` add that `prelint` (or make the CI lint job depend on a types step).

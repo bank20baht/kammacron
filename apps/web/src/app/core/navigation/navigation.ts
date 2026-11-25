@@ -1,10 +1,7 @@
 import type { ShellNavItem } from '@20baht/ui'
 
 /** The navigator: one entry per page. `key` is the page's path, without the leading slash. */
-export const NAV: ShellNavItem[] = [
-  { key: '', label: 'Home', href: '/' },
-  { key: 'contact', label: 'Contact', href: '/contact' },
-]
+export const NAV: ShellNavItem[] = [{ key: '', label: 'Home', href: '/' }]
 
 /** The key of the entry `url` sits under, the longest one first; `''` (Home) when none does. */
 export const currentKey = (url: string, keys: string[]): string => {

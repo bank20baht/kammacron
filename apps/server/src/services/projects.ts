@@ -1,0 +1,51 @@
+import { asc, eq } from 'drizzle-orm'
+
+import { firstRow, type Executor } from '../db'
+import { projects } from '../db/schema'
+import { conflict, invalid, notFound } from './errors'
+
+export type Project = typeof projects.$inferSelect
+export type ProjectInput = Omit<
+  typeof projects.$inferInsert,
+  'id' | 'created_at' | 'updated_at' | 'last_checked_at' | 'last_check_result'
+>
+export type ProjectPatch = Partial<ProjectInput>
+
+const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/
+
+const checkSlug = (slug: string) => {
+  if (!SLUG.test(slug))
+    throw invalid(
+      'BAD_SLUG',
+      'slug: lowercase letters, digits and "-", starting with a letter or digit',
+    )
+}
+
+export const listProjects = (db: Executor, { archived = false } = {}) =>
+  db.select().from(projects).where(eq(projects.archived, archived)).orderBy(asc(projects.name))
+
+export const getProject = async (db: Executor, id: number): Promise<Project> => {
+  const [row] = await db.select().from(projects).where(eq(projects.id, id))
+  if (!row) throw notFound('project', id)
+  return row
+}
+
+export const createProject = async (db: Executor, input: ProjectInput): Promise<Project> => {
+  checkSlug(input.slug)
+  const [taken] = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(eq(projects.slug, input.slug))
+  if (taken) throw conflict('SLUG_TAKEN', `slug "${input.slug}" is taken`)
+  return firstRow(await db.insert(projects).values(input).returning())
+}
+
+export const updateProject = async (
+  db: Executor,
+  id: number,
+  patch: ProjectPatch,
+): Promise<Project> => {
+  if (patch.slug !== undefined) checkSlug(patch.slug)
+  await getProject(db, id)
+  return firstRow(await db.update(projects).set(patch).where(eq(projects.id, id)).returning())
+}

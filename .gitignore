@@ -10,3 +10,6 @@ coverage
 *.log
 .DS_Store
 bun.lockb
+
+# local screenshots of the web app (dark/ and light/)
+docs/screenshots/

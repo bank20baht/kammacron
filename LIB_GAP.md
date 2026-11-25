@@ -107,3 +107,16 @@ what the library could do instead.
   carries none. Descriptions on plain types and on nullable unions are read.
 - **Workaround:** none; Claude sees the allowed values, only the sentence is lost.
 - **Fix in the lib:** read `description` from the union itself, as it already does for `t.Nullable`.
+
+## @20baht/live (browser)
+
+### The stream outlives the page in the back/forward cache
+
+- **Seen:** every full navigation away from a page with a live stream left that stream open: Chrome kept the
+  page in its back/forward cache with its `fetch` still streaming. Server stream count went 1, 2, 3 … 6 over
+  six navigations, and the seventh request to the host hung (six HTTP/1.1 connections per host), even for
+  plain files. `liveClient` reconnects on `visibilitychange` but does nothing on `pagehide`.
+- **Workaround:** `apps/web/src/app/services/live.service.ts` closes the client on `pagehide` and reloads on
+  `pageshow` with `persisted`.
+- **Fix in the lib:** `liveClient` aborts its stream on `pagehide` and reconnects on `pageshow` (when
+  `persisted`), as it already does for visibility.

@@ -8,6 +8,20 @@ body {
   font-family: var(--baht-font-family);
 }
 
+/* A light header band (the shell's documented white-header tokens), so the page, not the
+   frame, carries the colour; it follows the theme. */
+html {
+  --baht-shell-header-bg: var(--baht-color-surface);
+  --baht-shell-header-ink: var(--baht-color-text);
+}
+
+/* A navigator link with an icon spreads its children (space-between), so without a badge the
+   label sits at the far end. The label takes the room instead; the badge stays last. (LIB_GAP) */
+.baht-shell-link--icon > span:first-of-type {
+  flex: 1;
+  text-align: start;
+}
+
 /* The width every routed page keeps to inside the shell. */
 .app-page {
   display: flex;

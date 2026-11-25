@@ -25,6 +25,7 @@ const runsTable = tableQuery(sql, {
     id: sql`${runs.id}::text`,
     card: sql`'#' || ${runs.card_id}::text || ' ' || ${cards.title}`,
     status: sql`${runs.status}`,
+    project: sql`${projects.id}::text`,
     started: sql`to_char(${runs.started_at}, 'YYYY-MM-DD HH24:MI')`,
     pushed: sql`coalesce(${runs.pushed_to}, '')`,
     error: sql`coalesce(${runs.error_kind}, '')`,
@@ -67,9 +68,10 @@ export const runRoutes = (ctx: AppContext) =>
         const { limit, offset } = runsTable.page(parsed.query)
         const sorted = runsTable.orderBy(parsed.query)
         const rows = await ctx.db
-          .select({ run: runs, card_title: cards.title })
+          .select({ run: runs, card_title: cards.title, project_name: projects.name })
           .from(runs)
           .innerJoin(cards, eq(cards.id, runs.card_id))
+          .innerJoin(projects, eq(projects.id, runs.project_id))
           .where(where)
           .orderBy(...(sorted.length ? sorted : [sql`${runs.id} desc`]))
           .limit(limit)
@@ -78,6 +80,7 @@ export const runRoutes = (ctx: AppContext) =>
           .select({ n: count() })
           .from(runs)
           .innerJoin(cards, eq(cards.id, runs.card_id))
+          .innerJoin(projects, eq(projects.id, runs.project_id))
           .where(where)
         return {
           rows: rows.map((r) => ({ ...r.run, card_title: r.card_title })),

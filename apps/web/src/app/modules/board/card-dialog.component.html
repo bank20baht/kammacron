@@ -6,11 +6,18 @@
       [label]="label[c.status]"
     ></baht-badge>
     @if (c.human) {
-      <baht-badge tone="gold" label="human"></baht-badge>
+      <baht-badge tone="info" label="Human"></baht-badge>
+    } @else if (c.tags.includes('claude')) {
+      <baht-badge tone="neutral" label="Claude"></baht-badge>
     }
-    @for (tag of c.tags; track tag) {
-      <baht-badge tone="mono" [label]="tag"></baht-badge>
-    }
+    <span class="grow"></span>
+    <baht-menu
+      icon="more"
+      label="More"
+      [items]="menu"
+      align="end"
+      (bahtSelect)="onMenu($any($event).value)"
+    ></baht-menu>
   </div>
 
   @if (error(); as message) {
@@ -23,92 +30,131 @@
   }
 
   @if (c.status === 'review') {
-    <baht-card heading="Review" [subtitle]="c.review_reason ?? ''">
+    <section class="review">
+      <baht-alert
+        tone="warning"
+        heading="Needs your review"
+        [message]="c.review_reason ?? 'No reason given'"
+      ></baht-alert>
+      @if (c.last_run; as run) {
+        <p class="muted">
+          Latest run {{ run.id }}: {{ run.status }} ·
+          <a [routerLink]="['/runs', run.id]">View run</a>
+        </p>
+      }
       @if (c.branch) {
-        <p class="muted">Branch <baht-code [code]="c.branch"></baht-code></p>
-        @if (diff(); as d) {
-          <baht-code variant="block" [code]="d.stat"></baht-code>
+        <div class="changes">
+          <span class="muted">Changes on <baht-code [code]="c.branch"></baht-code></span>
+          <baht-code variant="block" [code]="diff() ?? '…'"></baht-code>
+        </div>
+      }
+      <baht-choice-group
+        label="Decision"
+        [options]="decisions"
+        [value]="decision()"
+        (bahtChange)="decision.set($any($event).value)"
+      ></baht-choice-group>
+      @switch (decision()) {
+        @case ('send-back') {
+          <baht-form #back="bahtForm" [form]="sendBackForm"></baht-form>
+          <div class="actions">
+            <baht-button variant="primary" [loading]="busy()" (click)="sendBack(back.element)"
+              >Send back</baht-button
+            >
+          </div>
+        }
+        @case ('approve') {
+          <p class="muted">
+            {{
+              c.branch
+                ? 'Rebases ' +
+                  c.branch +
+                  ' onto the default branch and pushes it; the pre-push hook still runs.'
+                : 'Nothing to push: the card is simply done.'
+            }}
+          </p>
+          <div class="actions">
+            <baht-button variant="primary" [loading]="busy()" (click)="approve()">{{
+              c.branch ? 'Approve and push' : 'Approve'
+            }}</baht-button>
+          </div>
+        }
+        @case ('take') {
+          <p class="muted">The card stays in review, marked human: the worker will not pick it.</p>
+          <div class="actions">
+            <baht-button variant="primary" [loading]="busy()" (click)="take()"
+              >I'll take it</baht-button
+            >
+          </div>
         }
       }
-      <baht-form #back="bahtForm" [form]="sendBackForm"></baht-form>
-      <div class="actions">
-        <baht-button variant="primary" [loading]="busy()" (click)="approve()">
-          {{ c.branch ? 'Approve and push' : 'Approve' }}
-        </baht-button>
-        <baht-button variant="secondary" [disabled]="busy()" (click)="sendBack(back.element)"
-          >Send back</baht-button
-        >
-        <baht-button variant="ghost" [disabled]="busy()" (click)="take()">I'll take it</baht-button>
-      </div>
-    </baht-card>
+    </section>
   }
 
-  @if (editing()) {
-    <div class="form">
-      <baht-form
-        #f="bahtForm"
-        [form]="cardForm"
-        [value]="editValue()"
-        [registry]="registry"
-      ></baht-form>
-      <div class="actions">
-        <baht-button variant="primary" [loading]="busy()" (click)="save(f.element)"
-          >Save</baht-button
-        >
-        <baht-button variant="ghost" (click)="editing.set(false)">Cancel</baht-button>
-      </div>
+  @if (start(); as value) {
+    <baht-form
+      #f="bahtForm"
+      [form]="cardForm"
+      [value]="value"
+      [registry]="registry"
+      (bahtDirtyChange)="dirty.set($any($event).dirty)"
+    ></baht-form>
+    <div class="actions save">
+      <baht-button
+        variant="primary"
+        [disabled]="!dirty()"
+        [loading]="busy()"
+        (click)="save(f.element)"
+        >Save changes</baht-button
+      >
+      <baht-button variant="ghost" [disabled]="!dirty()" (click)="cancel(f.element)"
+        >Cancel</baht-button
+      >
     </div>
-  } @else {
-    <h2 class="title">{{ c.title }}</h2>
-    @if (c.body.trim()) {
-      <baht-markdown-view [source]="c.body" [allowImage]="allowImage"></baht-markdown-view>
-    } @else {
-      <p class="muted">No description.</p>
-    }
-    @if (images().length > 0) {
+  }
+
+  @if (images().length > 0) {
+    <section>
+      <h3 class="section">Attachments</h3>
       <baht-image-preview [images]="images()"></baht-image-preview>
-    }
-    @if (c.waits_on.length > 0) {
-      <p class="muted">
-        Waits on
-        @for (w of c.waits_on; track w.id) {
-          <baht-badge
-            [tone]="w.status === 'done' ? 'success' : 'neutral'"
-            [label]="'#' + w.id + ' ' + w.title"
-          ></baht-badge>
-        }
-      </p>
-    }
-    <div class="actions">
-      <baht-button variant="secondary" (click)="edit()">Edit</baht-button>
-      <baht-button variant="ghost" [disabled]="busy()" (click)="archive()">Archive</baht-button>
-    </div>
+    </section>
   }
 
-  @if (c.last_run; as run) {
-    <baht-card heading="Last run" [subtitle]="'run ' + run.id + ' · ' + ago(run.started_at)">
-      <div class="head">
+  @if (c.waits_on.length > 0) {
+    <p class="muted">
+      Waits on
+      @for (w of c.waits_on; track w.id) {
         <baht-badge
-          [tone]="runTone[run.status] ?? 'neutral'"
-          [label]="run.status"
-          [busy]="run.status === 'running'"
+          [tone]="w.status === 'done' ? 'success' : 'neutral'"
+          [label]="'#' + w.id + ' ' + w.title"
         ></baht-badge>
-        <span class="muted">{{ run.num_turns ?? 0 }} turns · {{ cost(run.cost_usd) }}</span>
-        <a [routerLink]="['/runs', run.id]">Open run</a>
-      </div>
-      @if (run.summary) {
-        <baht-markdown-view [source]="run.summary"></baht-markdown-view>
       }
-    </baht-card>
+    </p>
   }
 
-  <baht-comments
-    [entries]="comments()"
-    placeholder="Comment (the worker reads every comment next run)"
-    empty-message="No comments yet"
-    [busy]="busy()"
-    (bahtSubmit)="comment($any($event).body)"
-  ></baht-comments>
+  @if (c.last_run && c.status !== 'review') {
+    <p class="muted">
+      Last run {{ c.last_run.id }} ·
+      <baht-badge
+        [tone]="runTone[c.last_run.status] ?? 'neutral'"
+        [label]="c.last_run.status"
+        [busy]="c.last_run.status === 'running'"
+      ></baht-badge>
+      · {{ ago(c.last_run.started_at) }} · {{ cost(c.last_run.cost_usd) }} ·
+      <a [routerLink]="['/runs', c.last_run.id]">View run</a>
+    </p>
+  }
+
+  <section>
+    <h3 class="section">Discussion</h3>
+    <baht-comments
+      [entries]="comments()"
+      placeholder="Add a comment. Claude reads every comment on its next run."
+      empty-message="No comments yet"
+      [busy]="busy()"
+      (bahtSubmit)="comment($any($event).body)"
+    ></baht-comments>
+  </section>
 } @else if (card().error) {
   <baht-error-state
     heading="This card did not load"

@@ -9,13 +9,33 @@ import {
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
-import type { BahtForm } from '@20baht/ui'
+import type { BahtForm, ColumnMap, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { accessForm, claudeTokenForm, newProjectForm, workerForm } from '../../shared/forms'
+
+const PROJECT_COLUMNS: ColumnMap = {
+  name: 'Name',
+  slug: { label: 'Slug', cell: 'code' },
+  worker: {
+    label: 'Worker',
+    cell: 'badge',
+    tone: (value) =>
+      value === 'paused' ? 'warning' : value === 'board only' ? 'neutral' : 'success',
+  },
+  checked: 'Last checked',
+}
+
+const TABS: TabItem[] = [
+  { key: 'projects', label: 'Projects' },
+  { key: 'claude', label: 'Claude connection' },
+  { key: 'worker', label: 'Worker' },
+  { key: 'access', label: 'Access & notifications' },
+  { key: 'machine', label: 'This machine' },
+]
 
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 
@@ -42,6 +62,22 @@ export class SettingsComponent {
   protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
   protected readonly busy = signal(false)
   protected readonly ago = ago
+  protected readonly tabs = TABS
+  protected readonly tab = signal('projects')
+  protected readonly projectColumns = PROJECT_COLUMNS
+  protected readonly projectRows = computed(() =>
+    (this.projects().data ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      worker: p.paused_reason
+        ? 'paused'
+        : p.worker_enabled && p.repo_path
+          ? `every ${String(p.interval_minutes)} min`
+          : 'board only',
+      checked: p.last_checked_at ? ago(p.last_checked_at) : 'not yet',
+    })),
+  )
   protected readonly forms = {
     claudeToken: claudeTokenForm,
     worker: workerForm,

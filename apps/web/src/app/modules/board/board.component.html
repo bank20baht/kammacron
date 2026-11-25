@@ -1,108 +1,174 @@
-<div class="app-page board-page">
-  <baht-page-header heading="Board" [description]="project()?.name ?? 'Every project'">
-    <baht-button variant="primary" (click)="startNew()">New card</baht-button>
-  </baht-page-header>
-
-  <baht-segmented-nav
-    label="Project"
-    [items]="nav()"
-    [current]="slug() ?? ''"
-    (baht-navigate)="navigate($event)"
-  ></baht-segmented-nav>
-
-  @if (project(); as p) {
-    @if (p.paused_reason) {
-      <baht-alert
-        tone="warning"
-        heading="This project is paused"
-        [message]="p.paused_reason"
-      ></baht-alert>
-    } @else if (p.last_checked_at) {
-      <p class="muted">Last check {{ ago(p.last_checked_at) }}: {{ p.last_check_result }}</p>
-    }
-  }
-  @if (error(); as message) {
-    <baht-alert
-      tone="danger"
-      [message]="message"
-      dismissible
-      (bahtDismiss)="error.set(null)"
-    ></baht-alert>
-  }
-
-  @if ((projects().data ?? []).length === 0 && projects().data) {
-    <baht-empty-state
-      message="No project yet"
-      hint="Three steps: the tools, a Claude token, a repo."
-    >
-      <baht-button variant="primary" (click)="go('/welcome')">Get started</baht-button>
-    </baht-empty-state>
-  } @else {
-    <div class="columns">
-      @for (status of columns; track status) {
-        <section
-          class="column"
-          (dragover)="$event.preventDefault()"
-          (drop)="drop($event, status, null)"
+<div class="layout">
+  <div class="app-page board-page">
+    @if (project(); as p) {
+      <baht-page-header heading="Board / {{ p.name }}">
+        <baht-button variant="secondary" icon="play" [disabled]="!p.repo_path" (click)="runNow()"
+          >Run now</baht-button
         >
-          <header>
-            <span>{{ label[status] }}</span>
-            <baht-badge tone="outline" [label]="'' + byColumn()[status].length"></baht-badge>
-          </header>
-          @for (card of byColumn()[status]; track card.id) {
-            <article
-              class="tile"
-              draggable="true"
-              tabindex="0"
-              (dragstart)="dragStart(card.id)"
-              (dragover)="$event.preventDefault()"
-              (drop)="drop($event, status, card.id)"
-              (click)="open(card.id)"
-              (keydown.enter)="open(card.id)"
-            >
-              <div class="meta">
-                <span class="num">#{{ card.id }}</span>
-                @if (!slug()) {
-                  <span class="muted">{{ projectName()(card.project_id) }}</span>
-                }
-                @if (card.priority !== 0) {
-                  <span class="muted">P{{ card.priority }}</span>
-                }
-              </div>
-              <div class="title">{{ card.title }}</div>
-              <div class="badges">
-                @if (card.status === 'doing' && card.claimed_by_run) {
-                  <baht-badge tone="info" busy label="working"></baht-badge>
-                }
-                @if (card.human) {
-                  <baht-badge tone="gold" label="human"></baht-badge>
-                }
-                @for (tag of card.tags; track tag) {
-                  <baht-badge tone="mono" [label]="tag"></baht-badge>
-                }
-                @if (card.status === 'review' && card.review_reason) {
-                  <span class="reason">{{ card.review_reason }}</span>
-                }
-              </div>
-            </article>
-          } @empty {
-            <p class="empty">Drop a card here</p>
-          }
-        </section>
+        <baht-button variant="primary" icon="plus" (click)="startNew()">New card</baht-button>
+      </baht-page-header>
+      <div class="meta">
+        <baht-badge
+          [tone]="p.paused_reason ? 'warning' : 'neutral'"
+          [label]="workerLine()"
+        ></baht-badge>
+        @if (p.last_checked_at) {
+          <span class="muted"
+            >Last check {{ ago(p.last_checked_at) }}: {{ p.last_check_result }}</span
+          >
+        }
+        @if (p.worker_enabled && p.next_run_at) {
+          <span class="muted">· Next check {{ ago(p.next_run_at) }}</span>
+        }
+        <a class="link" [routerLink]="['/settings/projects', p.id]">Project settings</a>
+      </div>
+      @if (p.paused_reason) {
+        <baht-alert
+          tone="warning"
+          heading="This project is paused"
+          [message]="p.paused_reason"
+        ></baht-alert>
       }
-    </div>
-  }
-</div>
+    } @else {
+      <baht-page-header heading="Board" description="All projects">
+        <baht-button variant="primary" icon="plus" (click)="startNew()">New card</baht-button>
+      </baht-page-header>
+    }
 
-<baht-modal size="lg" heading="Card" [open]="openCard() !== null" (bahtClose)="open(null)">
-  @if (openCard(); as id) {
-    <app-card-dialog [cardId]="id" (closed)="open(null)"></app-card-dialog>
-  }
-</baht-modal>
+    <baht-segmented-nav
+      label="Project"
+      [items]="nav()"
+      [current]="slug() ?? ''"
+      (baht-navigate)="navigate($event)"
+    ></baht-segmented-nav>
+
+    @if (byColumn().review.length > 0) {
+      <div class="banner">
+        <baht-alert
+          tone="warning"
+          [heading]="
+            byColumn().review.length +
+            (byColumn().review.length === 1 ? ' card needs review' : ' cards need review')
+          "
+        ></baht-alert>
+        <baht-button variant="secondary" icon="arrow-right" (click)="go('/review')"
+          >Open review</baht-button
+        >
+      </div>
+    }
+    @if (error(); as message) {
+      <baht-alert
+        tone="danger"
+        [message]="message"
+        dismissible
+        (bahtDismiss)="error.set(null)"
+      ></baht-alert>
+    }
+
+    @if ((projects().data ?? []).length === 0 && projects().data) {
+      <baht-empty-state
+        message="No project yet"
+        hint="Three steps: the tools, a Claude token, a repo."
+      >
+        <baht-button variant="primary" (click)="go('/welcome')">Get started</baht-button>
+      </baht-empty-state>
+    } @else {
+      <div class="columns">
+        @for (status of columns; track status) {
+          <section
+            class="column"
+            [attr.data-status]="status"
+            (dragover)="$event.preventDefault()"
+            (drop)="drop($event, status, null)"
+          >
+            <header>
+              <span>{{ label[status] }}</span>
+              <baht-badge tone="outline" [label]="'' + byColumn()[status].length"></baht-badge>
+            </header>
+            @for (card of byColumn()[status]; track card.id) {
+              <article
+                class="tile"
+                [class.selected]="openCard() === card.id"
+                draggable="true"
+                tabindex="0"
+                (dragstart)="dragStart(card.id)"
+                (dragover)="$event.preventDefault()"
+                (drop)="drop($event, status, card.id)"
+                (click)="open(card.id)"
+                (keydown.enter)="open(card.id)"
+              >
+                <div class="meta">
+                  <span class="num">#{{ card.id }}</span>
+                  @if (!slug()) {
+                    <span class="muted">{{ projectName()(card.project_id) }}</span>
+                  }
+                  @if (card.priority !== 0) {
+                    <baht-badge tone="mono" [label]="'P' + card.priority"></baht-badge>
+                  }
+                </div>
+                <div class="title">{{ card.title }}</div>
+                <div class="badges">
+                  @if (card.status === 'doing' && card.claimed_by_run) {
+                    <baht-badge tone="info" busy label="Claude is working"></baht-badge>
+                  }
+                  @if (card.human) {
+                    <baht-badge tone="info" label="Human"></baht-badge>
+                  } @else if (card.tags.includes(claude)) {
+                    <baht-badge tone="neutral" label="Claude"></baht-badge>
+                  }
+                  @for (tag of card.tags; track tag) {
+                    @if (tag !== claude) {
+                      <baht-badge tone="mono" [label]="tag"></baht-badge>
+                    }
+                  }
+                </div>
+                @if (card.status === 'review') {
+                  <div class="review-row">
+                    <span class="reason">{{ card.review_reason }}</span>
+                    <baht-button
+                      size="sm"
+                      variant="primary"
+                      (click)="open(card.id); $event.stopPropagation()"
+                      >Review</baht-button
+                    >
+                  </div>
+                }
+              </article>
+            } @empty {
+              <p class="empty">Drop a card here</p>
+            }
+            @if (status === 'todo' && project()) {
+              <div class="quick">
+                <baht-form
+                  #qa="bahtForm"
+                  [form]="quickAddForm"
+                  submit-on-enter
+                  [busy]="busy()"
+                  (bahtSubmit)="quickAdd(qa.element)"
+                ></baht-form>
+              </div>
+            }
+          </section>
+        }
+      </div>
+    }
+  </div>
+
+  <baht-panel
+    size="lg"
+    [heading]="openCard() ? 'Card #' + openCard() : ''"
+    [open]="openCard() !== null"
+    (bahtClose)="open(null)"
+  >
+    @if (openCard(); as id) {
+      <app-card-dialog [cardId]="id" (closed)="open(null)"></app-card-dialog>
+    }
+  </baht-panel>
+</div>
 
 <baht-form-modal
   heading="New card"
-  submit-label="Create"
+  submit-label="Create card"
   [open]="creating()"
   [form]="newForm()"
   [value]="newValue()"

@@ -1,19 +1,24 @@
+@if (items().length > 0) {
 <baht-app-shell
   brand="kammacron"
   brand-href="/board"
   label="kammacron"
-  [items]="items"
+  [items]="items()"
   [value]="current()"
   (baht-nav)="navigate($event)"
 >
-  <div data-slot="actions">
-    @if (session.state() === 'open') {
+  <div data-slot="actions" class="actions">
     <app-status-bar></app-status-bar>
-    }
     <baht-theme-toggle default="system"></baht-theme-toggle>
   </div>
   <main class="shell-main">
     <router-outlet />
   </main>
 </baht-app-shell>
+} @else {
+<!-- before the session (the token page): no frame, nothing to navigate to yet -->
+<main class="bare">
+  <router-outlet />
+</main>
+}
 <baht-toast></baht-toast>

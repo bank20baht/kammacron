@@ -1,24 +1,25 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
-import { Router } from '@angular/router'
+import { Router, RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import { guess } from '@20baht/live/browser'
-import type { FormDefinition, NavItem } from '@20baht/ui'
+import type { BahtForm, FormDefinition, NavItem } from '@20baht/ui'
 import { Api, answer, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
-import { newCardForm, REGISTRY } from '../../shared/forms'
+import { newCardForm, quickAddForm, REGISTRY } from '../../shared/forms'
 import { STATUS_LABEL, type CardStatus } from '../../shared/tones'
 import { CardDialogComponent } from './card-dialog.component'
 
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
+const CLAUDE = 'claude'
 
-/** Four columns, live; drag a card to move it, open it to edit, talk, review. */
+/** Four columns, live; drag a card to move it, open it in the drawer, add one in To do. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, CardDialogComponent],
+  imports: [BAHT_UI, CardDialogComponent, RouterLink],
   selector: 'web-board',
   styleUrl: './board.component.css',
   templateUrl: './board.component.html',
@@ -50,6 +51,7 @@ export class BoardComponent {
   protected readonly columns = COLUMNS
   protected readonly label = STATUS_LABEL
   protected readonly ago = ago
+  protected readonly claude = CLAUDE
   protected readonly openCard = computed(() => {
     const id = Number(this.card())
     return Number.isInteger(id) && id > 0 ? id : null
@@ -81,11 +83,22 @@ export class BoardComponent {
     return (id: number) => names.get(id) ?? ''
   })
 
+  /** What the project's worker is doing, in one line. */
+  protected readonly workerLine = computed(() => {
+    const p = this.project()
+    if (!p) return ''
+    if (p.paused_reason) return 'Worker: paused'
+    if (!p.repo_path || !p.worker_enabled) return 'Worker: board only'
+    return `Worker: every ${String(p.interval_minutes)} min`
+  })
+
   // a new card
   protected readonly creating = signal(false)
   protected readonly error = signal<string | null>(null)
   protected readonly createError = signal('')
+  protected readonly busy = signal(false)
   protected readonly registry = REGISTRY
+  protected readonly quickAddForm = quickAddForm
   protected readonly newValue = signal<Record<string, unknown>>({})
   protected readonly newForm = computed<FormDefinition>(() => ({
     ...newCardForm,
@@ -123,34 +136,78 @@ export class BoardComponent {
     const project = this.project() ?? this.projects().data?.[0]
     this.newValue.set({
       project_id: project ? String(project.id) : null,
-      tags: ['claude'],
-      human: false,
+      owner: 'claude',
+      tags: [],
     })
     this.createError.set('')
     this.creating.set(true)
   }
 
+  private async createOne(input: {
+    project_id: number
+    title: string
+    body?: string
+    owner: string
+    tags?: string[]
+  }) {
+    const others = (input.tags ?? []).filter((t) => t !== CLAUDE)
+    const [card] = answer(
+      await firstValueFrom(
+        this.api.cards.batch.post({
+          cards: [
+            {
+              project_id: input.project_id,
+              title: input.title,
+              body: input.body ?? '',
+              tags: input.owner === 'claude' ? [CLAUDE, ...others] : others,
+              human: input.owner === 'human',
+            },
+          ],
+        }),
+      ),
+    )
+    return card
+  }
+
   protected async create(data: Record<string, unknown>): Promise<void> {
     try {
-      const [card] = answer(
-        await firstValueFrom(
-          this.api.cards.batch.post({
-            cards: [
-              {
-                project_id: Number(data['project_id']),
-                title: typeof data['title'] === 'string' ? data['title'].trim() : '',
-                body: typeof data['body'] === 'string' ? data['body'] : '',
-                tags: Array.isArray(data['tags']) ? (data['tags'] as string[]) : [],
-                human: data['human'] === true,
-              },
-            ],
-          }),
-        ),
-      )
+      const card = await this.createOne({
+        project_id: Number(data['project_id']),
+        title: typeof data['title'] === 'string' ? data['title'].trim() : '',
+        body: typeof data['body'] === 'string' ? data['body'] : '',
+        owner: typeof data['owner'] === 'string' ? data['owner'] : 'claude',
+        tags: Array.isArray(data['tags']) ? (data['tags'] as string[]) : [],
+      })
       this.creating.set(false)
       if (card) this.open(card.id)
     } catch (error) {
       this.createError.set(describeError(error))
+    }
+  }
+
+  /** Quick add in To do: a Claude card in this project, titled and nothing else. */
+  protected async quickAdd(form: BahtForm): Promise<void> {
+    const project = this.project()
+    const title = form.getData()['title']
+    if (!project || typeof title !== 'string' || !title.trim()) return
+    this.busy.set(true)
+    try {
+      await this.createOne({ project_id: project.id, title: title.trim(), owner: 'claude' })
+      form.reset()
+    } catch (error) {
+      this.error.set(describeError(error))
+    } finally {
+      this.busy.set(false)
+    }
+  }
+
+  protected async runNow(): Promise<void> {
+    const project = this.project()
+    if (!project) return
+    try {
+      await firstValueFrom(this.api.projects({ id: String(project.id) })['run-now'].post())
+    } catch (error) {
+      this.error.set(describeError(error))
     }
   }
 

@@ -7,9 +7,10 @@ import {
   resource,
   signal,
 } from '@angular/core'
+import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
-import type { BahtForm } from '@20baht/ui'
+import type { BahtForm, Crumb, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -22,6 +23,15 @@ type Check = {
   checks: { name: string; ok: boolean; detail: string }[]
   default_branch: string | null
 }
+
+const SECTIONS: TabItem[] = [
+  { key: 'general', label: 'General' },
+  { key: 'worker', label: 'Worker & limits' },
+  { key: 'shipping', label: 'Shipping & verification' },
+  { key: 'permissions', label: 'Permissions' },
+  { key: 'schedules', label: 'Schedules' },
+  { key: 'advanced', label: 'Advanced' },
+]
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const count = (v: unknown, fallback: number) => {
@@ -43,6 +53,13 @@ const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
       gap: var(--baht-space-2);
       margin-block: var(--baht-space-2);
     }
+    .checks {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--baht-space-2);
+      margin-block: var(--baht-space-3);
+    }
     .muted {
       color: var(--baht-color-text-muted);
     }
@@ -53,6 +70,17 @@ export class ProjectSettingsComponent {
   private readonly api = inject(Api).client.api
   private readonly live = inject(LiveService).live
   readonly id = input.required<string>()
+  /** `?section=permissions` opens that section (the run page links there). */
+  readonly section = input<string>()
+  private readonly router = inject(Router)
+  protected readonly sections = SECTIONS
+  protected readonly picked = signal<string | null>(null)
+  protected readonly current = computed(() => this.picked() ?? this.section() ?? 'general')
+  protected readonly dirty = signal(false)
+  protected readonly crumbs = computed<Crumb[]>(() => [
+    { label: 'Settings' },
+    { label: this.project.value()?.name ?? '…' },
+  ])
 
   protected readonly project = resource({
     params: () => this.id(),
@@ -95,6 +123,15 @@ export class ProjectSettingsComponent {
     }
   }
 
+  protected go(url: string): void {
+    void this.router.navigateByUrl(url)
+  }
+
+  protected discard(form: BahtForm): void {
+    form.reset()
+    this.dirty.set(false)
+  }
+
   protected save(form: BahtForm): Promise<void> {
     if (!form.validate().valid) return Promise.resolve()
     const d = form.getData()
@@ -123,6 +160,8 @@ export class ProjectSettingsComponent {
           protected_paths: list(d['protected_paths']),
         }),
       )
+      form.markClean()
+      this.dirty.set(false)
       this.project.reload()
       if (text(d['repo_path'])) await this.runCheck()
     }, 'Saved')

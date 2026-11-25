@@ -3,7 +3,10 @@ import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { filter, map } from 'rxjs'
-import { NAV, currentKey } from './core/navigation/navigation'
+import { liveSignal } from '@20baht/angular/live'
+
+import { currentKey, navWith } from './core/navigation/navigation'
+import { LiveService } from './services/live.service'
 import { SessionService } from './services/session.service'
 import { StatusBarComponent } from './shared/status-bar.component'
 
@@ -27,12 +30,24 @@ export class App {
     { initialValue: this.router.url },
   )
 
-  protected readonly items = NAV
+  private readonly live = inject(LiveService).live
+  private readonly open = computed(() => this.session.state() === 'open')
+  private readonly status = liveSignal(() =>
+    this.open() ? this.live.subscribe('GET', '/api/status') : null,
+  )
+  private readonly projects = liveSignal(() =>
+    this.open() ? this.live.subscribe('GET', '/api/projects', { query: {} }) : null,
+  )
+
+  /** No navigator before the session exists (the token page). */
+  protected readonly items = computed(() =>
+    this.open() ? navWith(this.status().data?.review ?? 0, this.projects().data ?? []) : [],
+  )
 
   protected readonly current = computed(() =>
     currentKey(
       this.url(),
-      NAV.map((item) => item.key),
+      this.items().map((item) => item.key),
     ),
   )
 

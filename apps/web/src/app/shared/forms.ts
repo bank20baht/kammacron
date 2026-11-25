@@ -34,9 +34,35 @@ export const newCardForm = defineForm({
       options: [],
     },
     { order: 1, type: 'text', key: 'title', label: 'Title', required: true },
-    body,
-    { order: 3, type: 'tags', key: 'tags', label: 'Tags', help: '"claude": the worker takes it' },
-    { order: 4, type: 'toggle', key: 'human', label: 'A person takes this card' },
+    {
+      order: 2,
+      type: 'radio',
+      key: 'owner',
+      label: 'Owner',
+      required: true,
+      options: [
+        { key: 'claude', label: 'Claude' },
+        { key: 'human', label: 'Human' },
+      ],
+      help: 'Claude cards carry the claude tag: the worker takes them',
+    },
+    { ...body, order: 3 },
+    { order: 4, type: 'tags', key: 'tags', label: 'Tags' },
+  ],
+})
+
+/** One line in a column: a title, Enter, and the card is in the project's to do. */
+export const quickAddForm = defineForm({
+  form_id: 'quick-add',
+  form_name: 'Quick add',
+  fields: [
+    {
+      order: 1,
+      type: 'text',
+      key: 'title',
+      label: 'New card',
+      placeholder: 'Add a card title… (Enter)',
+    },
   ],
 })
 
@@ -48,29 +74,45 @@ export const cardForm = defineForm({
     body,
     {
       order: 3,
-      type: 'tags',
-      key: 'tags',
-      label: 'Tags',
-      help: '"claude" hands the card to the worker',
+      type: 'dropdown',
+      key: 'status',
+      label: 'Status',
+      width: '1/3',
+      options: [
+        { key: 'todo', label: 'To do' },
+        { key: 'doing', label: 'Doing' },
+        { key: 'done', label: 'Done' },
+      ],
     },
     {
       order: 4,
-      type: 'number',
-      key: 'priority',
-      label: 'Priority',
-      width: '1/2',
-      help: 'Higher is picked first',
+      type: 'dropdown',
+      key: 'owner',
+      label: 'Owner',
+      width: '1/3',
+      options: [
+        { key: 'claude', label: 'Claude' },
+        { key: 'human', label: 'Human' },
+        { key: 'none', label: 'Nobody' },
+      ],
     },
     {
       order: 5,
+      type: 'number',
+      key: 'priority',
+      label: 'Priority',
+      width: '1/3',
+      help: 'Higher first',
+    },
+    { order: 6, type: 'tags', key: 'tags', label: 'Other tags', width: '2/3' },
+    {
+      order: 7,
       type: 'text',
       key: 'waits_on',
       label: 'Waits on',
-      width: '1/2',
+      width: '1/3',
       placeholder: '12, 14',
-      help: 'Card numbers that must be done first',
     },
-    { order: 6, type: 'toggle', key: 'human', label: 'A person takes this card' },
   ],
 })
 
@@ -190,6 +232,25 @@ export const newProjectForm = defineForm({
 export const projectForm = defineForm({
   form_id: 'project',
   form_name: 'Project',
+  views: [
+    { name: 'general', fields: ['name', 'worker_enabled', 'repo_path', 'default_branch'] },
+    {
+      name: 'worker',
+      fields: ['mode', 'interval_minutes', 'max_cards_per_run', 'max_turns', 'model'],
+    },
+    {
+      name: 'shipping',
+      fields: [
+        'ship_policy',
+        'verify_command',
+        'max_diff_lines',
+        'protected_paths',
+        'setup_command',
+      ],
+    },
+    { name: 'permissions', fields: ['allowed_bash', 'web_tools', 'enabled_mcp_servers'] },
+    { name: 'advanced', fields: ['copy_files', 'extra_prompt'] },
+  ],
   fields: [
     { order: 1, type: 'text', key: 'name', label: 'Name', required: true, width: '1/2' },
     {

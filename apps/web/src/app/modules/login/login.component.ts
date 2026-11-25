@@ -12,31 +12,53 @@ import { loginForm } from '../../shared/forms'
   imports: [BAHT_UI],
   selector: 'web-login',
   styles: `
+    .center {
+      display: grid;
+      place-items: center;
+      min-height: 70dvh;
+      padding: var(--baht-space-5);
+    }
     .box {
       display: flex;
       flex-direction: column;
       gap: var(--baht-space-3);
-      max-width: 28rem;
+      width: min(30rem, 100%);
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: var(--baht-space-2);
+    }
+    .muted {
+      margin: 0;
+      color: var(--baht-color-text-muted);
+      font-size: var(--baht-text-sm);
     }
   `,
   template: `
-    <div class="app-page">
-      <baht-page-header
+    <div class="center">
+      <baht-card
         heading="Open kammacron"
-        description="This browser is not on the machine kammacron runs on. Enter its API token once: kammacron token, on that machine, prints it."
-      ></baht-page-header>
-      <div class="box">
-        @if (error()) {
-          <baht-alert tone="danger" message="That token is not this install's."></baht-alert>
-        }
-        <baht-form
-          #f="bahtForm"
-          [form]="form"
-          submit-on-enter
-          (bahtSubmit)="submit(f.element)"
-        ></baht-form>
-        <baht-button variant="primary" (click)="submit(f.element)">Open</baht-button>
-      </div>
+        subtitle="Enter the API token of the machine kammacron runs on."
+      >
+        <div class="box">
+          <p class="muted">On that machine, run:</p>
+          <div class="row">
+            <baht-code code="kammacron token"></baht-code>
+            <baht-copy-button text="kammacron token" label="Copy command"></baht-copy-button>
+          </div>
+          @if (error()) {
+            <baht-alert tone="danger" message="That token is not this install's."></baht-alert>
+          }
+          <baht-form
+            #f="bahtForm"
+            [form]="form"
+            submit-on-enter
+            (bahtSubmit)="submit(f.element)"
+          ></baht-form>
+          <baht-button variant="primary" block (click)="submit(f.element)">Open</baht-button>
+        </div>
+      </baht-card>
     </div>
   `,
 })

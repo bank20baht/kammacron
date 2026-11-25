@@ -1,74 +1,117 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
+import { CardDialogComponent } from '../board/card-dialog.component'
 
-/** Cards in review from every project: why, and the way into each. */
+/**
+ * Every card in review, the queue beside the one chosen: why it is here, and the decision,
+ * without leaving the page.
+ */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [BAHT_UI, CardDialogComponent],
   selector: 'web-review',
   styles: `
-    .list {
+    .split {
+      display: grid;
+      grid-template-columns: minmax(16rem, 22rem) 1fr;
+      gap: var(--baht-space-4);
+      align-items: start;
+    }
+    @media (width < 900px) {
+      .split {
+        grid-template-columns: 1fr;
+      }
+    }
+    .queue {
       display: flex;
       flex-direction: column;
-      gap: var(--baht-space-3);
-    }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
       gap: var(--baht-space-2);
+    }
+    .item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--baht-space-1);
+      padding: var(--baht-space-3);
+      border: 1px solid var(--baht-color-border);
+      border-radius: var(--baht-radius-md);
+      background: var(--baht-color-surface);
+      cursor: pointer;
+    }
+    .item:hover,
+    .item:focus-visible {
+      border-color: var(--baht-color-border-strong);
+    }
+    .item.selected {
+      border-color: var(--baht-color-accent);
+      background: var(--baht-color-bg-sunken);
+    }
+    .title {
+      font-weight: var(--baht-font-weight-label);
     }
     .muted {
       color: var(--baht-color-text-muted);
+      font-size: var(--baht-text-sm);
     }
   `,
   template: `
     <div class="app-page">
       <baht-page-header
         heading="Review"
-        description="Only what the worker could not ship by itself, or asked you to decide."
+        [description]="
+          count() === 1 ? '1 card needs a decision.' : count() + ' cards need a decision.'
+        "
       ></baht-page-header>
-      <div class="list">
-        @for (card of cards().data ?? []; track card.id) {
-          <baht-card
-            [heading]="'#' + card.id + ' ' + card.title"
-            [subtitle]="projectName()(card.project_id) + ' · ' + ago(card.updated_at)"
-          >
-            <p>{{ card.review_reason ?? 'No reason given' }}</p>
-            <div class="row">
-              @if (card.branch) {
-                <baht-code [code]="card.branch"></baht-code>
+      @if (cards().data; as all) {
+        @if (all.length === 0) {
+          <baht-empty-state
+            message="Nothing to review"
+            hint="Cards the worker hands back show up here."
+          ></baht-empty-state>
+        } @else {
+          <div class="split">
+            <div class="queue" role="listbox" aria-label="To review">
+              @for (card of all; track card.id) {
+                <div
+                  class="item"
+                  role="option"
+                  tabindex="0"
+                  [attr.aria-selected]="card.id === selected()"
+                  [class.selected]="card.id === selected()"
+                  (click)="select(card.id)"
+                  (keydown.enter)="select(card.id)"
+                >
+                  <span class="title">#{{ card.id }} {{ card.title }}</span>
+                  <span class="muted"
+                    >{{ projectName()(card.project_id) }} · {{ ago(card.updated_at) }}</span
+                  >
+                  <span class="muted">{{ card.review_reason ?? 'No reason given' }}</span>
+                </div>
               }
-              @for (tag of card.tags; track tag) {
-                <baht-badge tone="mono" [label]="tag"></baht-badge>
-              }
-              <baht-button variant="primary" size="sm" (click)="openCard(card.id, card.project_id)"
-                >Open</baht-button
-              >
             </div>
-          </baht-card>
-        } @empty {
-          @if (cards().data) {
-            <baht-empty-state
-              message="Nothing to review"
-              hint="Cards the worker hands back show up here."
-            ></baht-empty-state>
-          } @else {
-            <baht-skeleton variant="text"></baht-skeleton>
-          }
+            <baht-card>
+              @if (selected(); as id) {
+                <app-card-dialog [cardId]="id" (closed)="select(null)"></app-card-dialog>
+              }
+            </baht-card>
+          </div>
         }
-      </div>
+      } @else {
+        <baht-skeleton variant="text"></baht-skeleton>
+      }
     </div>
   `,
 })
 export class ReviewComponent {
   private readonly live = inject(LiveService).live
   private readonly router = inject(Router)
+  /** `?card=12` picks a card; the first one otherwise. */
+  readonly card = input<string>()
+
   protected readonly cards = liveSignal(() =>
     this.live.subscribe('GET', '/api/cards', { query: { status: 'review' } }),
   )
@@ -76,14 +119,20 @@ export class ReviewComponent {
     this.live.subscribe('GET', '/api/projects', { query: {} }),
   )
   protected readonly ago = ago
+  protected readonly count = computed(() => this.cards().data?.length ?? 0)
 
-  protected readonly projectName = computed(() => {
-    const names = new Map((this.projects().data ?? []).map((p) => [p.id, p]))
-    return (id: number) => names.get(id)?.name ?? ''
+  protected readonly selected = computed(() => {
+    const all = this.cards().data ?? []
+    const wanted = Number(this.card())
+    return all.find((c) => c.id === wanted)?.id ?? all[0]?.id ?? null
   })
 
-  protected openCard(id: number, projectId: number): void {
-    const slug = (this.projects().data ?? []).find((p) => p.id === projectId)?.slug
-    void this.router.navigate(slug ? ['/board', slug] : ['/board'], { queryParams: { card: id } })
+  protected readonly projectName = computed(() => {
+    const names = new Map((this.projects().data ?? []).map((p) => [p.id, p.name]))
+    return (id: number) => names.get(id) ?? ''
+  })
+
+  protected select(id: number | null): void {
+    void this.router.navigate([], { queryParams: { card: id }, queryParamsHandling: 'merge' })
   }
 }

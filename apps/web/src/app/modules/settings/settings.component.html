@@ -12,106 +12,147 @@
     ></baht-alert>
   }
 
-  <baht-card heading="Projects" subtitle="A project with a linked repo is worked by Claude">
-    @for (p of projects().data ?? []; track p.id) {
-      <div
-        class="row project"
-        tabindex="0"
-        (click)="openProject(p.id)"
-        (keydown.enter)="openProject(p.id)"
-      >
-        <strong>{{ p.name }}</strong>
-        <baht-code [code]="p.slug"></baht-code>
-        @if (p.paused_reason) {
-          <baht-badge tone="warning" label="paused"></baht-badge>
-        } @else if (p.worker_enabled && p.repo_path) {
-          <baht-badge tone="success" [label]="'every ' + p.interval_minutes + ' min'"></baht-badge>
-        } @else {
-          <baht-badge tone="neutral" label="board only"></baht-badge>
-        }
-        <span class="muted">{{
-          p.last_checked_at ? 'checked ' + ago(p.last_checked_at) : ''
-        }}</span>
+  <div class="split">
+    <baht-tabs [tabs]="tabs" [value]="tab()" (bahtChange)="tab.set($any($event).value)">
+      <div data-tab="projects" class="stack">
+        <baht-section-header
+          heading="Projects"
+          description="Each with a linked repo is worked by Claude"
+        ></baht-section-header>
+        <baht-table
+          [showIndex]="false"
+          [columns]="projectColumns"
+          [items]="projectRows()"
+          [total]="projectRows().length"
+          clickable
+          empty-message="No project yet"
+          (bahtRowClick)="openProject($any($event).row.id)"
+        ></baht-table>
+        <baht-card heading="Add project">
+          <baht-form #np="bahtForm" [form]="forms.newProject"></baht-form>
+          <div class="row">
+            <baht-button variant="primary" [disabled]="busy()" (click)="addProject(np.element)"
+              >Add project</baht-button
+            >
+          </div>
+        </baht-card>
       </div>
-    }
-    <baht-form #np="bahtForm" [form]="forms.newProject"></baht-form>
-    <baht-button variant="primary" [disabled]="busy()" (click)="addProject(np.element)"
-      >Add project</baht-button
-    >
-  </baht-card>
 
-  <baht-card heading="Claude" subtitle="The token every run uses: subscription quota, not the API">
-    @if (settings.value(); as s) {
-      <p class="muted">
-        @if (s.claude_token.source) {
-          Using the token from
-          {{ s.claude_token.source === 'env' ? 'the environment' : 'Settings' }} ({{
-            s.claude_token.last4
-          }}).
-        } @else {
-          No token yet: runs use whatever login claude finds, which a service may not have.
-        }
-      </p>
-    }
-    <baht-form #ct="bahtForm" [form]="forms.claudeToken"></baht-form>
-    <div class="row">
-      <baht-button variant="secondary" [disabled]="busy()" (click)="saveToken(ct.element)"
-        >Keep</baht-button
-      >
-      <baht-button variant="ghost" [loading]="busy()" (click)="testClaude()">Test</baht-button>
-    </div>
-  </baht-card>
-
-  <baht-card heading="Connect Claude Code" subtitle="Adds this board as an MCP server">
-    <baht-code variant="block" [code]="mcpCommand()"></baht-code>
-    <div class="row">
-      <baht-copy-button [text]="mcpCommand()" label="Copy"></baht-copy-button>
-      <baht-button variant="ghost" [disabled]="busy()" (click)="rotate()">Rotate token</baht-button>
-    </div>
-  </baht-card>
-
-  @if (settings.value(); as s) {
-    <baht-card heading="Worker">
-      <div class="row">
-        <baht-badge
-          [tone]="s.paused ? 'danger' : 'success'"
-          [label]="s.paused ? 'Paused' : 'On'"
-        ></baht-badge>
-        <baht-button variant="secondary" (click)="save({ paused: !s.paused })">
-          {{ s.paused ? 'Resume' : 'Pause everything' }}
-        </baht-button>
+      <div data-tab="claude" class="stack">
+        <baht-card
+          heading="Claude token"
+          subtitle="The token every run uses: subscription quota, not the API"
+        >
+          <baht-form #ct="bahtForm" [form]="forms.claudeToken"></baht-form>
+          <div class="row">
+            <baht-button variant="primary" [disabled]="busy()" (click)="saveToken(ct.element)"
+              >Keep</baht-button
+            >
+            <baht-button variant="secondary" [loading]="busy()" (click)="testClaude()"
+              >Test</baht-button
+            >
+          </div>
+        </baht-card>
+        <baht-card heading="Connect Claude Code" subtitle="Adds this board as an MCP server">
+          <baht-code variant="block" [code]="mcpCommand()"></baht-code>
+          <div class="row">
+            <baht-copy-button [text]="mcpCommand()" label="Copy"></baht-copy-button>
+            <baht-button variant="ghost" [disabled]="busy()" (click)="rotate()"
+              >Rotate token</baht-button
+            >
+          </div>
+        </baht-card>
       </div>
-      <baht-form #wf="bahtForm" [form]="forms.worker" [value]="workerValue()"></baht-form>
-      <baht-button variant="primary" [disabled]="busy()" (click)="saveWorker(wf.element)"
-        >Save</baht-button
-      >
-    </baht-card>
 
-    <baht-card heading="Access and notifications">
-      <baht-form #af="bahtForm" [form]="forms.access" [value]="accessValue()"></baht-form>
-      <baht-button variant="primary" [disabled]="busy()" (click)="saveAccess(af.element)"
-        >Save</baht-button
-      >
-    </baht-card>
-  }
+      <div data-tab="worker" class="stack">
+        @if (settings.value(); as s) {
+          <baht-card heading="Worker">
+            <div class="row">
+              <baht-badge
+                [tone]="s.paused ? 'danger' : 'success'"
+                [label]="s.paused ? 'Paused' : 'On'"
+              ></baht-badge>
+              <baht-button variant="secondary" (click)="save({ paused: !s.paused })">
+                {{ s.paused ? 'Resume' : 'Pause everything' }}
+              </baht-button>
+            </div>
+            <baht-form #wf="bahtForm" [form]="forms.worker" [value]="workerValue()"></baht-form>
+            <baht-button variant="primary" [disabled]="busy()" (click)="saveWorker(wf.element)"
+              >Save</baht-button
+            >
+          </baht-card>
+        }
+      </div>
 
-  @if (system.value(); as sys) {
-    <baht-card heading="This machine" [subtitle]="sys.data_dir">
-      @for (tool of sys.tools; track tool.name) {
-        <div class="row">
-          <baht-badge [tone]="tool.path ? 'success' : 'danger'" [label]="tool.name"></baht-badge>
-          <span class="muted">{{ tool.path ?? 'not found on the worker PATH' }}</span>
-          @if (tool.version) {
-            <baht-code [code]="tool.version"></baht-code>
-          }
+      <div data-tab="access" class="stack">
+        @if (settings.value()) {
+          <baht-card heading="Access and notifications">
+            <baht-form #af="bahtForm" [form]="forms.access" [value]="accessValue()"></baht-form>
+            <baht-button variant="primary" [disabled]="busy()" (click)="saveAccess(af.element)"
+              >Save</baht-button
+            >
+          </baht-card>
+        }
+      </div>
+
+      <div data-tab="machine" class="stack">
+        @if (system.value(); as sys) {
+          <baht-card heading="This machine" [subtitle]="sys.data_dir">
+            @for (tool of sys.tools; track tool.name) {
+              <div class="row">
+                <baht-badge
+                  [tone]="tool.path ? 'success' : 'danger'"
+                  [label]="tool.name"
+                ></baht-badge>
+                <span class="muted">{{ tool.path ?? 'not found on the worker PATH' }}</span>
+                @if (tool.version) {
+                  <baht-code [code]="tool.version"></baht-code>
+                }
+              </div>
+            }
+            @if (!sys.worker) {
+              <baht-alert
+                tone="info"
+                message="This process runs without the worker (--no-worker)."
+              ></baht-alert>
+            }
+          </baht-card>
+        }
+      </div>
+    </baht-tabs>
+
+    <baht-card class="status">
+      @if (settings.value(); as s) {
+        <div class="state">
+          <baht-badge
+            [tone]="s.claude_token.source ? 'success' : 'danger'"
+            [label]="s.claude_token.source ? 'Claude token set' : 'Claude token not set'"
+          ></baht-badge>
+          <p class="muted">
+            @if (s.claude_token.source) {
+              From {{ s.claude_token.source === 'env' ? 'the environment' : 'Settings' }} ({{
+                s.claude_token.last4
+              }}).
+            } @else {
+              Runs use the local Claude login, which a service may not have.
+            }
+          </p>
+          <baht-button size="sm" variant="ghost" icon="arrow-right" (click)="tab.set('claude')"
+            >Configure connection</baht-button
+          >
+        </div>
+        <div class="state">
+          <baht-badge
+            [tone]="s.paused ? 'danger' : 'success'"
+            [label]="s.paused ? 'Worker paused' : 'Worker on'"
+          ></baht-badge>
+          <p class="muted">
+            {{
+              s.paused ? 'No new runs start until you resume.' : 'Ready for the next pickable card.'
+            }}
+          </p>
         </div>
       }
-      @if (!sys.worker) {
-        <baht-alert
-          tone="info"
-          message="This process runs without the worker (--no-worker)."
-        ></baht-alert>
-      }
     </baht-card>
-  }
+  </div>
 </div>

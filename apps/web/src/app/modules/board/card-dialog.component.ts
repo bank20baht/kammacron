@@ -11,7 +11,7 @@ import {
 import { RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
-import type { BahtForm, CommentEntry, PreviewImage } from '@20baht/ui'
+import type { BahtForm, ChoiceOption, CommentEntry, MenuItem, PreviewImage } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -21,8 +21,22 @@ import { cardForm, REGISTRY, sameOriginImage, sendBackForm } from '../../shared/
 import { RUN_TONE, STATUS_LABEL } from '../../shared/tones'
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
+const CLAUDE = 'claude'
 
-/** One card: edit it, talk on it, see its last run, decide a review. */
+type Decision = 'send-back' | 'approve' | 'take'
+
+const DECISIONS: ChoiceOption[] = [
+  { key: 'send-back', label: 'Send back', description: 'Claude tries again with your note' },
+  { key: 'approve', label: 'Approve', description: 'Rebase the branch and push it' },
+  { key: 'take', label: "I'll take it", description: 'Mark it human: the worker leaves it' },
+]
+
+const MENU: MenuItem[] = [{ value: 'archive', label: 'Archive', danger: true }]
+
+/**
+ * One card, always editable: its fields (saved with Save), its review decision when it waits on
+ * one, the last run, the files and the comments. In the board's drawer and the Review page.
+ */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BAHT_UI, RouterLink],
@@ -40,16 +54,21 @@ export class CardDialogComponent {
   protected readonly card = liveSignal(() =>
     this.live.subscribe('GET', '/api/cards/:id', { params: { id: String(this.cardId()) } }),
   )
-  protected readonly editing = signal(false)
   protected readonly busy = signal(false)
+  protected readonly dirty = signal(false)
   protected readonly error = signal<string | null>(null)
-  protected readonly editValue = signal<Record<string, unknown>>({})
-  protected readonly diff = signal<{ stat: string } | null>(null)
+  protected readonly decision = signal<Decision>('send-back')
+  protected readonly diff = signal<string | null>(null)
+  /** The form's starting data: taken once per card, so live frames never wipe an edit. */
+  protected readonly start = signal<Record<string, unknown> | null>(null)
+  private loadedFor: number | null = null
 
   protected readonly cardForm = cardForm
   protected readonly sendBackForm = sendBackForm
   protected readonly registry = REGISTRY
   protected readonly allowImage = sameOriginImage
+  protected readonly decisions = DECISIONS
+  protected readonly menu = MENU
   protected readonly label = STATUS_LABEL
   protected readonly runTone = RUN_TONE
   protected readonly ago = ago
@@ -78,36 +97,35 @@ export class CardDialogComponent {
   )
 
   constructor() {
-    // the diff stat of a review card's branch, once per card
     effect(() => {
       const card = this.card().data
-      if (card?.status === 'review' && card.branch && this.diff() === null)
-        void this.loadDiff(card.id)
+      if (!card || this.loadedFor === card.id) return
+      this.loadedFor = card.id
+      this.diff.set(null)
+      this.start.set(this.valueOf(card))
+      if (card.status === 'review' && card.branch) void this.loadDiff(card.id)
     })
   }
 
-  private async loadDiff(id: number): Promise<void> {
-    this.diff.set({ stat: '…' })
-    try {
-      const diff = await firstValueFrom(this.api.cards({ id: String(id) }).diff.get())
-      this.diff.set({ stat: diff.stat || '(no changes against the default branch)' })
-    } catch (error) {
-      this.diff.set({ stat: describeError(error) })
+  private valueOf(card: NonNullable<ReturnType<typeof this.card>['data']>) {
+    return {
+      title: card.title,
+      body: card.body,
+      status: card.status,
+      owner: card.human ? 'human' : card.tags.includes(CLAUDE) ? 'claude' : 'none',
+      priority: card.priority,
+      tags: card.tags.filter((t) => t !== CLAUDE),
+      waits_on: card.waits_on.map((w) => String(w.id)).join(', '),
     }
   }
 
-  protected edit(): void {
-    const card = this.card().data
-    if (!card) return
-    this.editValue.set({
-      title: card.title,
-      body: card.body,
-      tags: card.tags,
-      human: card.human,
-      priority: card.priority,
-      waits_on: card.waits_on.map((w) => String(w.id)).join(', '),
-    })
-    this.editing.set(true)
+  private async loadDiff(id: number): Promise<void> {
+    try {
+      const diff = await firstValueFrom(this.api.cards({ id: String(id) }).diff.get())
+      this.diff.set(diff.stat || '(no changes against the default branch)')
+    } catch (error) {
+      this.diff.set(describeError(error))
+    }
   }
 
   private async act(work: () => Promise<unknown>): Promise<boolean> {
@@ -125,26 +143,43 @@ export class CardDialogComponent {
   }
 
   protected async save(form: BahtForm): Promise<void> {
-    if (!form.validate().valid) return
+    const card = this.card().data
+    if (!card || !form.validate().valid) return
     const d = form.getData()
+    const owner = text(d['owner'])
+    const others = Array.isArray(d['tags'])
+      ? (d['tags'] as string[]).filter((t) => t !== CLAUDE)
+      : []
     const waits = text(d['waits_on'])
       .split(/[\s,#]+/)
       .filter(Boolean)
       .map(Number)
       .filter((n) => Number.isInteger(n) && n > 0)
-    const ok = await this.act(() =>
-      firstValueFrom(
-        this.api.cards({ id: String(this.cardId()) }).patch({
+    const id = String(card.id)
+    const status = text(d['status'])
+    const ok = await this.act(async () => {
+      await firstValueFrom(
+        this.api.cards({ id }).patch({
           title: text(d['title']),
           body: text(d['body']),
-          tags: Array.isArray(d['tags']) ? (d['tags'] as string[]) : [],
-          human: d['human'] === true,
+          tags: owner === 'claude' ? [CLAUDE, ...others] : others,
+          human: owner === 'human',
           priority: Math.round(Number(d['priority']) || 0),
           waits_on: waits,
         }),
-      ),
-    )
-    if (ok) this.editing.set(false)
+      )
+      if ((status === 'todo' || status === 'doing' || status === 'done') && status !== card.status)
+        await firstValueFrom(this.api.cards({ id }).move.post({ status }))
+    })
+    if (ok) {
+      form.markClean()
+      this.dirty.set(false)
+    }
+  }
+
+  protected cancel(form: BahtForm): void {
+    form.reset()
+    this.dirty.set(false)
   }
 
   protected comment(body: string): Promise<boolean> {
@@ -176,7 +211,8 @@ export class CardDialogComponent {
     return this.act(() => firstValueFrom(this.api.cards({ id: String(this.cardId()) }).take.post()))
   }
 
-  protected async archive(): Promise<void> {
+  protected async onMenu(value: string): Promise<void> {
+    if (value !== 'archive') return
     if (
       await this.act(() =>
         firstValueFrom(this.api.cards({ id: String(this.cardId()) }).archive.post()),

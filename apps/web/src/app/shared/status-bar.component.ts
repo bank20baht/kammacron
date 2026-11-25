@@ -27,7 +27,7 @@ import { ago } from './format'
   template: `
     @if (status().data; as s) {
       @if (s.paused) {
-        <baht-badge tone="danger" label="Paused"></baht-badge>
+        <baht-badge tone="danger" label="Worker: paused"></baht-badge>
       } @else if (s.running.length > 0) {
         @for (run of s.running; track run.run_id) {
           <a [routerLink]="['/runs', run.run_id]">
@@ -39,14 +39,14 @@ import { ago } from './format'
           </a>
         }
       } @else {
-        <baht-badge tone="success" label="Idle"></baht-badge>
+        <baht-badge tone="success" label="Worker: idle"></baht-badge>
       }
       @for (p of s.paused_projects; track p.id) {
         <baht-badge tone="warning" [label]="p.name + ' paused'"></baht-badge>
       }
       @if (s.review > 0) {
         <a routerLink="/review">
-          <baht-badge tone="warning" [label]="s.review + ' to review'"></baht-badge>
+          <baht-badge tone="warning" [label]="'Review ' + s.review"></baht-badge>
         </a>
       }
       <baht-button

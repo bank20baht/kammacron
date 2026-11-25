@@ -11,12 +11,12 @@ bun run pack       # dist/package: the npm package
 bun run compile    # dist/bin: the single-file binary
 ```
 
-| Folder         | What it is                                                   |
-| -------------- | ------------------------------------------------------------ |
-| `apps/server`  | Elysia API, MCP, live updates, the worker, scheduler and CLI |
-| `apps/web`     | The Angular web app, built with `@20baht/ui`                 |
-| `apps/docs`    | This site (Astro and Starlight): `bun run --filter docs dev` |
-| `packages/kit` | The typed client the web app uses                            |
+| Folder         | What it is                                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `apps/server`  | Elysia API, MCP, live updates, the worker, scheduler and CLI                                                                  |
+| `apps/web`     | The Angular web app, built with `@20baht/ui`                                                                                  |
+| `apps/docs`    | This site (Astro and Starlight): `bun run --filter docs dev`; `bun run --filter docs deploy` publishes it to Cloudflare Pages |
+| `packages/kit` | The typed client the web app uses                                                                                             |
 
 The worker tests use a fake `claude` (`apps/server/test/fixtures/fake-claude.ts`) against real git repositories with a local bare remote. `TEST_DATABASE_URL=postgres://…` runs the server suite on Postgres.
 

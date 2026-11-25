@@ -13,7 +13,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "typecheck": "astro sync && tsc --noEmit"
+    "typecheck": "astro sync && tsc --noEmit",
+    "deploy": "astro build && bunx wrangler@4 pages deploy dist --project-name kammacron --branch main"
   },
   "type": "module"
 }

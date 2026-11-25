@@ -30,7 +30,7 @@ You only see the cards that need a decision.
 | **Settings**  | The Claude token (with a test run), the worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), each project's repo checklist and limits, and the language.                                                                             |
 | **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                                         |
 
-The full documentation is a Starlight site in `apps/docs` (`bun run --filter docs dev`). The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
+Documentation: **[kammacron.pages.dev](https://kammacron.pages.dev)** (the Starlight site in `apps/docs`: `bun run --filter docs dev`, and `bun run --filter docs deploy` to publish it). The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
 lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
 
 ## Install

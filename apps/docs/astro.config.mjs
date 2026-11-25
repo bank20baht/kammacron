@@ -3,6 +3,7 @@ import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 
 export default defineConfig({
+  site: 'https://kammacron.pages.dev',
   output: 'static',
   server: { port: 4321 },
   integrations: [

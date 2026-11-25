@@ -208,3 +208,34 @@ describe('on a real server', () => {
     }
   })
 })
+
+describe('runs search', () => {
+  test('term, sort and page over runs, with the total', async () => {
+    const [a, b] = await create([
+      { project_id: projectId, title: 'login bug' },
+      { project_id: projectId, title: 'docs' },
+    ])
+    const { createRun } = await import('../src/services/runs')
+    for (const card of [must(a), must(b), must(a)])
+      await createRun(t.ctx.db, {
+        project_id: projectId,
+        card_id: card.id,
+        base_sha: null,
+        log_path: null,
+      })
+    const found = await t.json<{ rows: { card_id: number }[]; total: number }>(
+      'POST',
+      '/api/runs/search',
+      {
+        term: 'login',
+        sort: { key: 'id', dir: 'asc' },
+        page: 1,
+        pageSize: 1,
+      },
+    )
+    expect(found.total).toBe(2)
+    expect(found.rows.map((r) => r.card_id)).toEqual([must(a).id])
+    const bad = await t.call('POST', '/api/runs/search', { columns: { nope: 'x' } })
+    expect(bad.status).toBe(400)
+  })
+})

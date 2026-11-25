@@ -77,7 +77,12 @@ export const startServer = async (options: ServerOptions = {}) => {
     options.port ?? Number(process.env['KAMMACRON_PORT'] ?? process.env['PORT'] ?? DEFAULT_PORT)
 
   await mkdir(dataDir, { recursive: true, mode: 0o700 })
-  const held = await readLock(dataDir)
+  // a process that was just told to stop may still be closing the database: give it a moment
+  let held = await readLock(dataDir)
+  for (let waited = 0; held && waited < 15_000; waited += 250) {
+    await Bun.sleep(250)
+    held = await readLock(dataDir)
+  }
   if (held)
     throw new Error(
       `${dataDir} is in use by kammacron pid ${String(held.pid)} on port ${String(held.port)}`,
@@ -119,11 +124,25 @@ export const startServer = async (options: ServerOptions = {}) => {
   return {
     ctx,
     url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${String(actualPort)}`,
+    /**
+     * In order, each step guarded so one failing cannot keep the rest (and the lock) from going:
+     * runs stop, then HTTP with its open live streams, then the hub, then the database.
+     */
     stop: async () => {
-      await ctx.scheduler?.stop()
-      await app.stop()
-      ctx.live.close()
-      await database.close()
+      const quietly = async (step: () => unknown) => {
+        try {
+          await step()
+        } catch {
+          // shutting down: nothing left to tell
+        }
+      }
+      await quietly(() => ctx.scheduler?.stop())
+      await quietly(() => app.stop(true))
+      await quietly(() => {
+        ctx.live.close()
+      })
+      await Bun.sleep(100) // a live run that was mid-query sees the hub closed before the DB goes
+      await quietly(() => database.close())
       await rm(lockPath(dataDir), { force: true })
     },
   }

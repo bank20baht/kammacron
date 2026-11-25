@@ -1,5 +1,6 @@
 import { liveMacro, liveRoute } from '@20baht/live/elysia'
-import { and, count, eq, inArray } from 'drizzle-orm'
+import { parseTableQuery, tableQuery } from '@20baht/table-query'
+import { and, count, eq, inArray, sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
@@ -17,6 +18,29 @@ import { idParams, oneOf } from './params'
 
 const Id = idParams()
 
+/** The Runs table's columns, as SQL text the query can search, filter and sort (@20baht/table-query). */
+const runsTable = tableQuery(sql, {
+  key: sql`${runs.id}`,
+  columns: {
+    id: sql`${runs.id}::text`,
+    card: sql`'#' || ${runs.card_id}::text || ' ' || ${cards.title}`,
+    status: sql`${runs.status}`,
+    started: sql`to_char(${runs.started_at}, 'YYYY-MM-DD HH24:MI')`,
+    pushed: sql`coalesce(${runs.pushed_to}, '')`,
+    error: sql`coalesce(${runs.error_kind}, '')`,
+    took: sql`coalesce((${runs.ended_at} - ${runs.started_at})::text, '')`,
+    turns: sql`coalesce(${runs.num_turns}::text, '')`,
+    cost: sql`coalesce(${runs.cost_usd}::text, '')`,
+  },
+  term: [sql`${cards.title}`, sql`coalesce(${runs.summary}, '')`, sql`coalesce(${runs.error}, '')`],
+  sortAs: {
+    id: sql`${runs.id}`,
+    started: sql`${runs.started_at}`,
+    turns: sql`${runs.num_turns}`,
+    cost: sql`${runs.cost_usd}`,
+  },
+})
+
 export const runRoutes = (ctx: AppContext) =>
   new Elysia()
     .use(liveMacro(ctx.live))
@@ -31,6 +55,44 @@ export const runRoutes = (ctx: AppContext) =>
       live: liveRoute(ctx.live, { topics: () => ['runs'], key: 'id' }),
       detail: { operationId: 'list_runs', summary: 'Worker runs, newest first' },
     })
+    .post(
+      '/runs/search',
+      async ({ body, status }) => {
+        const parsed = parseTableQuery(body)
+        if (!parsed.ok) return status(400, { code: 'BAD_QUERY', message: parsed.message })
+        const unknown = runsTable.unknownColumn(parsed.query)
+        if (unknown)
+          return status(400, { code: 'UNKNOWN_COLUMN', message: `unknown column ${unknown}` })
+        const where = runsTable.where(parsed.query)
+        const { limit, offset } = runsTable.page(parsed.query)
+        const sorted = runsTable.orderBy(parsed.query)
+        const rows = await ctx.db
+          .select({ run: runs, card_title: cards.title })
+          .from(runs)
+          .innerJoin(cards, eq(cards.id, runs.card_id))
+          .where(where)
+          .orderBy(...(sorted.length ? sorted : [sql`${runs.id} desc`]))
+          .limit(limit)
+          .offset(offset)
+        const [total] = await ctx.db
+          .select({ n: count() })
+          .from(runs)
+          .innerJoin(cards, eq(cards.id, runs.card_id))
+          .where(where)
+        return {
+          rows: rows.map((r) => ({ ...r.run, card_title: r.card_title })),
+          total: total?.n ?? 0,
+        }
+      },
+      {
+        body: t.Record(t.String(), t.Unknown(), { description: 'A <baht-table> query' }),
+        live: liveRoute(ctx.live, { topics: () => ['runs'], key: 'id', rows: 'rows' }),
+        detail: {
+          operationId: 'search_runs',
+          summary: 'Runs searched, filtered, sorted and paged',
+        },
+      },
+    )
     .get(
       '/runs/:id',
       ({ params, query }) => getRunWithEvents(ctx.db, Number(params.id), query.after ?? 0),

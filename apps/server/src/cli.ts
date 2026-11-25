@@ -96,7 +96,9 @@ switch (command) {
     }).catch((error: unknown) => die(error instanceof Error ? error.message : String(error)))
     console.log(`kammacron ${await version()} on ${handle.url} (data: ${dataDir})`)
     const stop = () => {
-      void handle.stop().then(() => process.exit(0))
+      // exit however stopping ends, and within 10 s even if something hangs
+      setTimeout(() => process.exit(1), 10_000).unref()
+      void handle.stop().finally(() => process.exit(0))
     }
     process.on('SIGTERM', stop)
     process.on('SIGINT', stop)

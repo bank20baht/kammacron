@@ -1,8 +1,8 @@
 # kammacron
 
 A Kanban board, an MCP server and an unattended Claude Code worker in one process on your own
-machine. Cards tagged `claude` are picked up on a schedule: one `claude -p` per card in a git
-worktree, which fixes the bug, pushes through your repo's pre-push hook, and comments on the card.
+machine. Cards tagged `claude` are picked up on a schedule: one `claude -p` per card, in your repo
+folder (or a worktree of its own, if you turn that on), which fixes the bug, pushes through your repo's pre-push hook, and comments on the card.
 You only see the cards that need a decision.
 
 - **Runs without `--dangerously-skip-permissions`.** An exact tool allowlist (no force push, no
@@ -53,8 +53,13 @@ Project rules for the worker live in the repo at `.claude-worker/prompt.md` (the
 Every project is checked on its interval. With a pickable card (tagged `claude`, not `human`, in
 `todo`, everything it `waits_on` done) the worker:
 
-1. prepares `~/.kammacron/worktrees/<project>` on `claude/<card>` from `origin/<default>`, copies the
-   card's images into it, and runs `setup_command` when a lock file changed;
+1. prepares where Claude works, on `claude/<card>`, and copies the card's images into it, then runs
+   `setup_command` when a lock file changed. By default that is the repo folder itself, branched
+   from the branch it is on: a round is skipped (with one alert) while the folder has uncommitted
+   changes or commits not on origin, and afterwards the folder goes back to its branch, moved up to
+   what was pushed. With **Separate worktree** on (project settings), it is
+   `~/.kammacron/worktrees/<project>`, from `origin/<default>`, and your folder is never touched.
+   The board shows the folder's branch, and whether it has uncommitted changes;
 2. runs `claude -p` with the card, its comments and earlier runs, the rules, and only the
    kammacron MCP tools plus the project's enabled servers;
 3. reads what happened: the card's status, which refs moved on the remote. A push anywhere else

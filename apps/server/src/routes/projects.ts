@@ -4,6 +4,9 @@ import { Elysia, t } from 'elysia'
 import type { AppContext } from '../context'
 import { idParams, oneOf } from './params'
 import { createProject, getProject, listProjects, updateProject } from '../services/projects'
+import { childEnv } from '../worker/env'
+import { gitIn } from '../worker/git'
+import { localGit } from '../worker/workspace'
 
 const Id = idParams()
 
@@ -25,6 +28,7 @@ const ProjectFields = {
   web_tools: t.Optional(t.Boolean()),
   mode: t.Optional(oneOf(['watch', 'autopilot'])),
   ship_policy: t.Optional(oneOf(['push', 'branch'])),
+  use_worktree: t.Optional(t.Boolean()),
   worktree_path: t.Optional(t.Nullable(t.String())),
   verify_timeout_minutes: t.Optional(t.Integer({ minimum: 1, maximum: 240 })),
   lock_files: t.Optional(t.Array(t.String())),
@@ -46,6 +50,25 @@ export const projectRoutes = (ctx: AppContext) =>
       params: Id,
       detail: { operationId: 'get_project', summary: 'One project' },
     })
+    .get(
+      '/projects/:id/git',
+      async ({ params }) => {
+        const project = await getProject(ctx.db, Number(params.id))
+        const none = { branch: null, dirty: false, ahead: null, behind: null }
+        const local = project.repo_path
+          ? await localGit(gitIn(project.repo_path, await childEnv(ctx.worker)))
+          : none
+        return { ...local, use_worktree: project.use_worktree }
+      },
+      {
+        params: Id,
+        detail: {
+          operationId: 'project_git',
+          summary:
+            "The project directory's branch, uncommitted changes, and how far it is from origin",
+        },
+      },
+    )
     // Project settings steer the worker (its tools, its prompt): never tools.
     .post('/projects', ({ body }) => createProject(ctx.db, body), {
       body: t.Object({ slug: t.String(), ...ProjectFields }),

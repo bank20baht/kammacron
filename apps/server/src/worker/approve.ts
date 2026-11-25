@@ -6,8 +6,8 @@ import { conflict, invalid } from '../services/errors'
 import { getProject } from '../services/projects'
 import { cardBranch, childEnv, type WorkerEnv } from './env'
 import { shipBranch } from './gate'
-import { defaultBranch, gitIn, remoteHeads } from './git'
-import { ensureWorktree, worktreeDir } from './runner'
+import { remoteHeads } from './git'
+import { openWorkspace } from './workspace'
 
 /**
  * Approve: rebase `claude/<card>` onto the default branch and push it there (an ordinary push, so
@@ -23,11 +23,7 @@ export const approveCard = async (env: WorkerEnv, cardId: number) => {
   if (!card.branch || !project.repo_path) return moveCard(env.db, cardId, { status: 'done' })
 
   const childEnvironment = await childEnv(env)
-  const repo = gitIn(project.repo_path, childEnvironment)
-  const branchName = project.default_branch ?? (await defaultBranch(repo))
-  if (!branchName)
-    throw conflict('NO_DEFAULT_BRANCH', 'cannot find the default branch (origin/HEAD)')
-  // the worktree is the worker's while a run of this project goes
+  // the working copy is the worker's while a run of this project goes
   const live = [...env.handles.keys()]
   if (live.length > 0) {
     const busy = await env.db
@@ -37,21 +33,28 @@ export const approveCard = async (env: WorkerEnv, cardId: number) => {
     if (busy.length > 0)
       throw conflict('WORKTREE_BUSY', 'a run of this project is going; approve when it ends')
   }
-  const wt = gitIn(
-    (await ensureWorktree(repo, worktreeDir(env, project), branchName)).cwd,
+  const space = await openWorkspace(
+    env,
+    { ...project, repo_path: project.repo_path },
     childEnvironment,
   )
-  const branch = cardBranch(cardId)
-  await wt.out('fetch', 'origin', '--prune')
-  const heads = await remoteHeads(wt)
-  if (!heads[branch]) {
-    await env.db.update(cards).set({ branch: null }).where(eq(cards.id, cardId))
-    return moveCard(env.db, cardId, { status: 'done' })
+  if ('skip' in space) throw conflict('WORKSPACE_BUSY', `cannot approve now: ${space.skip}`)
+  const { git: wt, branch: branchName } = space
+  try {
+    const branch = cardBranch(cardId)
+    await wt.out('fetch', 'origin', '--prune')
+    const heads = await remoteHeads(wt)
+    if (!heads[branch]) {
+      await env.db.update(cards).set({ branch: null }).where(eq(cards.id, cardId))
+      return await moveCard(env.db, cardId, { status: 'done' })
+    }
+    const sha = await shipBranch(wt, childEnvironment, branch, branchName)
+    await addComment(env.db, cardId, {
+      author: 'user',
+      body: `Approved: ${branch} rebased and pushed to ${branchName} at ${sha.slice(0, 8)}.`,
+    })
+    return await moveCard(env.db, cardId, { status: 'done' })
+  } finally {
+    await space.release(`the approval of #${String(cardId)}`)
   }
-  const sha = await shipBranch(wt, childEnvironment, branch, branchName)
-  await addComment(env.db, cardId, {
-    author: 'user',
-    body: `Approved: ${branch} rebased and pushed to ${branchName} at ${sha.slice(0, 8)}.`,
-  })
-  return moveCard(env.db, cardId, { status: 'done' })
 }

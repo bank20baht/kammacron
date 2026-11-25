@@ -12,8 +12,9 @@ import { getProject, type Project } from '../services/projects'
 import { markInterruptedRuns, pruneRunEvents } from '../services/runs'
 import { getSettings } from '../services/settings'
 import { childEnv, type WorkerEnv } from './env'
-import { defaultBranch, exec, gitIn } from './git'
-import { ensureWorktree, runCard, worktreeDir } from './runner'
+import { exec, gitIn, type Git } from './git'
+import { runCard } from './runner'
+import { ensureWorktree, targetBranch, worktreeDir } from './workspace'
 
 const TICK_MS = 30_000
 
@@ -74,7 +75,10 @@ export const createScheduler = (env: WorkerEnv) => {
 
   const nextRunAt = (project: Project) => new Date(Date.now() + project.interval_minutes * 60_000)
 
-  /** Up to max cards, one at a time; null when the round must end without rescheduling. */
+  /**
+   * Up to max cards, one at a time: how many ran, and why the round stopped short of a card it
+   * had (a dirty directory, no default branch); null when it must end without rescheduling.
+   */
   const runCards = async (project: Project) => {
     let done = 0
     for (; done < project.max_cards_per_run; done++) {
@@ -86,9 +90,17 @@ export const createScheduler = (env: WorkerEnv) => {
       const outcome = await runCard(env, fresh, card.id)
       const kind = outcome.result?.errorKind
       if (kind === 'auth' || kind === 'rate_limit') return null
-      if (outcome.skipped && outcome.skipped !== 'claimed by someone else') break
+      if (outcome.skipped && outcome.skipped !== 'claimed by someone else')
+        return { done, skipped: outcome.skipped }
     }
-    return done
+    return { done, skipped: null }
+  }
+
+  /** What the round says of itself on the board and in the calendar. */
+  const checkResult = (done: number, skipped: string | null) => {
+    const ran = done === 0 ? 'no cards' : `ran ${String(done)} card${done === 1 ? '' : 's'}`
+    if (!skipped) return ran
+    return done === 0 ? `skipped: ${skipped}` : `${ran}, then skipped: ${skipped}`
   }
 
   /** One round of a project: stale sweep, pre-check without Claude, then up to max cards. */
@@ -98,17 +110,40 @@ export const createScheduler = (env: WorkerEnv) => {
     if (settings.paused || !runnable(project)) return
     await sweepStale(project.id)
     await runSchedules(project)
-    const done = await runCards(project)
-    if (done === null) return
+    const outcome = await runCards(project)
+    if (outcome === null) return
+    const result = checkResult(outcome.done, outcome.skipped)
+    // said once, not every round it stays so
+    if (outcome.skipped && result !== project.last_check_result)
+      await addAlert(env.db, {
+        level: 'warning',
+        project_id: project.id,
+        message: `${project.name}: round skipped: ${outcome.skipped}`,
+      })
     await env.db
       .update(projects)
       .set({
         last_checked_at: new Date(),
-        last_check_result:
-          done === 0 ? 'no cards' : `ran ${String(done)} card${done === 1 ? '' : 's'}`,
+        last_check_result: result,
         next_run_at: nextRunAt(project),
       })
       .where(eq(projects.id, project.id))
+  }
+
+  /**
+   * Where a project's schedules run: in its worktree, reset to what origin has before each; in
+   * the directory itself, as it is (never touched). Null when there is no branch to go by.
+   */
+  const scheduleDir = async (project: Project, repo: Git) => {
+    const branch = await targetBranch(project, repo)
+    if (!branch) return null
+    if (!project.use_worktree) return { wt: repo, reset: () => Promise.resolve() }
+    const wt = await ensureWorktree(repo, worktreeDir(env, project), branch)
+    const reset = async () => {
+      await wt.out('fetch', 'origin', '--prune')
+      await wt.out('checkout', '-f', '--detach', `origin/${branch}`)
+    }
+    return { wt, reset }
   }
 
   /** Schedules of a project that are due: a failing command opens (or comments on) a card. */
@@ -125,13 +160,11 @@ export const createScheduler = (env: WorkerEnv) => {
       )
     if (due.length === 0 || !project.repo_path) return
     const childEnvironment = await childEnv(env)
-    const repo = gitIn(project.repo_path, childEnvironment)
-    const branch = project.default_branch ?? (await defaultBranch(repo))
-    if (!branch) return
-    const wt = await ensureWorktree(repo, worktreeDir(env, project), branch)
+    const place = await scheduleDir(project, gitIn(project.repo_path, childEnvironment))
+    if (!place) return
+    const { wt } = place
     for (const schedule of due) {
-      await wt.out('fetch', 'origin', '--prune')
-      await wt.out('checkout', '-f', '--detach', `origin/${branch}`)
+      await place.reset()
       const r = await exec(['sh', '-c', schedule.command], {
         cwd: wt.cwd,
         env: childEnvironment,

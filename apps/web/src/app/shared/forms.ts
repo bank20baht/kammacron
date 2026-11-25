@@ -262,7 +262,10 @@ export const projectForm = (t: Translate) =>
     form_id: 'project',
     form_name: t('forms.project.name'),
     views: [
-      { name: 'general', fields: ['name', 'worker_enabled', 'repo_path', 'default_branch'] },
+      {
+        name: 'general',
+        fields: ['name', 'worker_enabled', 'repo_path', 'use_worktree', 'default_branch'],
+      },
       {
         name: 'worker',
         fields: ['mode', 'interval_minutes', 'max_cards_per_run', 'max_turns', 'model'],
@@ -304,6 +307,13 @@ export const projectForm = (t: Translate) =>
         placeholder: '/Users/me/code/my-app',
         help: t('forms.project.repoPathHelp'),
         width: '2/3',
+      },
+      {
+        order: 3.5,
+        type: 'toggle',
+        key: 'use_worktree',
+        label: t('forms.project.useWorktree'),
+        help: t('forms.project.useWorktreeHelp'),
       },
       {
         order: 4,

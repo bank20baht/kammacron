@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  resource,
+  signal,
+} from '@angular/core'
 import { Router, RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
@@ -112,6 +120,24 @@ export class BoardComponent {
     const names = new Map((this.projects().data ?? []).map((p) => [p.id, p.name]))
     return (id: number) => names.get(id) ?? ''
   })
+
+  /**
+   * The project directory's branch and state. Read again when a round ends or the project
+   * changes (the round may have moved it); not live, git has no events to send.
+   */
+  protected readonly gitState = resource({
+    params: () => {
+      const p = this.project()
+      return p?.repo_path
+        ? { id: p.id, at: p.last_checked_at, worktree: p.use_worktree }
+        : undefined
+    },
+    loader: ({ params }) => firstValueFrom(this.api.projects({ id: params.id }).git.get()),
+  })
+
+  protected due(at: string | Date): boolean {
+    return new Date(at).getTime() <= Date.now()
+  }
 
   /** What the project's worker is doing, in one line. */
   protected readonly workerLine = computed(() => {

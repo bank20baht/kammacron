@@ -10,8 +10,8 @@ import { conflict } from '../services/errors'
 import { getProject } from '../services/projects'
 import { getSettings } from '../services/settings'
 import { cardBranch, childEnv } from '../worker/env'
-import { defaultBranch, exec, gitIn } from '../worker/git'
-import { worktreeDir } from '../worker/runner'
+import { exec, gitIn } from '../worker/git'
+import { targetBranch, worktreeDir } from '../worker/workspace'
 import { idParams } from './params'
 
 /** Where a tool is on the worker's PATH, and its version line. */
@@ -112,10 +112,10 @@ export const adminRoutes = (ctx: AppContext) =>
         const project = await getProject(ctx.db, card.project_id)
         if (!project.repo_path) throw conflict('NO_REPO', 'the project has no repo')
         const env = await childEnv(ctx.worker)
-        const branchName =
-          project.default_branch ?? (await defaultBranch(gitIn(project.repo_path, env)))
+        const branchName = await targetBranch(project, gitIn(project.repo_path, env))
         const dir = worktreeDir(ctx.worker, project)
-        const git = gitIn((await Bun.file(`${dir}/.git`).exists()) ? dir : project.repo_path, env)
+        const inWorktree = project.use_worktree && (await Bun.file(`${dir}/.git`).exists())
+        const git = gitIn(inWorktree ? dir : project.repo_path, env)
         await git.run('fetch', 'origin', '--prune')
         const range = `origin/${branchName ?? 'main'}...origin/${cardBranch(card.id)}`
         const stat = await git.run('diff', '--stat', range)

@@ -60,7 +60,12 @@ export const projects = pgTable('projects', {
   ship_policy: text('ship_policy', { enum: ['push', 'branch'] })
     .notNull()
     .default('push'),
-  /** Where the worktree lives; `<data>/worktrees/<slug>` when null. */
+  /**
+   * false: Claude works in `repo_path` itself, on the branch it is on, and a round is skipped while
+   * it has uncommitted changes. true: in a worktree of its own, from the default branch.
+   */
+  use_worktree: boolean('use_worktree').notNull().default(false),
+  /** Where the worktree lives (with use_worktree); `<data>/worktrees/<slug>` when null. */
   worktree_path: text('worktree_path'),
   /** Files hashed to decide whether `setup_command` runs again. */
   lock_files: text('lock_files')

@@ -72,6 +72,7 @@ beforeEach(async () => {
     name: 'Demo',
     repo_path: repo,
     worker_enabled: true,
+    use_worktree: true,
   })
   projectId = project.id
 })
@@ -273,5 +274,102 @@ describe('the scheduler', () => {
     const project = await getProject(t.ctx.db, projectId)
     expect(project.last_check_result).toBe('no cards')
     expect(must(project.next_run_at).getTime()).toBeGreaterThan(Date.now())
+  })
+})
+
+describe('working in the directory itself (no worktree)', () => {
+  const direct = () =>
+    t.json('PATCH', `/api/projects/${String(projectId)}`, { use_worktree: false })
+  const head = () => git(repo, 'branch', '--show-current')
+
+  test('push: ships to the branch the directory is on and leaves it there, moved up', async () => {
+    await direct()
+    const card = await newCard()
+    const { run: r } = await run('push', card.id)
+    expect(must(r).status).toBe('succeeded')
+    expect(must(r).pushed_to).toBe('main')
+    expect(await remoteHas('main', 'fixed.txt')).toBe(true)
+    expect(await head()).toBe('main')
+    expect(await Bun.file(join(repo, 'fixed.txt')).exists()).toBe(true)
+    expect(await git(repo, 'status', '--porcelain')).toBe('')
+    expect(await Bun.file(join(t.dataDir, 'worktrees', 'demo', '.git')).exists()).toBe(false)
+  })
+
+  test('the branch is whatever the directory is on, not the default', async () => {
+    await direct()
+    await git(repo, 'checkout', '-qb', 'feature')
+    await git(repo, 'push', '-q', 'origin', 'feature')
+    const card = await newCard()
+    const { run: r } = await run('push', card.id)
+    expect(must(r).pushed_to).toBe('feature')
+    expect(await remoteHas('feature', 'fixed.txt')).toBe(true)
+    expect(await remoteHas('main', 'fixed.txt')).toBe(false)
+    expect(await head()).toBe('feature')
+  })
+
+  test('branch policy: the card waits in review and the directory is back on its branch', async () => {
+    await direct()
+    const card = await newCard()
+    await run('branch', card.id)
+    expect((await getCard(t.ctx.db, card.id)).status).toBe('review')
+    expect(await head()).toBe('main')
+    expect(await Bun.file(join(repo, 'wip.txt')).exists()).toBe(false)
+  })
+
+  test('uncommitted changes: the card is not touched, and neither are they', async () => {
+    await direct()
+    await Bun.write(join(repo, 'README.md'), '# mine, half done\n')
+    const card = await newCard()
+    const outcome = await run('push', card.id)
+    expect(outcome.run).toBeNull()
+    expect(outcome.skipped).toContain('uncommitted changes')
+    expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
+    expect(await Bun.file(join(repo, 'README.md')).text()).toBe('# mine, half done\n')
+  })
+
+  test('commits not on origin yet: skipped, so a push never carries them along', async () => {
+    await direct()
+    await Bun.write(join(repo, 'local.txt'), 'not pushed\n')
+    await git(repo, 'add', 'local.txt')
+    await git(repo, 'commit', '-qm', 'local only')
+    const outcome = await run('push', (await newCard()).id)
+    expect(outcome.skipped).toContain('1 commit not on origin')
+  })
+
+  test('a round that skips says why, and alerts once while it stays so', async () => {
+    await direct()
+    await Bun.write(join(repo, 'README.md'), '# dirty\n')
+    await newCard()
+    const scheduler = createScheduler(t.ctx.worker)
+    for (let i = 0; i < 2; i++) {
+      scheduler.runNow(projectId)
+      await scheduler.idle()
+    }
+    const project = await getProject(t.ctx.db, projectId)
+    expect(project.last_check_result).toBe('skipped: the directory has uncommitted changes on main')
+    const skips = (await listAlerts(t.ctx.db)).filter((a) => a.message.includes('round skipped'))
+    expect(skips).toHaveLength(1)
+  })
+
+  test('GET /projects/:id/git: the branch, uncommitted changes, ahead and behind', async () => {
+    await direct()
+    type LocalGit = {
+      branch: string
+      dirty: boolean
+      ahead: number
+      behind: number
+      use_worktree: boolean
+    }
+    const clean = await t.json<LocalGit>('GET', `/api/projects/${String(projectId)}/git`)
+    expect(clean).toEqual({
+      branch: 'main',
+      dirty: false,
+      ahead: 0,
+      behind: 0,
+      use_worktree: false,
+    })
+    await Bun.write(join(repo, 'new.txt'), 'x\n')
+    const dirty = await t.json<LocalGit>('GET', `/api/projects/${String(projectId)}/git`)
+    expect(dirty.dirty).toBe(true)
   })
 })

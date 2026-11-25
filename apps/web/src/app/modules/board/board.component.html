@@ -20,12 +20,35 @@
           }}</span>
         }
         @if (p.worker_enabled && p.next_run_at) {
-          <span class="muted">{{ t('board.nextCheck', { ago: ago(p.next_run_at) }) }}</span>
+          <span class="muted">{{
+            due(p.next_run_at)
+              ? t('board.nextCheckDue')
+              : t('board.nextCheck', { ago: ago(p.next_run_at) })
+          }}</span>
         }
         <a class="link" [routerLink]="['/settings/projects', p.id]">{{
           t('board.projectSettings')
         }}</a>
       </div>
+      @if (gitState.value(); as g) {
+        <div class="meta">
+          <baht-badge
+            tone="info"
+            [label]="g.branch ? t('board.branch', { branch: g.branch }) : t('board.detached')"
+          ></baht-badge>
+          @if (g.ahead) {
+            <span class="muted">{{ t('board.ahead', { count: g.ahead }) }}</span>
+          }
+          @if (g.behind) {
+            <span class="muted">{{ t('board.behind', { count: g.behind }) }}</span>
+          }
+          @if (g.use_worktree) {
+            <span class="muted">{{ t('board.inWorktree') }}</span>
+          } @else if (g.dirty) {
+            <baht-badge tone="warning" [label]="t('board.dirty')"></baht-badge>
+          }
+        </div>
+      }
       @if (p.paused_reason) {
         <baht-alert
           tone="warning"

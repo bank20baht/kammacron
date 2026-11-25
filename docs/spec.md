@@ -242,7 +242,8 @@ stateDiagram-v2
 
 **Worktree**
 
-- สร้างครั้งแรกที่ `<repo>/.worktrees/claude` แบบ detached และใส่ `.worktrees/` กับ `.kammacron/` ลง `.git/info/exclude` ให้เอง
+- เปิด/ปิดได้ต่อโปรเจกต์ (`use_worktree` ค่าเริ่มต้นปิด โปรเจกต์ที่มีอยู่ก่อนยังเปิดไว้ตามเดิม) ตอนปิด worker ทำงานใน `repo_path` ตรงๆ บน branch ที่ dir นั้นอยู่ และข้ามรอบนั้น (แจ้งเตือนครั้งเดียว) ถ้ามีไฟล์ที่ยังไม่ commit, อยู่ที่ detached HEAD, branch ไม่มีบน origin หรือมี commit ที่ยังไม่ push การ์ดทำบน `claude/<card>` จาก `origin/<branch>` แล้ว push ตาม ship policy โดยใช้ branch นั้นแทน default branch จบแล้วพา dir กลับ branch เดิม (ของที่ Claude ทิ้งไว้เก็บใน `git stash`) และ fast-forward ตาม origin ส่วน schedules รันใน dir ตามที่เป็นอยู่โดยไม่ checkout
+- ตอนเปิด: สร้างครั้งแรกที่ `<repo>/.worktrees/claude` แบบ detached และใส่ `.worktrees/` กับ `.kammacron/` ลง `.git/info/exclude` ให้เอง
 - copy ไฟล์ใน `copy_files` (ค่าเริ่มต้น `.mcp.json`, `.claude/settings.local.json`) แล้วรัน `setup_command` ครั้งเดียว
 - ก่อนทำการ์ดทุกใบ: `git fetch origin` → `git checkout -B claude/<card-id> origin/<default>` → `git clean -fd` (ไม่ลบไฟล์ที่ ignore เช่น `node_modules`) ถ้าการ์ดถูกส่งกลับและมี branch เดิม ให้ checkout branch นั้นแทน
 - ถ้าไฟล์ lock ของ dependency เปลี่ยนจากรอบก่อน ให้รัน `setup_command` ซ้ำ

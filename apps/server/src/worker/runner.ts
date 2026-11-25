@@ -13,27 +13,10 @@ import { getSettings, updateSettings } from '../services/settings'
 import { spawnClaude, type ClaudeResult } from './claude'
 import { cardBranch, childEnv, type WorkerEnv } from './env'
 import { checkGate, isGated, shipBranch } from './gate'
-import { defaultBranch, exclude, exec, gitIn, hashFiles, remoteHeads, type Git } from './git'
+import { exclude, exec, hashFiles, remoteHeads, type Git } from './git'
 import { taskPrompt, workerRules } from './prompt'
 import { verifyAndRevert } from './verify'
-
-export const worktreeDir = (env: WorkerEnv, project: Project) =>
-  project.worktree_path ?? join(env.dataDir, 'worktrees', project.slug)
-
-const pathExists = async (path: string) => {
-  const r = await exec(['test', '-e', path], { cwd: '/' })
-  return r.code === 0
-}
-
-/** Makes the project's worktree on first use; later, only checks it is still one. */
-export const ensureWorktree = async (repo: Git, dir: string, branch: string) => {
-  await repo.run('worktree', 'prune')
-  if (await pathExists(join(dir, '.git'))) return gitIn(dir, {})
-  await mkdir(dirname(dir), { recursive: true })
-  await repo.out('fetch', 'origin', '--prune')
-  await repo.out('worktree', 'add', '--detach', dir, `origin/${branch}`)
-  return gitIn(dir, {})
-}
+import { openWorkspace, type Workspace } from './workspace'
 
 /** Exact tools: anything not listed is refused (spike S3: compound commands are split and checked). */
 export const toolLists = (
@@ -149,6 +132,7 @@ const prepareBranch = async (
 }
 
 const copyProjectFiles = async (repoPath: string, worktree: string, files: readonly string[]) => {
+  if (repoPath === worktree) return // working in the directory itself: they are already there
   for (const name of files) {
     const from = join(repoPath, name)
     if (!(await Bun.file(from).exists())) continue
@@ -218,6 +202,8 @@ type Stage = {
   branchName: string
   before: Record<string, string>
   baseSha: string | null
+  release: Workspace['release']
+  childEnvironment: Record<string, string>
 }
 
 const failRun = (env: WorkerEnv, runId: number, message: string, kind: string) =>
@@ -494,24 +480,23 @@ const pauseForRefs = async (stage: Stage, run: Run, outside: string[]) => {
   await env.notify('kammacron paused a project', `${project.name}: ${reason}`)
 }
 
-/** Where a run starts: the default branch, the worktree, and the remote's heads before it. */
+/** Where a run starts: the branch it ships to, where it works, and the remote's heads before it. */
 const openStage = async (env: WorkerEnv, project: Project & { repo_path: string }) => {
   const childEnvironment = await childEnv(env)
-  const repo = gitIn(project.repo_path, childEnvironment)
-  const branchName = project.default_branch ?? (await defaultBranch(repo))
-  if (!branchName) {
-    await addAlert(env.db, {
-      level: 'error',
-      project_id: project.id,
-      message: `${project.name}: cannot find the default branch (origin/HEAD)`,
-    })
-    return null
-  }
-  const dir = worktreeDir(env, project)
-  const wt = gitIn((await ensureWorktree(repo, dir, branchName)).cwd, childEnvironment)
+  const space = await openWorkspace(env, project, childEnvironment)
+  if ('skip' in space) return space
+  const { git: wt, dir, branch: branchName, release } = space
   await exclude(wt, ['.kammacron/'])
   const before = await remoteHeads(wt)
-  return { childEnvironment, branchName, dir, wt, before, baseSha: before[branchName] ?? null }
+  return {
+    childEnvironment,
+    branchName,
+    dir,
+    wt,
+    before,
+    baseSha: before[branchName] ?? null,
+    release,
+  }
 }
 
 /** After a clean end: what reached the remote, the card's state, the gate, then verify. */
@@ -578,13 +563,30 @@ export const runCard = async (
   const repoPath = project.repo_path
   if (!repoPath) return { run: null, result: null, skipped: 'no repo' }
   const opened = await openStage(env, { ...project, repo_path: repoPath })
-  if (!opened) return { run: null, result: null, skipped: 'no default branch' }
-  const logDir = join(env.dataDir, 'logs', 'runs')
-  await mkdir(logDir, { recursive: true, mode: 0o700 })
-  const claimed = await claim(env, project, cardId, opened.baseSha, logDir)
-  if (!claimed) return { run: null, result: null, skipped: 'claimed by someone else' }
-  const stage: Stage = { env, project, card: claimed.card, ...opened }
-  let run = claimed.run
+  if ('skip' in opened) return { run: null, result: null, skipped: opened.skip }
+  let label = 'a run'
+  try {
+    const logDir = join(env.dataDir, 'logs', 'runs')
+    await mkdir(logDir, { recursive: true, mode: 0o700 })
+    const claimed = await claim(env, project, cardId, opened.baseSha, logDir)
+    if (!claimed) return { run: null, result: null, skipped: 'claimed by someone else' }
+    label = `run ${String(claimed.run.id)}`
+    return await work({ env, project, card: claimed.card, ...opened }, claimed.run)
+  } finally {
+    const problem = await opened.release(label)
+    if (problem)
+      await addAlert(env.db, {
+        level: 'warning',
+        project_id: project.id,
+        message: `${project.name}: ${problem}`.slice(0, 1000),
+      })
+  }
+}
+
+/** The claimed card's run: prepare, `claude -p`, then what it left. */
+const work = async (stage: Stage, claimedRun: Run): Promise<CardOutcome> => {
+  const { env } = stage
+  let run = claimedRun
 
   const prepared = await prepare(stage, run)
   if (!prepared) return { run: await getRun(env.db, run.id), result: null }
@@ -592,12 +594,12 @@ export const runCard = async (
   const settings = await getSettings(env.db)
 
   let seq = 0
-  const logFile = run.log_path ?? join(logDir, `${String(run.id)}.jsonl`)
+  const logFile = run.log_path ?? join(env.dataDir, 'logs', 'runs', `${String(run.id)}.jsonl`)
   const handle = spawnClaude({
     bin: env.claudeBin,
     args,
     cwd: stage.dir,
-    env: opened.childEnvironment,
+    env: stage.childEnvironment,
     prompt,
     secrets: [env.apiToken(), env.claudeToken() ?? ''].filter(Boolean),
     timeoutMs: settings.stale_minutes * 60_000,

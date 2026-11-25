@@ -63,7 +63,11 @@ export const forms = {
     repoPath: 'Repo path',
     repoPathHelp: 'Empty: a board without a worker',
     defaultBranch: 'Default branch',
-    defaultBranchHelp: 'Found from origin/HEAD when empty',
+    defaultBranchHelp:
+      'With a separate worktree: where runs start and ship. Found from origin/HEAD when empty',
+    useWorktree: 'Separate worktree',
+    useWorktreeHelp:
+      'Off: Claude works in the repo folder itself, on the branch it is on, and skips a round while it has uncommitted changes. On: Claude works in a worktree of its own, from the default branch, and never touches your folder',
     shipPolicy: 'Shipping',
     shipPush: 'Push to the default branch (pre-push is the gate)',
     shipBranch: 'claude/<card> only; you approve each',

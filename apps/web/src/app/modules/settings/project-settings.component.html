@@ -35,7 +35,11 @@
         }}</span>
       }
       @if (p.worker_enabled && p.next_run_at) {
-        <span class="muted">{{ t('project.nextCheck', { when: ago(p.next_run_at) }) }}</span>
+        <span class="muted">{{
+          due(p.next_run_at)
+            ? t('board.nextCheckDue')
+            : t('project.nextCheck', { when: ago(p.next_run_at) })
+        }}</span>
       }
     </div>
     @if (p.paused_reason) {

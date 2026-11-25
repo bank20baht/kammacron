@@ -120,6 +120,10 @@ export class ProjectSettingsComponent {
     }
   }
 
+  protected due(at: string | Date): boolean {
+    return new Date(at).getTime() <= Date.now()
+  }
+
   protected go(url: string): void {
     void this.router.navigateByUrl(url)
   }
@@ -139,6 +143,7 @@ export class ProjectSettingsComponent {
           repo_path: text(d['repo_path']),
           default_branch: text(d['default_branch']),
           worker_enabled: d['worker_enabled'] === true,
+          use_worktree: d['use_worktree'] === true,
           mode: d['mode'] === 'watch' ? 'watch' : 'autopilot',
           ship_policy: d['ship_policy'] === 'branch' ? 'branch' : 'push',
           interval_minutes: count(d['interval_minutes'], 30),

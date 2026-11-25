@@ -4,7 +4,7 @@ import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import { guess } from '@20baht/live/browser'
 import type { BahtForm, FormDefinition, NavItem } from '@20baht/ui'
-import { Api, answer, describeError } from '@kammacron/kit'
+import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { LiveService } from '../../services/live.service'
@@ -151,20 +151,18 @@ export class BoardComponent {
     tags?: string[]
   }) {
     const others = (input.tags ?? []).filter((t) => t !== CLAUDE)
-    const [card] = answer(
-      await firstValueFrom(
-        this.api.cards.batch.post({
-          cards: [
-            {
-              project_id: input.project_id,
-              title: input.title,
-              body: input.body ?? '',
-              tags: input.owner === 'claude' ? [CLAUDE, ...others] : others,
-              human: input.owner === 'human',
-            },
-          ],
-        }),
-      ),
+    const [card] = await firstValueFrom(
+      this.api.cards.batch.post({
+        cards: [
+          {
+            project_id: input.project_id,
+            title: input.title,
+            body: input.body ?? '',
+            tags: input.owner === 'claude' ? [CLAUDE, ...others] : others,
+            human: input.owner === 'human',
+          },
+        ],
+      }),
     )
     return card
   }

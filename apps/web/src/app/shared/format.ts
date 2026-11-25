@@ -1,44 +1,16 @@
-const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ['second', 60],
-  ['minute', 60],
-  ['hour', 24],
-  ['day', 7],
-  ['week', 4.35],
-  ['month', 12],
-  ['year', Number.POSITIVE_INFINITY],
-]
+import { duration as span, money, relativeTime } from '@20baht/formats'
 
-/** "3 minutes ago", "in 2 hours", from a date or an ISO string. */
-export const ago = (value: string | Date | null | undefined, now = Date.now()): string => {
-  if (value === null || value === undefined) return '—'
-  let amount = (new Date(value).getTime() - now) / 1000
-  for (const [unit, size] of STEPS) {
-    if (Math.abs(amount) < size) return relative.format(Math.round(amount), unit)
-    amount /= size
-  }
-  return '—'
-}
+/** "3 minutes ago", "in 2 hours"; `—` when there is no date. */
+export const ago = (value: string | Date | null | undefined): string =>
+  value === null || value === undefined ? '—' : relativeTime(value) || '—'
 
-/** "4m 12s", "1h 03m", between two dates (now when the end is missing). */
-export const duration = (start: string | Date, end?: string | Date | null): string => {
-  const ms = (end ? new Date(end).getTime() : Date.now()) - new Date(start).getTime()
-  const s = Math.max(0, Math.round(ms / 1000))
-  if (s < 60) return `${String(s)}s`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${String(m)}m ${String(s % 60).padStart(2, '0')}s`
-  return `${String(Math.floor(m / 60))}h ${String(m % 60).padStart(2, '0')}m`
-}
+/** "4m 12s", "1h 3m", between two dates (now when the end is missing). */
+export const duration = (start: string | Date, end?: string | Date | null): string =>
+  span(Math.max(0, (end ? new Date(end).getTime() : Date.now()) - new Date(start).getTime()))
 
-const usd = new Intl.NumberFormat(undefined, {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 2,
-})
-
-/** API-equivalent cost, as Claude Code reports it ($0.42). */
+/** API-equivalent cost, as Claude Code reports it, with cents ($0.42). */
 export const cost = (value: number | null | undefined): string =>
-  value === null || value === undefined ? '—' : usd.format(value)
+  value === null || value === undefined ? '—' : money(value, 'USD') || '—'
 
 /** "2026-11-25 09:30", local time. */
 export const stamp = (value: string | Date | null | undefined): string => {

@@ -10,8 +10,8 @@ const UNIT = 'kammacron.service'
 export type ServiceSpec = {
   /** Full path of `bun` (never a bunx cache path: a cache can be cleared). */
   bun: string
-  /** The installed CLI entry (global package), run as `bun <entry> start`. */
-  entry: string
+  /** The installed CLI entry (global package), run as `bun <entry> start`; null for the compiled binary. */
+  entry: string | null
   dataDir: string
   port: number
   /** The shell's PATH now: what `claude`, `git` and hooks need, which launchd/systemd lack. */
@@ -30,8 +30,7 @@ export const launchdPlist = (spec: ServiceSpec) => `<?xml version="1.0" encoding
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${xml(spec.bun)}</string>
-    <string>${xml(spec.entry)}</string>
+    <string>${xml(spec.bun)}</string>${spec.entry === null ? '' : `\n    <string>${xml(spec.entry)}</string>`}
     <string>start</string>
     <string>--port</string><string>${String(spec.port)}</string>
     <string>--data-dir</string><string>${xml(spec.dataDir)}</string>
@@ -58,7 +57,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${systemdQuote(spec.bun)} ${systemdQuote(spec.entry)} start --port ${String(spec.port)} --data-dir ${systemdQuote(spec.dataDir)}
+ExecStart=${systemdQuote(spec.bun)}${spec.entry === null ? '' : ` ${systemdQuote(spec.entry)}`} start --port ${String(spec.port)} --data-dir ${systemdQuote(spec.dataDir)}
 Environment=${systemdQuote(`PATH=${spec.path}`)}
 Restart=always
 RestartSec=10

@@ -159,6 +159,14 @@ export const accessForm = defineForm({
       help: 'POSTed when a card needs review or something is paused (Slack-compatible `text`)',
     },
     { order: 3, type: 'toggle', key: 'desktop_notifications', label: 'Desktop notifications' },
+    {
+      order: 4,
+      type: 'text',
+      key: 'public_url',
+      label: 'Public URL (a tunnel)',
+      placeholder: 'https://board.example.net',
+      help: 'Set and restart: claude.ai and Claude Desktop connect to /mcp with OAuth, and this host is allowed',
+    },
   ],
 })
 

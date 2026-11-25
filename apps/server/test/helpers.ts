@@ -5,7 +5,9 @@ import { join } from 'node:path'
 import { buildApp } from '../src/app'
 import { buildContext } from '../src/bootstrap'
 import type { AppContext } from '../src/context'
-import { openDatabase, type Database } from '../src/db'
+import postgres from 'postgres'
+
+import { openDatabase, openPostgres, type Database } from '../src/db'
 
 export type TestApp = {
   ctx: AppContext
@@ -24,10 +26,18 @@ export type TestApp = {
 }
 
 export const testApp = async (
-  options: { loopback?: boolean; claudeBin?: string; serverUrl?: () => string } = {},
+  options: {
+    loopback?: boolean
+    claudeBin?: string
+    serverUrl?: () => string
+    publicUrl?: string
+  } = {},
 ): Promise<TestApp> => {
   const dataDir = await mkdtemp(join(tmpdir(), 'kammacron-test-'))
-  const database = await openDatabase()
+  // TEST_DATABASE_URL: the same tests on Postgres, each from an empty schema
+  const pgUrl = process.env['TEST_DATABASE_URL']
+  if (pgUrl) await resetPostgres(pgUrl)
+  const database = pgUrl ? await openPostgres(pgUrl) : await openDatabase()
   const ctx = await buildContext({
     database,
     dataDir,
@@ -36,6 +46,7 @@ export const testApp = async (
     isLoopback: () => options.loopback ?? true,
     claudeBin: options.claudeBin,
     notify: () => Promise.resolve(),
+    publicUrl: options.publicUrl,
   })
   const app = buildApp(ctx)
   const call = (
@@ -80,4 +91,12 @@ export const testApp = async (
 export const must = <T>(value: T | null | undefined, what = 'value'): T => {
   if (value === null || value === undefined) throw new Error(`expected a ${what}`)
   return value
+}
+
+const resetPostgres = async (url: string) => {
+  const sql = postgres(url, { max: 1, onnotice: () => undefined })
+  await sql.unsafe(
+    'drop schema if exists public cascade; drop schema if exists drizzle cascade; create schema public;',
+  )
+  await sql.end()
 }

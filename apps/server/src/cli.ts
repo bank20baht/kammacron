@@ -70,6 +70,8 @@ const api = async (method: string, path: string, body?: unknown) => {
 }
 
 const version = async () => {
+  const given = process.env['KAMMACRON_VERSION'] // the compiled binary
+  if (given) return given
   // the npm package keeps package.json beside the bundle
   const pkg = Bun.file(join(import.meta.dir, 'package.json'))
   if (await pkg.exists()) return ((await pkg.json()) as { version?: string }).version ?? '0.0.0'
@@ -152,8 +154,10 @@ switch (command) {
   }
   case 'install-service': {
     const bun = realpathSync(process.execPath)
-    const entry = realpathSync(Bun.main)
-    if (/[/\\](\.bun[/\\]install[/\\]cache|bunx-)/.test(entry))
+    // the compiled binary is its own entry; Bun.main then sits in Bun's embedded filesystem
+    const compiled = Bun.main.startsWith('/$bunfs/') || Bun.main.startsWith('B:\\~BUN\\')
+    const entry = compiled ? null : realpathSync(Bun.main)
+    if (entry !== null && /[/\\](\.bun[/\\]install[/\\]cache|bunx-)/.test(entry))
       die(
         'This copy runs from the bunx cache, which can be cleared. Install it first: bun add -g kammacron, then kammacron install-service',
       )

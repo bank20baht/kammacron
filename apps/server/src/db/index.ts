@@ -3,9 +3,13 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { PGlite } from '@electric-sql/pglite'
-import { liveTriggers } from '@20baht/live/pg'
-import { drizzle } from 'drizzle-orm/pglite'
-import { migrate } from 'drizzle-orm/pglite/migrator'
+import { liveTriggers, pgliteListener, postgresJsListener, type PgListener } from '@20baht/live/pg'
+import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
+import { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
+import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator'
+import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js'
+import { migrate as migratePostgres } from 'drizzle-orm/postgres-js/migrator'
+import postgres from 'postgres'
 
 import {
   alerts,
@@ -21,25 +25,46 @@ import {
   settings,
 } from './schema'
 
-export type Db = ReturnType<typeof drizzle<typeof schema>>
+/** Either driver: PGlite in the data dir (the default) or Postgres at DATABASE_URL. */
+export type Db = PgDatabase<PgQueryResultHKT, typeof schema>
 /** A drizzle transaction of `Db`: what services take when they join a caller's transaction. */
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 /** Either: a service call works alone (`db`) or inside one (`tx`). */
 export type Executor = Db | Tx
 
 export type Database = {
-  client: PGlite
+  kind: 'pglite' | 'postgres'
   db: Db
+  /** Where `@20baht/live` hears the triggers' NOTIFY. */
+  listener: PgListener
   close: () => Promise<void>
 }
 
-/** The migrations: beside the bundle in the npm package (`./drizzle`), at the app root in the repo. */
-const MIGRATIONS =
+/**
+ * The migrations: KAMMACRON_MIGRATIONS (the compiled binary unpacks them there), beside the bundle
+ * in the npm package (`./drizzle`), or at the app root in the repo.
+ */
+const migrationsDir = () =>
   [
+    process.env['KAMMACRON_MIGRATIONS'],
     fileURLToPath(new URL('./drizzle', import.meta.url)),
     fileURLToPath(new URL('../../drizzle', import.meta.url)),
-  ].find((dir) => existsSync(join(dir, 'meta', '_journal.json'))) ??
+  ].find((dir) => dir !== undefined && existsSync(join(dir, 'meta', '_journal.json'))) ??
   fileURLToPath(new URL('../../drizzle', import.meta.url))
+
+/** PGlite's wasm and data, when they are not files beside its module (the compiled binary). */
+type PgliteAssets = {
+  pgliteWasmModule?: WebAssembly.Module
+  initdbWasmModule?: WebAssembly.Module
+  fsBundle?: Blob
+}
+let pgliteAssets: PgliteAssets = {}
+/**
+ * Hands PGlite its embedded files. @public: called by the entry `scripts/compile.ts` generates.
+ */
+export const usePgliteAssets = (assets: PgliteAssets) => {
+  pgliteAssets = assets
+}
 
 /**
  * Every write to these tables notifies `@20baht/live` on commit (`<table>`, `<table>:<id>`, and
@@ -62,13 +87,37 @@ const LIVE_TABLES = [
 /** Opens PGlite at `dataDir` (in memory when omitted), migrated and with live triggers. */
 export const openDatabase = async (
   dataDir?: string,
-  migrationsFolder = MIGRATIONS,
+  migrationsFolder = migrationsDir(),
 ): Promise<Database> => {
-  const client = new PGlite(dataDir)
-  const db = drizzle(client, { schema })
-  await migrate(db, { migrationsFolder })
+  const client = new PGlite(dataDir, pgliteAssets)
+  const db = drizzlePglite(client, { schema })
+  await migratePglite(db, { migrationsFolder })
   await client.exec(liveTriggers(LIVE_TABLES))
-  return { client, db, close: () => client.close() }
+  return { kind: 'pglite', db, listener: pgliteListener(client), close: () => client.close() }
+}
+
+/**
+ * Postgres at `url` (DATABASE_URL): a pool for queries, and one connection of its own for LISTEN,
+ * so several kammacron processes could share it. The data dir still holds secrets, logs and files.
+ */
+export const openPostgres = async (
+  url: string,
+  migrationsFolder = migrationsDir(),
+): Promise<Database> => {
+  const pool = postgres(url, { max: 10, onnotice: () => undefined })
+  const listen = postgres(url, { max: 1, onnotice: () => undefined })
+  const db = drizzlePostgres(pool, { schema })
+  await migratePostgres(db, { migrationsFolder })
+  await pool.unsafe(liveTriggers(LIVE_TABLES))
+  return {
+    kind: 'postgres',
+    db,
+    listener: postgresJsListener(listen),
+    close: async () => {
+      await listen.end({ timeout: 5 })
+      await pool.end({ timeout: 5 })
+    },
+  }
 }
 
 /** The row an `insert … returning` or `update … returning` of one row gave back. */

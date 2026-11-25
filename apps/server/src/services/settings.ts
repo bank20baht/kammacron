@@ -58,6 +58,7 @@ export const updateSettings = async (
       | 'concurrency'
       | 'webhook_url'
       | 'desktop_notifications'
+      | 'public_url'
     >
   >,
 ) => {

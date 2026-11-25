@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import { buildApp } from './app'
 import { buildContext } from './bootstrap'
-import { openDatabase } from './db'
+import { openDatabase, openPostgres } from './db'
 
 export type ServerOptions = {
   host?: string | undefined
@@ -13,6 +13,8 @@ export type ServerOptions = {
   dataDir?: string | undefined
   /** false: serve the board and MCP only, run no worker. */
   worker?: boolean | undefined
+  /** Postgres instead of PGlite (else DATABASE_URL, else PGlite in the data dir). */
+  databaseUrl?: string | undefined
   /** The built web app; found beside the bundle (`./web`) or in `apps/web/dist` when omitted. */
   webDir?: string | undefined
 }
@@ -81,7 +83,9 @@ export const startServer = async (options: ServerOptions = {}) => {
       `${dataDir} is in use by kammacron pid ${String(held.pid)} on port ${String(held.port)}`,
     )
 
-  const database = await openDatabase(join(dataDir, 'db'))
+  // DATABASE_URL: Postgres; otherwise PGlite in the data dir
+  const url = options.databaseUrl ?? process.env['DATABASE_URL']
+  const database = url ? await openPostgres(url) : await openDatabase(join(dataDir, 'db'))
   // filled once listening: `isLoopback` asks the Bun server for the peer address
   const listening: {
     server?: { requestIP: (r: Request) => { address: string } | null }

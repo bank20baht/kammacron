@@ -1,10 +1,12 @@
 import { openapi } from '@elysiajs/openapi'
-import { mcpify } from '@20baht/elysia-openapi-mcp'
+import { mcpify, verifyWithOAuthProvider } from '@20baht/elysia-openapi-mcp'
 import { bindLive, livePlugin } from '@20baht/live/elysia'
 import { Elysia } from 'elysia'
 
 import { authGuard, isAuthenticated } from './auth'
 import type { AppContext } from './context'
+import { OAUTH_SCOPE } from './oauth'
+import { sameSecret } from './secrets'
 import { adminRoutes } from './routes/admin'
 import { cardRoutes, CARD_RULES } from './routes/cards'
 import { fileApiRoutes, fileRoutes } from './routes/files'
@@ -19,6 +21,32 @@ Cards are numbered (#12). Use list_projects for project ids, list_cards to find 
 ${CARD_RULES}
 Moving a card to review needs a reason. Nothing is ever deleted: archive_card instead.
 To show an image (a screenshot of a bug), upload it with upload_image and put the markdown it returns in the card body or a comment.`
+
+/**
+ * How /mcp checks its caller. Without OAuth: the API token or the session (request mode). With it:
+ * a resource server whose 401 tells MCP clients where to sign in, accepting the provider's tokens
+ * and, as before, the API token (the worker and `claude mcp add` keep working).
+ */
+const mcpAuth = (ctx: AppContext) => {
+  const oauth = ctx.oauth
+  if (!oauth) return { verify: (request: Request) => isAuthenticated(request, ctx.auth) }
+  const viaProvider = verifyWithOAuthProvider(oauth.provider, oauth.issuer)
+  return {
+    resource: oauth.resource,
+    authorizationServers: [oauth.issuer],
+    scopes: [OAUTH_SCOPE],
+    verify: (token: string, context: { request: Request }) =>
+      sameSecret(token, ctx.auth.apiToken)
+        ? {
+            iss: oauth.issuer,
+            aud: oauth.resource,
+            sub: 'owner',
+            scope: OAUTH_SCOPE,
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          }
+        : viaProvider(token, context),
+  }
+}
 
 /**
  * The whole HTTP surface. Keep imports extensionless (`./x`, never `./x.ts`): the web app compiles
@@ -38,6 +66,7 @@ export const buildApp = (ctx: AppContext) => {
         )
       return undefined
     })
+    .use(ctx.oauth?.plugin ?? new Elysia({ name: 'kammacron-no-oauth' }))
     .use(
       openapi({
         path: '/api/docs',
@@ -51,7 +80,7 @@ export const buildApp = (ctx: AppContext) => {
         instructions: MCP_INSTRUCTIONS,
         allRoutes: false, // a route is a tool only when it says `detail.mcp: true`
         headerParams: true, // so a tool call can send Idempotency-Key
-        auth: { verify: (request) => isAuthenticated(request, ctx.auth) },
+        auth: mcpAuth(ctx),
         headers: (incoming) => {
           // what reaches the route: the caller's credentials and the worker's run id
           const out = new Headers()

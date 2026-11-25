@@ -49,8 +49,10 @@ export class LoginComponent {
 
   protected async submit(form: BahtForm): Promise<void> {
     const token = form.getData()['token']
-    if (typeof token === 'string' && (await this.session.login(token.trim())))
-      void this.router.navigateByUrl(this.next() ?? '/board')
-    else this.error.set(true)
+    if (typeof token === 'string' && (await this.session.login(token.trim()))) {
+      // the OAuth consent page is the server's, not a route of this app
+      if (this.next()?.startsWith('/oauth/')) globalThis.location.assign(this.next() ?? '/')
+      else void this.router.navigateByUrl(this.next() ?? '/board')
+    } else this.error.set(true)
   }
 }

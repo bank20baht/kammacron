@@ -59,6 +59,8 @@ export const systemRoutes = (ctx: AppContext) =>
           concurrency: row.concurrency,
           webhook_url: row.webhook_url,
           desktop_notifications: row.desktop_notifications,
+          public_url: row.public_url,
+          oauth: ctx.oauth !== null,
           claude_token: {
             source: envToken
               ? ('env' as const)
@@ -89,6 +91,7 @@ export const systemRoutes = (ctx: AppContext) =>
             concurrency: t.Integer({ minimum: 1, maximum: 8 }),
             webhook_url: t.Nullable(t.String({ pattern: '^https?://' })),
             desktop_notifications: t.Boolean(),
+            public_url: t.Nullable(t.String({ pattern: '^https://[^/]+/?$' })),
           }),
         ),
         detail: { operationId: 'update_settings', summary: 'Pause, timeouts, allowed hosts' },

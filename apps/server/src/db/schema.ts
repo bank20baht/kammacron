@@ -35,6 +35,11 @@ export const settings = pgTable('settings', {
   concurrency: integer('concurrency').notNull().default(1),
   webhook_url: text('webhook_url'),
   desktop_notifications: boolean('desktop_notifications').notNull().default(true),
+  /**
+   * The URL people and claude.ai reach this install at (a tunnel). Set, it turns on OAuth for
+   * /mcp (claude.ai and Claude Desktop connect through it) and its host is allowed. Read at start.
+   */
+  public_url: text('public_url'),
   ...timestamps,
 })
 
@@ -270,6 +275,17 @@ export const schedules = pgTable('schedules', {
   ...timestamps,
 })
 
+/** `@20baht/elysia-oauth-provider`'s storage: one key-value table, with expiry. */
+export const oauthKv = pgTable(
+  'oauth_kv',
+  {
+    key: text('key').primaryKey(),
+    value: jsonb('value').notNull(),
+    expires_at: timestamp('expires_at', { withTimezone: true }),
+  },
+  (t) => [index('oauth_kv_expires').on(t.expires_at)],
+)
+
 export const idempotencyKeys = idempotencyTable()
 
 export const schema = {
@@ -283,5 +299,6 @@ export const schema = {
   attachments,
   alerts,
   schedules,
+  oauthKv,
   idempotencyKeys,
 }

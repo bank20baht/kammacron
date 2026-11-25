@@ -5,6 +5,7 @@ import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import { cards, projects, runs, schedules } from '../db/schema'
 import { addAlert } from '../services/alerts'
 import { purgeOrphans } from '../services/attachments'
+import { purgeOAuth } from '../services/oauth-storage'
 import { addComment, createCards, moveCard, pickableCards } from '../services/cards'
 import { getProject, type Project } from '../services/projects'
 import { markInterruptedRuns, pruneRunEvents } from '../services/runs'
@@ -228,6 +229,7 @@ export const createScheduler = (env: WorkerEnv) => {
     const settings = await getSettings(env.db)
     await pruneRunEvents(env.db, settings.run_log_retention_days)
     await purgeOrphans(env.db, join(env.dataDir, 'files'))
+    await purgeOAuth(env.db)
   }
   let housekeepingTimer: ReturnType<typeof setInterval> | undefined
 

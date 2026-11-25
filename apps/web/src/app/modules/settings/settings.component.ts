@@ -66,6 +66,7 @@ export class SettingsComponent {
           allowed_hosts: s.allowed_hosts,
           webhook_url: s.webhook_url ?? '',
           desktop_notifications: s.desktop_notifications,
+          public_url: s.public_url ?? '',
         }
       : {}
   })
@@ -135,6 +136,7 @@ export class SettingsComponent {
       allowed_hosts: Array.isArray(d['allowed_hosts']) ? (d['allowed_hosts'] as string[]) : [],
       webhook_url: text(d['webhook_url']) || null,
       desktop_notifications: d['desktop_notifications'] === true,
+      public_url: text(d['public_url']).replace(/\/+$/, '') || null,
     })
   }
 

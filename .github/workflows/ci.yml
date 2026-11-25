@@ -74,6 +74,27 @@ jobs:
           path: '**/coverage'
           retention-days: 7
 
+  test-postgres:
+    name: test (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: kammacron
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: bun test
+        working-directory: apps/server
+        env:
+          TEST_DATABASE_URL: postgres://postgres:test@127.0.0.1:5432/kammacron
+
   build:
     name: build
     runs-on: ubuntu-latest

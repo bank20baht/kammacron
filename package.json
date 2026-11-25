@@ -25,7 +25,8 @@
     "check:fast": "bun run lint && bun run format:check && bun run typecheck && bun run madge && bun run deps",
     "check": "bun run check:fast && bun run knip && bun run dup && bun run build && bun run test",
     "prepare": "husky",
-    "pack": "bun run scripts/pack.ts"
+    "pack": "bun run scripts/pack.ts",
+    "compile": "bun run scripts/compile.ts"
   },
   "prettier": "@20baht/strict/prettier",
   "packageManager": "bun@1.3.14",

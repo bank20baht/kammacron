@@ -21,6 +21,43 @@ kammacron คือเว็บแอปบน localhost ที่รวม Kanb
 | Review           | เหลือเฉพาะงานที่ push ไม่ได้ หรืองานที่ Claude ส่งมาให้คนตัดสิน                                    |
 | การแจก           | npm package ที่รันด้วย Bun                                                                 |
 
+## สถานะการทำ (25 พ.ย. 2026)
+
+ทำครบทั้ง 3 เฟสแล้ว ทุกอย่างผ่าน `bun run check` และชุด test ของ server ผ่านทั้งบน PGlite และ Postgres 17 นอกจาก test แล้วยังลองใช้จริงในเบราว์เซอร์ และรัน `claude -p` จริง (haiku) กับ repo ทดลองจนครบวงจร: สร้างการ์ดพร้อมรูป → ลากย้าย → ส่งกลับพร้อมคอมเมนต์ → worker ทำ → ไป review → Approve แล้ว push
+
+**ผล spike เฟส 0**
+
+| #   | ผล                                                                         | สิ่งที่เปลี่ยนเพราะผลนี้                                                                      |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| S1  | ผ่าน ไลบรารีทั้ง 4 ตัวใช้กับ PGlite ได้                                            | live ใช้ `pgSource(pgliteListener)` (`changed()` ต้องมี LISTEN อยู่เบื้องหลัง)                |
+| S2  | ผ่าน kill -9 ระหว่างเขียน 15 รอบ ข้อมูลไม่เสีย                                    | ไม่ต้องทำ backup รายวัน                                                                  |
+| S3  | ผ่าน `&&`, `;`, `sh -c`, refspec `+` และ `-c core.hooksPath` ถูกปฏิเสธหมด     | ใช้ allowlist แบบตรงตัว และตรวจ ref ที่ขยับหลังจบ run อีกชั้น                                  |
+| S4  | ผ่าน `--mcp-config` คู่กับ `--strict-mcp-config` ใน headless ขึ้นครบโดยไม่ต้องอนุมัติ | —                                                                                     |
+| S5  | token ผิดได้ `api_error_status: 401` และ `error: authentication_failed`      | auth → pause ทั้งระบบ, 429/usage limit → เลื่อนรอบไป 1 ชม.                                |
+| S6  | **ไม่ผ่าน** ESLint ของ repo หลักไล่ตรวจไฟล์ใน `.worktrees/` ด้วย                 | worktree ย้ายไปอยู่ที่ `~/.kammacron/worktrees/<slug>` เป็นค่าเริ่มต้น                          |
+| S7  | ยังไม่ได้ทดสอบ (ไม่ได้ติดตั้ง service แล้วรีบูตเครื่องจริง)                              | `install-service` บันทึก PATH ของ shell ไว้ให้ และหน้า Settings แสดง path ของเครื่องมือที่หาเจอ |
+| S8  | ผ่าน Claude ใช้ `Read` เปิดรูปใน worktree ได้                                   | รูปถูก copy ไปไว้ที่ `<worktree>/.kammacron/attachments/`                                  |
+
+**สิ่งที่ต่างจาก spec ข้างล่าง**
+
+- **endpoint:** `POST /cards:batch` เปลี่ยนเป็น `/cards/batch` และอัปโหลดผ่าน MCP ใช้ `POST /files/base64` (Elysia อ่าน `:` เป็นพารามิเตอร์ของ path)
+- **ค่าตั้งใหม่ต่อโปรเจกต์ (มาจาก `~/claude-worker`):**
+  - `ship_policy` (`push`/`branch`) และ `mode` (`autopilot`/`watch`)
+  - อ่านกฎของโปรเจกต์จาก `.claude-worker/prompt.md` ใน repo
+  - บันทึก `permission_denials` ของแต่ละ run ไว้ให้รู้ว่าควรเพิ่มคำสั่งไหนใน `allowed_bash`
+- **ด่านตรวจ diff (เฟส 3):** ตั้ง `max_diff_lines` หรือ `protected_paths` แล้ว Claude push ได้แค่ `claude/<card>` โปรแกรมตรวจ diff เอง ถ้าผ่านค่อย rebase แล้ว push ต่อ ไม่ต้องย้อนแก้ทีหลัง
+- **OAuth:** เปิดเมื่อตั้ง `public_url` (URL ของ tunnel) ใน Settings แล้ว restart ส่วน API token เดิมยังใช้กับ `/mcp` ได้
+- **ตารางที่เพิ่ม:** `alerts`, `schedules` (schedule ที่สร้างการ์ดเมื่อคำสั่งล้ม) และ `oauth_kv`
+- **ไลบรารี:**
+  - `@20baht/formats` ไม่มีรูปแบบเวลาหรือเงิน เลยใช้ `Intl` แทน
+  - `@20baht/dashboard` ใช้ผ่าน chart element ของ `@20baht/ui`
+- **ข้อบกพร่องที่หาเจอจากการใช้จริง:**
+  - Elysia เติมค่าแรกให้ `t.Optional(t.UnionEnum)` ที่ไม่ได้ส่งมา
+  - path param ที่เป็น `t.Numeric` ตอบ 500 บน `Bun.serve`
+  - ปิด PGlite ขณะยังมี live stream เปิดอยู่ ทำให้ process ค้าง
+
+  ทั้งหมดแก้แล้ว มี test กันไว้ และจดลง `LIB_GAP.md`
+
 ## จุดยืนเทียบกับเครื่องมืออื่น
 
 kammacron คือตัวที่ปล่อยรันข้ามคืนได้อย่างปลอดภัย ด้วยโควต้า subscription ที่มีอยู่ Kanban + MCP + cron ที่เรียก Claude มีคนทำแล้วอย่างน้อย 2 ตัว จึงไม่ใช่จุดขาย ข้อมูลด้านล่างมาจาก README ของแต่ละตัว ยังไม่ได้ลองรันจริง

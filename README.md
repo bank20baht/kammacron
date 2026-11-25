@@ -1,58 +1,112 @@
 # kammacron
 
-An Angular app and an Elysia server on the `@20baht` libraries, scaffolded by
-[`@20baht/cli`](https://github.com/bank20baht/20baht) (`20baht create`).
+A Kanban board, an MCP server and an unattended Claude Code worker in one process on your own
+machine. Cards tagged `claude` are picked up on a schedule: one `claude -p` per card in a git
+worktree, which fixes the bug, pushes through your repo's pre-push hook, and comments on the card.
+You only see the cards that need a decision.
 
-```
-apps/web          the Angular app (:4200): @20baht/ui app shell, one page calling one API route
-apps/server       Elysia API (:3001) under /api; exports `type App` as built declarations
-packages/kit      the typed ngx-eden client and error text, compiled into the app as @kammacron/kit
+- **Runs without `--dangerously-skip-permissions`.** An exact tool allowlist (no force push, no
+  `--no-verify`, no pushing to other branches), the repo's own pre-push as the gate, a check of what
+  actually reached the remote after every run, and an optional `verify_command` that reverts a push
+  that breaks the branch.
+- **Uses your subscription.** `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, and a pre-check
+  that calls Claude only when there is a card to work.
+- **Cards triaged before Claude works.** `claude` / `human`, `waits_on`, splitting a person's task
+  into small Claude cards, and review only for what could not ship.
+
+The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
+lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
+
+## Install
+
+Needs [Bun](https://bun.sh) 1.3+, git, and [Claude Code](https://claude.com/claude-code).
+
+```sh
+bunx kammacron start          # try it: http://127.0.0.1:7420
 ```
 
-## Quickstart
+```sh
+bun add -g kammacron          # keep it
+kammacron install-service     # launchd (macOS) or systemd --user (Linux), with your PATH
+kammacron open
+```
+
+Or one file with nothing to install: `bun run compile` builds `dist/bin/kammacron-<os>-<arch>`.
+
+## First steps
+
+1. **Token**: `claude setup-token`, then Settings → Claude → Keep (or set `CLAUDE_CODE_OAUTH_TOKEN`).
+   **Test** runs one short `claude -p`.
+2. **Project**: Settings → Projects → add one, set its repo path, turn the worker on. The checklist
+   says whether the path is a repo with `origin`, a default branch and a pre-push hook.
+3. **Cards**: on the board, or from Claude Code itself:
+
+   ```sh
+   kammacron token   # prints: claude mcp add --transport http kammacron http://127.0.0.1:7420/mcp --header "Authorization: Bearer …"
+   ```
+
+Project rules for the worker live in the repo at `.claude-worker/prompt.md` (the same file the
+`~/claude-worker/run.sh` setup used), plus **Extra rules** in the project's settings.
+
+## How a card is worked
+
+Every project is checked on its interval. With a pickable card (tagged `claude`, not `human`, in
+`todo`, everything it `waits_on` done) the worker:
+
+1. prepares `~/.kammacron/worktrees/<project>` on `claude/<card>` from `origin/<default>`, copies the
+   card's images into it, and runs `setup_command` when a lock file changed;
+2. runs `claude -p` with the card, its comments and earlier runs, the rules, and only the
+   kammacron MCP tools plus the project's enabled servers;
+3. reads what happened: the card's status, which refs moved on the remote. A push anywhere else
+   pauses the project; a card left in `doing`, or `done` without its commits on the default branch,
+   goes to review;
+4. with `verify_command`, runs it on what was pushed (twice) and reverts with an ordinary push when
+   it fails;
+5. with a **gate** (`max_diff_lines` or `protected_paths`), Claude only pushes `claude/<card>` and
+   kammacron pushes it on when the diff passes.
+
+**Shipping**: `push` (Claude pushes to the default branch) or `branch` (you approve each one).
+**Mode**: `autopilot` (decides reversible things, says so) or `watch` (asks when unsure).
+
+## CLI
+
+| Command                                 | What it does                                                    |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `start`                                 | foreground (`--port`, `--host`, `--data-dir`, `--no-worker`)    |
+| `open` / `status`                       | the web app / is it running, paused, the run going              |
+| `pause` / `resume`                      | stop or restart the worker everywhere                           |
+| `token`                                 | the `claude mcp add` command                                    |
+| `install-service` / `uninstall-service` | background service with the shell's PATH                        |
+| `update`                                | the latest version (`install-service` again to restart onto it) |
+
+## Reaching it from elsewhere
+
+It binds `127.0.0.1`. Put a tunnel in front, add its host under Settings → allowed hosts, and the
+browser asks for the API token once. Set **Public URL** to the tunnel's `https://` address and
+restart: `/mcp` then speaks OAuth, so claude.ai and Claude Desktop can connect (dynamic
+registration; the consent page needs your session).
+
+## Data
+
+`~/.kammacron/`: `db/` (PGlite), `secrets.json` (API token, session secret, Claude token; mode 600),
+`files/` (images), `logs/` (server and one `.jsonl` per run), `mcp/`, `worktrees/`. Set
+`DATABASE_URL` to use Postgres instead of PGlite.
+
+## Development
 
 ```sh
 bun install
-bun run dev        # every apps/* dev script in parallel
-bun run check      # lint, format, typecheck, madge, boundaries, knip, dup, build, test
+bun run dev        # server :7420 and ng serve :4200 (proxied to it)
+bun run check      # lint, format, typecheck, madge, deps, knip, dup, build, test (pre-push)
+bun run pack       # dist/package: the npm package
+bun run compile    # dist/bin: the single-file binary
 ```
 
-## The form
+```
+apps/server   Elysia API, MCP, live, worker, scheduler, CLI (bun test)
+apps/web      Angular + @20baht/ui pages
+packages/kit  the typed client the web app uses
+```
 
-`apps/server/src/forms/contact.form.ts` is one form as data. The server serves it
-(`GET /api/contact/form`) and validates a submission against it (`POST /api/contact`, the form as
-the route's body: `formRoute`, so a refused one answers `422 { issues }` before the handler runs);
-`apps/web/src/app/modules/contact` renders it with `<baht-form>`. That
-is all a form needs: no workflow, no approval step. Add a field to the schema and both sides have it.
-The schema is declared with `defineForm`, so its data is typed from it on both sides (`ContactMessage`):
-rename a field and the server's handler and the page stop compiling until they agree. For the next
-form, copy the three pieces.
-
-## The table
-
-The same file declares the list of what was received: `contactTable = defineTable(contactForm, …)`.
-A field's label is the column's header and its type how the column filters; `received_at` is a
-column the form does not have. The server sends the columns (`GET /api/contact/table`) and answers
-each query (`POST /api/contact/search`, `tableRoute`); the Contact page shows it with
-`<baht-table [table]>` and asks the server again whenever it is sorted, filtered, searched (the box
-above it, the row under its headers) or paged. The rows
-are kept in memory (`queryRows`), so the starter needs no database: with one, insert the row in
-`POST /api/contact` and answer the search with `tableQueryOf(sql, contactTable, { … })`.
-
-## Add a page
-
-A component under `apps/web/src/app/modules/<page>/`, a route in `app.routes.ts`, an entry in
-`core/navigation/navigation.ts`. What a page asks the server goes in a service under `services/`,
-through the kit's `Api`.
-
-## Things that are this way on purpose
-
-- The web app sees the server only as types, from `apps/server/dist/types` (`build:types` runs
-  before every web build and typecheck). Keep the server's imports extensionless: Angular's
-  compiler rejects `./x.ts` specifiers in sources it follows.
-- `apps/web` lists `marked`, `dompurify` and `flatpickr`: they are optional peers of @20baht/ui,
-  which imports them when a markdown or date field renders.
-- In dev the app calls the server on `:3001`; in production it calls `/api` on its own origin, so
-  serve both behind one web server.
-- This is one app. Microfrontends on Native Federation (a host that reads its remotes from a
-  manifest at runtime) are another scaffold: `20baht create <name> --federation`.
+The worker tests use a fake `claude` (`apps/server/test/fixtures/fake-claude.ts`) against real git
+repos with a local bare remote. `TEST_DATABASE_URL=postgres://…` runs the server suite on Postgres.

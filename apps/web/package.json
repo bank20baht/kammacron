@@ -1,0 +1,39 @@
+{
+  "name": "web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "ng": "ng",
+    "dev": "ng serve",
+    "build": "ng build",
+    "test": "ng test",
+    "test:coverage": "ng test --watch=false --coverage",
+    "typecheck": "tsc -b --noEmit",
+    "pretypecheck": "bun run --filter server build:types",
+    "prebuild": "bun run --filter server build:types"
+  },
+  "dependencies": {
+    "@angular/common": "^22.2.0",
+    "@angular/compiler": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/platform-browser": "^22.2.0",
+    "@angular/router": "^22.2.0",
+    "@20baht/ui": "0.3.32",
+    "@20baht/angular": "0.3.32",
+    "dompurify": "3.4.17",
+    "flatpickr": "4.6.13",
+    "marked": "18.1.3",
+    "@20baht/ngx-eden": "^0.1.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.0",
+    "@angular/cli": "^22.2.0",
+    "@angular/compiler-cli": "^22.2.0",
+    "@vitest/coverage-v8": "^4.0.8",
+    "jsdom": "^30.0.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.8"
+  }
+}

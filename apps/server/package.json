@@ -1,0 +1,33 @@
+{
+  "name": "server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "types": "dist/types/index.d.ts",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --target bun --outdir dist",
+    "build:types": "tsc -p tsconfig.types.json",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "dependencies": {
+    "@20baht/engine": "0.3.32",
+    "@20baht/table-query": "^0.4.0",
+    "@20baht/validator": "^0.3.32",
+    "@elysiajs/cors": "^1.4.3",
+    "elysia": "^1.4.31"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.3"
+  }
+}

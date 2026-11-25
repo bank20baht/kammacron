@@ -1,0 +1,16 @@
+<baht-app-shell
+  brand="kammacron"
+  brand-href="/"
+  label="kammacron"
+  [items]="items"
+  [value]="current()"
+  (baht-nav)="navigate($event)"
+>
+  <div data-slot="actions">
+    <baht-theme-toggle default="system"></baht-theme-toggle>
+  </div>
+  <main class="shell-main">
+    <router-outlet />
+  </main>
+</baht-app-shell>
+<baht-toast></baht-toast>

@@ -1,0 +1,6 @@
+{
+  "apps": { "web": "apps/web", "api": "apps/server" },
+  "libsDir": "packages",
+  "frontend": "angular",
+  "backend": "elysia"
+}

@@ -1,0 +1,4 @@
+# Baan Kanom
+
+A static site: index.html, menu.html and app.js. No build, no tests.
+Commit each change on main with a short message. Do not push (there is no remote).

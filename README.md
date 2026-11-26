@@ -24,20 +24,20 @@ through MCP and leaves what it did on it.
 
 ## What it does
 
-| Area          | In short                                                                                                                                                                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Playbook**  | Per project, the steps of a run: Claude steps and shell commands (`ssh`, tests, deploys), in order; a failing step stops the rest. Edited in the project's settings, with templates.                                                                         |
-| **Board**     | Four columns (To do, Doing, Review, Done) per project or all together, live. Drag or Alt+arrows to move; one-line quick add. A card has a markdown body with pasted images, an owner (auto pilot or a person), tags, a priority, and cards it waits on.      |
-| **Worker**    | On each project's interval it picks the next `auto-pilot` card and runs the project's playbook on it, in the project's directory as it is. Modes `autopilot` / `watch`.                                                                                      |
-| **Review**    | The cards waiting for you: handed over by an agent, or stopped by a failing step, with the reason and the step's output. Approve, or send back with a comment for the next run.                                                                              |
-| **Runs**      | Every run with its steps, the agent's live event stream (Claude or Codex), turns and cost; stop one that is going.                                                                                                                                           |
-| **Calendar**  | What runs on its own and when: each project's worker round, its cron jobs and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                                 |
-| **Stats**     | Week by week: runs done, sent to review, failed, and what they cost.                                                                                                                                                                                         |
-| **Cron jobs** | Per project, made in the GUI (every N minutes, hourly, daily, weekdays, weekly, or a cron expression): Claude or Codex with your own prompt, optionally with the board's `auto-pilot` cards; a shell command (when it fails it opens a card); or a playbook. |
-| **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                                   |
-| **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a project paused, a round skipped.                                                                                                                                               |
-| **Settings**  | The worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), MCP, each project's directory, playbook and limits, and the language.                                                                                                 |
-| **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                                   |
+| Area          | In short                                                                                                                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Playbook**  | Per project, the steps of a run: Claude steps and shell commands (`ssh`, tests, deploys), in order; a failing step stops the rest. Edited in the project's settings, with templates.                                                                                                    |
+| **Board**     | Four columns (To do, Doing, Review, Done) per project or all together, live. Drag or Alt+arrows to move; one-line quick add. A card has a markdown body with pasted images, an owner (auto pilot or a person), tags, a priority, and cards it waits on.                                 |
+| **Worker**    | On each project's interval it picks the next `auto-pilot` card and runs the project's playbook on it, in the project's directory as it is. Modes `autopilot` / `watch`.                                                                                                                 |
+| **Review**    | The cards waiting for you: handed over by an agent, or stopped by a failing step, with the reason and the step's output. Approve, or send back with a comment for the next run.                                                                                                         |
+| **Runs**      | Every run with its steps, the agent's live event stream (Claude or Codex), turns and cost; stop one that is going.                                                                                                                                                                      |
+| **Calendar**  | What runs on its own and when: each project's worker round, its cron jobs and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                                                            |
+| **Stats**     | Week by week: runs done, sent to review, failed, and what they cost.                                                                                                                                                                                                                    |
+| **Cron jobs** | Per project, set in the GUI like an alarm clock (a time and the days of the week, every N minutes, every hour, or a custom cron): Claude or Codex with your own prompt, optionally with the board's `auto-pilot` cards; a shell command (when it fails it opens a card); or a playbook. |
+| **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                                                              |
+| **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a project paused, a round skipped.                                                                                                                                                                          |
+| **Settings**  | The worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), MCP, each project's directory, playbook and limits, and the language.                                                                                                                            |
+| **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                                                              |
 
 Documentation: **[kammacron.pages.dev](https://kammacron.pages.dev)** (the Starlight site in `apps/docs`: `bun run --filter docs dev`, and `bun run --filter docs deploy` to publish it). The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
 lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
@@ -63,8 +63,9 @@ Or one file with nothing to install: `bun run compile` builds `dist/bin/kammacro
 1. **Project**: Settings → Projects → add one and set its directory (any folder, say `~/ops`). Turn
    **Run this project on its schedule** on if you want the worker to take cards on its own; cron
    jobs run without it.
-2. **Cron job with a command**: in the project, Schedules → **Runs: Command**, pick **When**
-   (every N minutes, hourly, daily, weekdays, weekly or cron) and give it a command:
+2. **Cron job with a command**: **Cron jobs** in the navigator → **Runs: Command**, set **When**
+   like an alarm clock (a time and the days, every N minutes, every hour, or a custom cron) and give
+   it a command:
 
    ```sh
    curl -fsS --max-time 10 https://example.com/health

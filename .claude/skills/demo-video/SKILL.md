@@ -10,7 +10,7 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
 
 ## The story (hard sell: an AI factory on your machine)
 
-1. **Open on the action**: Project settings → Schedules, a Claude cron job "หาบัคในโปรเจกต์"
+1. **Open on the action**: the Cron jobs page (`/cron`), a Claude cron job "หาบัคในโปรเจกต์"
    (`* * * * *`, haiku, a prompt that says: read the code, file one `auto-pilot` card per bug,
    do not fix, no duplicates; *Use the Kanban board* ticked). First caption states the pitch.
 2. **Split screen, the hunt**: board on the left (the navigator folded on screen, so To do → Done
@@ -78,12 +78,18 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
 ## Gotchas this kit already handles (do not relearn them)
 
 - Live pages keep an SSE stream open: wait for the `h1`, never `networkidle`.
-- `<baht-tabs>` buttons are `role=tab` with a `data-key`; `<baht-form>` controls have ids
+- The shell scrolls inside `.baht-shell-main` (`scroll="main"`), not the window: scroll that
+  element (or `scrollIntoView`), never `window.scrollTo`.
+- The cron job form's Runs are radio cards (the `input` is hidden: click its `label`); When is
+  the app's `<kc-schedule>` picker (its value is a cron string): day chips `[data-day="2"]`, the
+  time `[data-time]`, the mode cards `label.kc-schedule-mode:has(input[value="cron"])`, then five boxes `[data-part="0"]` …
+  `[data-part="4"]` (a space moves to the next box). `<baht-tabs>` buttons are `role=tab` with a `data-key`;
+  `<baht-form>` controls have ids
   `baht-<key>-<n>` (labels end in `*` when required); the card dialog is `app-card-dialog`
   and it scrolls in `.baht-modal-body`; the comments are `li.baht-comment`.
-- "Every N min" takes 5 at least: use the Cron tab with `* * * * *`. A cron job's first run comes
+- Every N min stops at 5: use the Cron card with `* * * * *`. A cron job's first run comes
   at the next whole minute plus up to one 30 s scheduler tick.
-- The board needs its navigator folded (header button "Hide the navigator", remembered in
+- The board needs its navigator folded (the ‹ button by the brand, "Hide the navigator", remembered in
   `localStorage['kammacron.nav-hidden']`) for To do → Done to fit the split window.
 - A person's card (`human`) stays in todo: the fix scene stops when no card an agent may take
   is left, not when todo is empty.

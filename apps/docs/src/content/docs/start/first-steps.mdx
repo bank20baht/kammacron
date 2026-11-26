@@ -9,7 +9,7 @@ import { Steps, Aside } from '@astrojs/starlight/components'
 
 1. **Project.** **Settings → Projects → Add project**, give it a slug and a name, and set its **directory** (any folder, say `~/ops`). Turn **Run this project on its schedule** on if you want the project's worker to take cards on its own; cron jobs run without it.
 
-2. **A cron job with a command.** In the project, **Schedules**: pick **Runs: Command**, pick **When** (every N minutes, hourly, daily, weekdays, weekly, or a cron expression), and give it a name and a command.
+2. **A cron job with a command.** Open **Cron jobs** in the navigator: pick **Runs: Command**, set **When** like an alarm clock (a time and the days, every N minutes, every hour, or a custom cron), and give it a name and a command.
 
    ```sh
    curl -fsS --max-time 10 https://example.com/health
@@ -29,7 +29,7 @@ Run `claude` or `codex` once on this machine, as the user kammacron runs as, and
 
 1. **Cards for agents.** On the board, make cards with owner **Auto pilot** (it adds the `auto-pilot` tag): reversible work with a clear done condition.
 
-2. **A cron job with an agent.** In the project's **Schedules**, pick **Runs: Codex** (or Claude), **When: Hourly**, and a prompt such as:
+2. **A cron job with an agent.** On **Cron jobs**, pick **Runs: Codex** (or Claude), **When: Hourly**, and a prompt such as:
 
    ```text
    Take one auto-pilot card, do it, and write the result on the card.

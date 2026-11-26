@@ -5,7 +5,7 @@ the board's card counts over time to clips/marks.json.
 
   python3 record.py hunt_setup hunt fix_setup fix
 
-- hunt_setup / fix_setup: Project settings → Schedules, a Claude cron job (`* * * * *`) is added
+- hunt_setup / fix_setup: the Cron jobs page, a Claude cron job (`* * * * *`) is added
 - hunt / fix: the board (left) and Runs (right) side by side through that job's runs; the job is
   turned off when its runs are shown
 """
@@ -115,38 +115,44 @@ def field(form, key):
     return form.locator(f'[id^="baht-{key}-"]:not(label)').first
 
 
-TAB_KEYS = {'Cron': 'cron', 'Every N min': 'interval', 'Hourly': 'hourly', 'Daily': 'daily', 'Weekly': 'weekly'}
-
-
-def tab_button(page, text):
-    """<baht-tabs> buttons have role=tab and a data-key."""
-    return page.locator(f'baht-tabs button[data-key="{TAB_KEYS[text]}"]').first
+def day_chip(page, day):
+    """A day of the When picker (`<kc-schedule>`), by cron's number: 1 = Monday … 0 = Sunday."""
+    return page.locator(f'kc-schedule [data-day="{day}"]').first
 
 
 def scroll_bottom(page):
-    page.evaluate("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})")
+    """The page scrolls inside the shell (`scroll="main"`), not the window."""
+    page.evaluate("""() => {
+      const m = document.querySelector('.baht-shell-main') || document.scrollingElement
+      m.scrollTo({ top: m.scrollHeight, behavior: 'smooth' })
+    }""")
 
 
 def schedule_scene(b, name, job, first):
-    """Project settings → Schedules: Claude, the Cron tab, `* * * * *`, a name, a model, the prompt, Add."""
+    """The Cron jobs page: Claude, the Cron tab, `* * * * *`, a name, a model, the prompt, Add."""
     s = Scene(b, name)
-    s.go('/settings/projects/1?section=schedules')
+    s.go('/cron')
     s.mark('start')
     s.wait(700)
+    # the "Add a cron job" card in view (the page scrolls inside the shell)
     s.page.evaluate("""() => {
-      const h = [...document.querySelectorAll('*')].find(e => e.textContent.trim() === 'Cron jobs' && !e.children.length)
-      window.scrollTo({ top: h.getBoundingClientRect().top + window.scrollY - 90, behavior: 'smooth' })
+      const h = [...document.querySelectorAll('*')].find(e => e.textContent.trim() === 'Add a cron job' && !e.children.length)
+      h.scrollIntoView({ block: 'start', behavior: 'smooth' })
     }""")
     s.wait(1100)
     if first:
-        # the presets first, once: the GUI writes the cron expression
-        for tab in ['Daily', 'Hourly']:
-            s.click(tab_button(s.page, tab), 800)
-    # every minute, for the demo ("Every N min" takes 5 at least)
-    s.click(tab_button(s.page, 'Cron'), 700)
+        # the alarm-clock way, once: Tuesday and Thursday on, Monday off ("Runs on Tue and Thu")
+        for day in (2, 4, 1):
+            s.click(day_chip(s.page, day), 600)
+        s.wait(700)
+    # every minute, for the demo (Every N min stops at 5): the Cron card, typed in
+    s.click(s.page.locator('kc-schedule label.kc-schedule-mode:has(input[value="cron"])').first, 700)
     form = s.page.locator('baht-form').last
     s.mark('cron')
-    s.type(field(form, 'cron'), '* * * * *', delay=70)
+    # the five boxes, as a one-time code: empty them, then type; a space moves to the next box
+    for i in range(5):
+        s.page.locator(f'kc-schedule [data-part="{i}"]').fill('')
+    s.type(s.page.locator('kc-schedule [data-part="0"]').first, '* * * * *', delay=90)
     s.type(field(form, 'name'), job['name'], delay=25)
     s.type(field(form, 'model'), 'haiku', delay=40)
     s.mark('prompt')

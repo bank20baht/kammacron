@@ -5,20 +5,22 @@ description: Claude or Codex with your own prompt, commands and playbooks on a t
 
 ## Cron jobs
 
-A cron job (a schedule) runs in the project's directory as it is, on its own time: the project's worker switch does not have to be on, only a directory set and the project not paused. Add one under **Project settings → Schedules**. Pick what it **runs** and **when** with the tabs, give it a name, and fill in the fields that appear.
+A cron job (a schedule) runs in the project's directory as it is, on its own time: the project's worker switch does not have to be on, only a directory set and the project not paused. Add one on the **Cron jobs** page (in the navigator, under Cron; with more than one project, pick it with the tabs at the top), or in a project's settings under **Schedules**. Pick what it **runs** and **when** on the cards at the top of the form, give it a name, and fill in the fields that appear.
 
 ### When
 
-| Tab         | Runs                                                     | Saved as       |
-| ----------- | -------------------------------------------------------- | -------------- |
-| Every N min | every N minutes (5 or more), from when it last ran       | the interval   |
-| Hourly      | at a minute past every hour                              | `15 * * * *`   |
-| Daily       | at a time of day                                         | `30 9 * * *`   |
-| Weekdays    | at a time, Monday to Friday                              | `30 9 * * 1-5` |
-| Weekly      | on a day of the week, at a time                          | `0 7 * * 1`    |
-| Cron        | the expression you type: `minute hour day month weekday` | as typed       |
+Set it the way an alarm clock is set, with one of four cards:
 
-The line under the form shows the expression it will save. Times are the server's local time. Cron takes `*`, numbers, ranges (`1-5`), lists (`1,15`), steps (`*/10`) and `@hourly`, `@daily`, `@weekly`, `@monthly`; day-of-week 0 and 7 are both Sunday. An expression that never comes (`0 0 31 2 *`) is refused.
+| Card        | What you set                                    | Saved as                           |
+| ----------- | ----------------------------------------------- | ---------------------------------- |
+| Every N min | 5, 10, 15, 20 or 30 minutes                     | `*/15 * * * *`                     |
+| Every hour  | the minute past the hour                        | `15 * * * *`                       |
+| Date        | a time, and the days it runs (any of Mon … Sun) | `30 7 * * 2,4` (Tue and Thu 07:30) |
+| Cron        | the five fields, one box each                   | as typed                           |
+
+All seven days save as `*`, Monday to Friday as `1-5`. A sentence under the picker reads it back ("Runs on Tue and Thu at 07:30"). What is saved is always a cron expression.
+
+**Cron** opens the five fields in five boxes (minute, hour, day of month, month, day of week), filled with what the card before it made: type them as a one-time code is typed (a space moves to the next box, Backspace in an empty one steps back), or paste a whole expression into any box. A box holding something its field does not take turns red. Times are the server's local time. Each box takes `*`, numbers, ranges (`1-5`), lists (`2,4`) and steps (`*/10`); a pasted `@hourly`, `@daily`, `@weekly` or `@monthly` is spelt out; day-of-week 0 and 7 are both Sunday. An expression that never comes (`0 0 31 2 *`) is refused.
 
 ### What it runs
 

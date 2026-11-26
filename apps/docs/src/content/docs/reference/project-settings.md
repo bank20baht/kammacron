@@ -43,4 +43,4 @@ The steps a run takes with a card: one Claude step by default. See [playbooks](/
 | ---------------------- | ------- | --------------------------------------------------------- |
 | Extra rules for Claude | empty   | Appended to the rules of every Claude step of the project |
 
-**Schedules** has its own section, for the project's cron jobs: see [cron jobs and the calendar](/guides/schedules/).
+**Schedules** lists the project's cron jobs and adds one, as the **Cron jobs** page does: see [cron jobs and the calendar](/guides/schedules/).

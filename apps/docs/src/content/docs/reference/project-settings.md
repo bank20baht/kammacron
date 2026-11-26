@@ -7,13 +7,13 @@ Under **Settings → Projects → (a project)**, in six sections.
 
 ## General
 
-| Setting                   | Default | What it does                                                              |
-| ------------------------- | ------- | ------------------------------------------------------------------------- |
-| Name                      |         | Shown on the board                                                        |
-| Claude works this project | off     | The worker's switch for this project                                      |
-| Directory                 | empty   | Where runs happen, as it is (git or not). Empty: a board without a worker |
+| Setting                          | Default | What it does                                                              |
+| -------------------------------- | ------- | ------------------------------------------------------------------------- |
+| Name                             |         | Shown on the board                                                        |
+| Run this project on its schedule | off     | The worker's switch for this project: its schedules and cards             |
+| Directory                        | empty   | Where runs happen, as it is (git or not). Empty: a board without a worker |
 
-**Check the directory** says whether it is there, its git branch, and which instructions (`CLAUDE.md`, `.claude-worker/prompt.md`) it found.
+**Check the directory** says whether it is there, its git branch, and which Claude instructions (`CLAUDE.md`, `.claude/CLAUDE.md`, `.claude-worker/prompt.md`) it found.
 
 ## Playbook
 
@@ -31,11 +31,11 @@ The steps a run takes with a card: one Claude step by default. See [playbooks](/
 
 ## Permissions
 
-| Setting                                    | Default | What it does                                                              |
-| ------------------------------------------ | ------- | ------------------------------------------------------------------------- |
-| Allowed Bash commands                      | none    | More `Bash(…)` patterns for the allowlist, such as `Bash(bun run test:*)` |
-| WebSearch and WebFetch                     | off     | Allows `WebSearch` and `WebFetch`                                         |
-| MCP servers from the directory's .mcp.json | none    | Servers from the directory's `.mcp.json` a Claude step may use            |
+| Setting                                    | Default | What it does                                                                                                                 |
+| ------------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Allowed Bash commands                      | none    | More `Bash(…)` patterns for the allowlist, such as `Bash(bun run test:*)`                                                    |
+| WebSearch and WebFetch                     | off     | Allows `WebSearch` and `WebFetch`                                                                                            |
+| MCP servers from the directory's .mcp.json | none    | Servers from the directory's `.mcp.json` a Claude step may use; one whose definition changed waits until you save this again |
 
 ## Advanced
 

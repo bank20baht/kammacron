@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   signal,
@@ -17,21 +18,31 @@ import { firstValueFrom } from 'rxjs'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
-import { REGISTRY, scheduleForm } from '../../shared/forms'
 import {
-  cronProblem,
-  DEFAULT_CRON,
-  runsWhat,
-  SCHEDULE_KINDS,
-  type ScheduleKind,
-} from '../../shared/schedule'
+  MODEL_DEFAULT,
+  MODEL_OTHER,
+  NO_AGENT,
+  REGISTRY,
+  scheduleForm,
+  scheduleKinds,
+  type AgentOptions,
+} from '../../shared/forms'
+import { DEFAULT_CRON, runsWhat, SCHEDULE_KINDS, type ScheduleKind } from '../../shared/schedule'
+
+/** A new cron job's form before anything is typed. */
+const FRESH = {
+  when: DEFAULT_CRON,
+  use_board: true,
+  model: MODEL_DEFAULT,
+  claude_agent: NO_AGENT,
+} as const
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
 
 /**
  * One project's cron jobs: the list (turn on or off, the last run) and the form that adds one,
- * what it runs picked with radio cards and when with the schedule picker. On the Cron jobs page, and in the project's settings.
+ * what it runs picked with radio cards and when with the library's `schedule` field. On the Cron jobs page, and in the project's settings.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -83,6 +94,15 @@ const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
           ></baht-badge>
           <strong>{{ s.name }}</strong>
           <baht-code [code]="runsWhat(s)"></baht-code>
+          @if (s.claude_agent) {
+            <baht-badge
+              tone="neutral"
+              [label]="t('cron.asAgent', { agent: s.claude_agent })"
+            ></baht-badge>
+          }
+          @if (s.model) {
+            <baht-badge tone="neutral" [label]="s.model"></baht-badge>
+          }
           @if (s.agent && s.use_board) {
             <baht-badge tone="info" [label]="t('project.schedules.board')"></baht-badge>
           }
@@ -153,19 +173,52 @@ export class CronJobsComponent {
   protected readonly registry = REGISTRY
   /** What the new cron job runs: the form's first radio cards; it picks the fields that follow. */
   protected readonly kind = signal<ScheduleKind>('claude')
+  /** What this machine can run, the project's Claude Code agents and the models; null until read. */
+  protected readonly options = signal<AgentOptions | null>(null)
+  /** Bumped after a job is added: the form is given its fresh value again. */
+  private readonly fresh = signal(0)
+  /** The model is "Other…": its name is typed in. */
+  private readonly otherModel = signal(false)
   protected readonly playbookNames = computed(() => this.playbooks().map((p) => p.name))
-  protected readonly form = computed(() => scheduleForm(this.t, this.kind(), this.playbookNames()))
-  /** What the form holds now: it keeps what was typed when the tabs change the fields. */
-  private readonly data = signal<Record<string, unknown>>({
-    runs: 'claude',
-    when: DEFAULT_CRON,
-    use_board: true,
-  })
-  /** Given to the form again only when Runs changes its fields, never on each keystroke. */
+  protected readonly form = computed(() =>
+    scheduleForm(this.t, {
+      kind: this.kind(),
+      playbooks: this.playbookNames(),
+      options: this.options(),
+      otherModel: this.otherModel(),
+    }),
+  )
+  /** What the form holds now: it keeps what was typed when Runs changes the fields. */
+  private readonly data = signal<Record<string, unknown>>({ ...FRESH, runs: 'claude' })
+  /** Given to the form again only when its fields change, never on each keystroke. */
   protected readonly formValue = computed(() => {
+    this.fresh()
     this.kind()
+    this.otherModel()
+    this.options()
     return untracked(() => this.data())
   })
+
+  constructor() {
+    // the project's options; a CLI this machine has not leaves its card out, and Runs moves on
+    effect(() => {
+      const id = this.projectId()
+      void firstValueFrom(this.api.projects({ id }).agents.get()).then(
+        (options) => {
+          const kinds = scheduleKinds(options)
+          this.options.set(options)
+          const first = kinds[0]
+          if (first && !kinds.includes(untracked(() => this.kind()))) {
+            this.kind.set(first)
+            this.data.update((now) => ({ ...now, runs: first }))
+          }
+        },
+        () => {
+          this.options.set({ claude: null, codex: null })
+        },
+      )
+    })
+  }
   private async act(work: () => Promise<unknown>, done: string): Promise<void> {
     this.busy.set(true)
     this.message.set(null)
@@ -183,12 +236,29 @@ export class CronJobsComponent {
     void this.router.navigateByUrl(url)
   }
 
-  /** Keeps what was typed; Runs picks the fields the form shows. */
+  /**
+   * Keeps what was typed; Runs picks the fields the form shows. Claude's models are not Codex's:
+   * another Runs starts the model (and Claude's agent) over.
+   */
   protected changed(data: Record<string, unknown>): void {
-    this.data.update((now) => ({ ...now, ...data }))
     const runs = data['runs']
-    if (typeof runs === 'string' && (SCHEDULE_KINDS as readonly string[]).includes(runs))
-      this.kind.set(runs as ScheduleKind)
+    const kind =
+      typeof runs === 'string' && (SCHEDULE_KINDS as readonly string[]).includes(runs)
+        ? (runs as ScheduleKind)
+        : this.kind()
+    const fresh = kind !== this.kind() ? { model: MODEL_DEFAULT, claude_agent: NO_AGENT } : {}
+    this.data.update((now) => ({ ...now, ...data, ...fresh }))
+    this.kind.set(kind)
+    this.otherModel.set(this.data()['model'] === MODEL_OTHER)
+  }
+
+  /** The model as the API takes it: null for the CLI's default, the typed name for "Other…". */
+  private modelOf(d: Record<string, unknown>): string | null {
+    const model = text(d['model'])
+    if (model === MODEL_OTHER) return text(d['model_other'])
+    // no list to pick from (Codex never ran here): the name is typed in
+    if (model === null) return text(d['model_other'])
+    return model === MODEL_DEFAULT ? null : model
   }
 
   /** What the new cron job runs, as the API takes it. */
@@ -199,7 +269,11 @@ export class CronJobsComponent {
         agent: kind,
         prompt: text(d['prompt']),
         use_board: d['use_board'] === true,
-        model: text(d['model']),
+        model: this.modelOf(d),
+        claude_agent:
+          kind === 'claude' && text(d['claude_agent']) !== NO_AGENT
+            ? text(d['claude_agent'])
+            : null,
       }
     if (kind === 'playbook') return { playbook: text(d['playbook']) }
     return { command: text(d['command']), card_tags: list(d['card_tags']) }
@@ -209,7 +283,8 @@ export class CronJobsComponent {
     if (!form.validate().valid) return Promise.resolve()
     const d = form.getData()
     const when = d['when']
-    if (typeof when !== 'string' || cronProblem(when)) {
+    // the schedule field checks the expression itself; this is only its type
+    if (typeof when !== 'string') {
       this.message.set({ tone: 'danger', text: this.t('project.schedules.previewMissing') })
       return Promise.resolve()
     }
@@ -221,8 +296,11 @@ export class CronJobsComponent {
           cron: when,
         }),
       )
+      // a fresh form for the next one, on the same Runs: emptied, then given its first choices
       form.reset()
-      this.data.update((now) => ({ ...now, runs: this.kind() }))
+      this.data.set({ ...FRESH, runs: this.kind() })
+      this.otherModel.set(false)
+      this.fresh.update((n) => n + 1)
     }, this.t('project.messages.scheduleAdded'))
   }
 

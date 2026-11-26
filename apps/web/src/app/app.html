@@ -1,6 +1,8 @@
 @if (items().length > 0) {
+<!-- collapsible: the fold button by the brand, the choice kept per browser under storage-key -->
 <baht-app-shell
-  [class.nav-hidden]="navHidden()"
+  collapsible
+  storage-key="kammacron.nav-hidden"
   scroll="main"
   brand="kammacron"
   brand-href="/board"
@@ -17,18 +19,6 @@
     alt=""
     decoding="async"
   />
-  <!-- by the brand, on the left: fold the navigator away for a wider page -->
-  <div data-slot="breadcrumb" class="nav-toggle">
-    <baht-button
-      variant="ghost"
-      size="sm"
-      [icon]="navHidden() ? 'chevron-right' : 'chevron-left'"
-      icon-only
-      [label]="navHidden() ? t('nav.show') : t('nav.hide')"
-      [attr.aria-pressed]="navHidden()"
-      (click)="toggleNav()"
-    ></baht-button>
-  </div>
   <div data-slot="actions" class="actions">
     <app-status-bar></app-status-bar>
     <baht-theme-toggle default="system"></baht-theme-toggle>

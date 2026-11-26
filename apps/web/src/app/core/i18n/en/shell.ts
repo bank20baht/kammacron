@@ -13,8 +13,6 @@ export const nav = {
     cron: 'Cron',
     system: 'System',
   },
-  hide: 'Hide the navigator',
-  show: 'Show the navigator',
 } as const
 
 /** The browser tab: `{page} · kammacron`. */

@@ -80,17 +80,18 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
 - Live pages keep an SSE stream open: wait for the `h1`, never `networkidle`.
 - The shell scrolls inside `.baht-shell-main` (`scroll="main"`), not the window: scroll that
   element (or `scrollIntoView`), never `window.scrollTo`.
-- The cron job form's Runs are radio cards (the `input` is hidden: click its `label`); When is
-  the app's `<kc-schedule>` picker (its value is a cron string): day chips `[data-day="2"]`, the
-  time `[data-time]`, the mode cards `label.kc-schedule-mode:has(input[value="cron"])`, then five boxes `[data-part="0"]` …
-  `[data-part="4"]` (a space moves to the next box). `<baht-tabs>` buttons are `role=tab` with a `data-key`;
-  `<baht-form>` controls have ids
-  `baht-<key>-<n>` (labels end in `*` when required); the card dialog is `app-card-dialog`
-  and it scrolls in `.baht-modal-body`; the comments are `li.baht-comment`.
-- Every N min stops at 5: use the Cron card with `* * * * *`. A cron job's first run comes
+- The cron job form's Runs, Agent and Model are radio cards (the `input` is hidden: click its
+  `label`); When is the library's `<baht-schedule>` (its value is a cron string): day chips are
+  buttons named after the day ("Tuesday"), the time an `input[type=time]`, the cards
+  `label.baht-choice:has(input[value="cron"])`, then a `<baht-cron>` of five inputs (a space moves
+  to the next box). `<baht-tabs>` buttons are `role=tab` with a `data-key`; `<baht-form>` controls
+  have ids `baht-<key>-<n>` (labels end in `*` when required); the card dialog is
+  `app-card-dialog` and it scrolls in `.baht-modal-body`; the comments are `li.baht-comment`.
+- Every few minutes stops at 5: use the Cron card with `* * * * *`. A cron job's first run comes
   at the next whole minute plus up to one 30 s scheduler tick.
-- The board needs its navigator folded (the ‹ button by the brand, "Hide the navigator", remembered in
-  `localStorage['kammacron.nav-hidden']`) for To do → Done to fit the split window.
+- The board needs its navigator folded (the shell's own button by the brand, "Hide the
+  navigator", remembered in `localStorage['kammacron.nav-hidden']`) for To do → Done to fit the
+  split window.
 - A person's card (`human`) stays in todo: the fix scene stops when no card an agent may take
   is left, not when todo is empty.
 - vhs: quote paths; `Wait /regex/` for live states; `Menlo, Sukhumvit Set` draws Thai (Menlo

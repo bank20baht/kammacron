@@ -115,9 +115,17 @@ def field(form, key):
     return form.locator(f'[id^="baht-{key}-"]:not(label)').first
 
 
+DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+
 def day_chip(page, day):
-    """A day of the When picker (`<kc-schedule>`), by cron's number: 1 = Monday … 0 = Sunday."""
-    return page.locator(f'kc-schedule [data-day="{day}"]').first
+    """A day of the When field (`<baht-schedule>`), by cron's number: 1 = Monday … 0 = Sunday."""
+    return page.locator('baht-schedule').get_by_role('button', name=DAY_NAMES[day]).first
+
+
+def schedule_card(page, mode):
+    """One of the When field's cards: interval, hourly, date or cron."""
+    return page.locator('baht-schedule label.baht-choice', has=page.locator(f'input[value="{mode}"]')).first
 
 
 def scroll_bottom(page):
@@ -145,16 +153,18 @@ def schedule_scene(b, name, job, first):
         for day in (2, 4, 1):
             s.click(day_chip(s.page, day), 600)
         s.wait(700)
-    # every minute, for the demo (Every N min stops at 5): the Cron card, typed in
-    s.click(s.page.locator('kc-schedule label.kc-schedule-mode:has(input[value="cron"])').first, 700)
+    # every minute, for the demo (every few minutes stops at 5): the Cron card, typed in
+    s.click(schedule_card(s.page, 'cron'), 700)
     form = s.page.locator('baht-form').last
     s.mark('cron')
     # the five boxes, as a one-time code: empty them, then type; a space moves to the next box
+    boxes = s.page.locator('baht-schedule baht-cron input')
     for i in range(5):
-        s.page.locator(f'kc-schedule [data-part="{i}"]').fill('')
-    s.type(s.page.locator('kc-schedule [data-part="0"]').first, '* * * * *', delay=90)
+        boxes.nth(i).fill('')
+    s.type(boxes.first, '* * * * *', delay=90)
     s.type(field(form, 'name'), job['name'], delay=25)
-    s.type(field(form, 'model'), 'haiku', delay=40)
+    # the Model cards: Haiku
+    s.click(form.locator('label', has=s.page.locator('input[value="haiku"]')).first, 500)
     s.mark('prompt')
     s.type(field(form, 'prompt'), job['prompt'], delay=14)
     s.wait(400)

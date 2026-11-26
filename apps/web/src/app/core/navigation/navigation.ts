@@ -10,7 +10,7 @@ import type { Translate } from '../i18n/i18n.service'
 const PAGES = [
   { key: 'board', icon: 'columns', group: 'kanban' },
   { key: 'review', icon: 'file-check', group: 'kanban' },
-  { key: 'cron', icon: 'refresh', group: 'cron' },
+  { key: 'cron', icon: 'clock', group: 'cron' },
   { key: 'runs', icon: 'play', group: 'cron' },
   { key: 'calendar', icon: 'calendar', group: 'cron' },
   { key: 'stats', icon: 'chart', group: 'system' },

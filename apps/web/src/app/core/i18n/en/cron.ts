@@ -6,6 +6,7 @@ export const cron = {
   project: 'Project',
   listHeading: 'Jobs of this project',
   addHeading: 'Add a cron job',
+  asAgent: 'as {agent}',
   on: 'On',
   off: 'Off',
   noProject: 'No project yet',

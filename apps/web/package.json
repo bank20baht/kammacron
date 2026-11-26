@@ -13,11 +13,10 @@
     "prebuild": "bun run --filter server build:types"
   },
   "dependencies": {
-    "@20baht/angular": "0.3.36",
-    "@20baht/engine": "0.3.36",
+    "@20baht/angular": "0.3.38",
     "@20baht/formats": "^0.1.1",
     "@20baht/live": "^0.1.2",
-    "@20baht/ui": "0.3.36",
+    "@20baht/ui": "0.3.38",
     "@angular/common": "^22.2.0",
     "@angular/compiler": "^22.2.0",
     "@angular/core": "^22.2.0",

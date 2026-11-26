@@ -11,6 +11,7 @@ description: What kammacron reads from its environment.
 | `DATABASE_URL`           | A Postgres URL; PGlite in the data folder when unset                     |
 | `KAMMACRON_PUBLIC_URL`   | The public `https://` address, over the one saved in Settings            |
 | `KAMMACRON_CLAUDE_BIN`   | The `claude` executable (`claude`)                                       |
+| `KAMMACRON_CODEX_BIN`    | The `codex` executable, for Codex cron jobs (`codex`)                    |
 | `KAMMACRON_PASS_ENV`     | More variable names to hand on to runs, comma-separated (`NODE_OPTIONS`) |
 | `KAMMACRON_WEB_DIR`      | Serve the web app from this folder                                       |
 | `KAMMACRON_MIGRATIONS`   | Where the database migrations are (the binary unpacks them)              |

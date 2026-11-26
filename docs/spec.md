@@ -1,4 +1,6 @@
-# Spec: kammacron — Kanban + MCP + Claude worker แบบ self-hosted
+# Spec: kammacron — Kanban + Cron job + MCP สำหรับ Claude/Codex แบบ self-hosted
+
+> **เป้าหมายล่าสุด (2026-11-26 รอบสอง):** kammacron คือเครื่องมือ self-hosted สำหรับจัดการงานบน Kanban Board และสร้าง Cron Job ผ่าน GUI cron job เลือกได้ว่าจะรัน Claude หรือ Codex พร้อม prompt ของผู้ใช้เอง และเลือกได้ว่าจะให้ agent ใช้ข้อมูลจาก Kanban หรือไม่ (สั่งใน prompt หรือติ๊ก checkbox) MCP เป็นช่องทางที่ agent ใช้อ่านบอร์ดและอัปเดตการ์ด การ์ดที่ติดแท็ก `auto-pilot` คือการ์ดที่เปิดให้ agent หยิบไปทำ (แท็กเดิม `claude` ถูก migrate เป็น `auto-pilot` แล้ว) สิ่งที่ทำไปแล้วอยู่ในหัวข้อ [Cron job ของ agent](#cron-job-ของ-agent) ส่วนที่เขียนว่า "แท็ก `claude`" ข้างล่างให้อ่านเป็น `auto-pilot`
 
 > **ทิศทางเปลี่ยน (2026-11-26):** kammacron คือ scheduler ที่ใช้ง่ายและไม่ผูกกับ agent ตัวใด Claude เป็นเพียงชนิดหนึ่งของ step และ kammacron ไม่เก็บ token ของ Claude อีกแล้ว (ใช้ login ของเครื่อง) ส่วนของเอกสารนี้ที่พูดถึง `CLAUDE_CODE_OAUTH_TOKEN` หรือ `claude setup-token` เป็นของเดิม
 
@@ -61,6 +63,40 @@ kammacron คือเว็บแอปบน localhost ที่รวม Kanb
   - ปิด PGlite ขณะยังมี live stream เปิดอยู่ ทำให้ process ค้าง
 
   ทั้งหมดแก้แล้ว มี test กันไว้ และจดลง `LIB_GAP.md`
+
+## Cron job ของ agent
+
+ทำเสร็จ 26 พ.ย. 2026 ตามเป้าหมายล่าสุด ผ่าน `bun run check` ทั้งชุด
+
+**Cron job (ตาราง `schedules`)** รันอย่างใดอย่างหนึ่งเท่านั้น: `command` (ล้มแล้วเปิดการ์ด), `playbook` (เปิดการ์ด `playbook:<name>` ให้ worker รัน) หรือ `agent` (`claude` / `codex`) พร้อม `prompt` คอลัมน์ที่เพิ่ม:
+
+| คอลัมน์         | ความหมาย                                                             |
+| ------------- | -------------------------------------------------------------------- |
+| `agent`       | `claude` หรือ `codex`                                                 |
+| `prompt`      | งานที่ให้ agent ทำแต่ละรอบ                                               |
+| `use_board`   | แนบการ์ด `auto-pilot` ที่เปิดอยู่และกติกาการหยิบการ์ดไปกับ prompt (ค่าเริ่มต้นเปิด) |
+| `model`       | model ของ agent ว่างคือใช้ค่าเริ่มต้นของ agent                              |
+| `cron`        | cron 5 ช่อง ตามเวลาเครื่อง server ถ้าว่างใช้ `interval_minutes` เหมือนเดิม   |
+| `last_result` | ผลรอบล่าสุดแบบสั้น (`exit 1`, `card #12`, `run 7 succeeded`)             |
+| `last_run_id` | run ล่าสุดของ cron job แบบ agent                                       |
+
+ส่วน `runs` เปลี่ยน `card_id` เป็น nullable (run ของ cron job ไม่มีการ์ดของตัวเอง) และเพิ่ม `schedule_id` กับ `agent` ส่วน `run_steps.kind` มี `codex` เพิ่ม
+
+**GUI** อยู่ที่ Project settings → Schedules เลือกสิ่งที่จะรันด้วยแท็บ (Claude / Codex / Command / Playbook) และเลือกรอบเวลาด้วยแท็บ (ทุก N นาที / Hourly / Daily / Weekdays / Weekly / Cron) ฟอร์มแสดงเฉพาะช่องที่เกี่ยว และใต้ฟอร์มบอก cron expression ที่จะบันทึก ฝั่ง server ตรวจว่ารันอย่างเดียว, agent ต้องมี prompt และ cron ต้องมีเวลาที่มาถึงได้จริง (`0 0 31 2 *` ถูกปฏิเสธ)
+
+**การตั้งเวลา** cron job รันตามเวลาของตัวเอง ไม่ต้องรอรอบของ worker และไม่ต้องเปิดสวิตช์ worker ของโปรเจกต์ ขอแค่โปรเจกต์มี directory ไม่ถูก archive และไม่ pause scheduler ตรวจทุก 30 วินาที คิวยังเป็นหนึ่งงานต่อโปรเจกต์ในเวลาเดียวกัน (กันสองงานแก้ directory เดียวกันพร้อมกัน) และตั้ง `next_run_at` รอบถัดไปก่อนเริ่มรัน เพื่อไม่ให้ tick ถัดไปสั่งซ้ำ
+
+**รันของ agent** หนึ่งรอบเท่ากับหนึ่ง run ที่มี step เดียว ไม่ผูกการ์ด
+
+- prompt คือกติกากลาง (directory, ไม่ push ถ้าโปรเจกต์ไม่ได้บอก, กติกาบอร์ด) + กฎของโปรเจกต์ (`CLAUDE.md` ฯลฯ และ Extra rules) + prompt ของผู้ใช้ ถ้า `use_board` เปิด จะมีรายการการ์ด `auto-pilot` ที่หยิบได้ (todo, ไม่ใช่ `human`, ไม่รอการ์ดอื่น) เรียงตาม priority ต่อท้าย
+- กติกาบอร์ด: ย้ายการ์ดไป doing ก่อน (กันอีก run หยิบซ้ำ) อ่านด้วย `get_card` ประเมินก่อนทำ เขียนผลด้วย `add_comment` แล้วย้ายไป done หรือ review พร้อมเหตุผล ถามคนด้วยการใส่ `human` ห้ามแตะการ์ดที่ไม่ใช่ `auto-pilot` การ์ด `human` หรือการ์ดใน review
+- MCP ของ kammacron มีให้ทุก run ไม่ว่า `use_board` จะเปิดไหม ผู้ใช้จึงสั่งให้ใช้บอร์ดใน prompt ได้เอง
+- **Claude:** `claude -p` ด้วย allowlist เดียวกับ step ของ playbook, `--append-system-prompt` เป็นกติกา และใช้ MCP ของโปรเจกต์ที่เปิดไว้ ถ้ายังไม่ login หรือโควต้าหมด cron job ของ Claude รอ 1 ชั่วโมงเหมือนการ์ด
+- **Codex:** `codex exec --json --cd <dir> --sandbox workspace-write -c approval_policy="never"` ส่ง prompt ทาง stdin (กติกาอยู่ต้น prompt เพราะ Codex ไม่มี flag เพิ่ม system prompt) MCP ของ kammacron ส่งผ่าน `-c mcp_servers.kammacron.url=…` และ token อยู่ใน env `KAMMACRON_RUN_TOKEN` (`bearer_token_env_var`) จึงไม่โผล่ใน argv อ่าน event `thread.started` / `item.completed` / `turn.completed` / `turn.failed` แปลงเป็น `run_events` ชนิดเดียวกับของ Claude Codex รายงาน token ไม่รายงานเงิน `cost_usd` จึงว่าง ใช้ `KAMMACRON_CODEX_BIN` ถ้า `codex` ไม่อยู่ใน PATH ของ worker MCP ของโปรเจกต์จาก `.mcp.json` ยังไม่ส่งให้ Codex
+
+**ขอบเขตของ token** `RunScope` มีสองแบบ run ของ worker เขียนได้เฉพาะการ์ดของตัวเองเหมือนเดิม run ของ cron job เขียนได้เฉพาะการ์ดในโปรเจกต์ของตัวเอง (ตอบ `NOT_YOUR_CARD` ถ้าแตะโปรเจกต์อื่น) การจบ review ยังเป็นของคนเท่านั้น ถ้า run ของ cron job ย้ายการ์ดไป doing ระบบตั้ง `claimed_by_run` ให้ ถ้าจบ run แล้วการ์ดยังค้าง doing การกวาด stale จะคืนการ์ดไป todo ตามปกติ
+
+**ที่ยังไม่ได้ทดสอบกับของจริง:** รัน Codex จริงครบวงจร (test ใช้ Codex ปลอมที่พิมพ์ JSON แบบเดียวกับ `codex exec --json` และเรียก MCP จริง) และฟอร์มใหม่ในเบราว์เซอร์
 
 ## จุดยืนเทียบกับเครื่องมืออื่น
 

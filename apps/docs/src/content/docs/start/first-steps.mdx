@@ -1,15 +1,15 @@
 ---
 title: First steps
-description: A project, a scheduled command, and, if you want it, Claude.
+description: A project, a cron job, and Claude or Codex working the cards you tagged auto pilot.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components'
 
 <Steps>
 
-1. **Project.** **Settings → Projects → Add project**, give it a slug and a name, set its **directory** (any folder, say `~/ops`) and turn **Run this project on its schedule** on.
+1. **Project.** **Settings → Projects → Add project**, give it a slug and a name, and set its **directory** (any folder, say `~/ops`). Turn **Run this project on its schedule** on if you want the project's worker to take cards on its own; cron jobs run without it.
 
-2. **Schedule.** In the project, **Schedules**: a name, a command and how often (5 minutes at least).
+2. **A cron job with a command.** In the project, **Schedules**: pick **Runs: Command**, pick **When** (every N minutes, hourly, daily, weekdays, weekly, or a cron expression), and give it a name and a command.
 
    ```sh
    curl -fsS --max-time 10 https://example.com/health
@@ -21,15 +21,29 @@ import { Steps, Aside } from '@astrojs/starlight/components'
 
 </Steps>
 
-## With Claude
+## With Claude or Codex
 
-Run `claude` once on this machine, as the user kammacron runs as, and sign in. kammacron asks for no token and keeps none.
+Run `claude` or `codex` once on this machine, as the user kammacron runs as, and sign in. kammacron asks for no token and keeps none.
 
-Then a card tagged `claude` (owner **Claude** on **New card**) is worked by the project's playbook, which in a new project is one Claude step. To have a failing schedule's card fixed that way, put `claude` in the schedule's **Tags of that card**.
+<Steps>
+
+1. **Cards for agents.** On the board, make cards with owner **Auto pilot** (it adds the `auto-pilot` tag): reversible work with a clear done condition.
+
+2. **A cron job with an agent.** In the project's **Schedules**, pick **Runs: Codex** (or Claude), **When: Hourly**, and a prompt such as:
+
+   ```text
+   Take one auto-pilot card, do it, and write the result on the card.
+   ```
+
+   Keep **Use the Kanban board** ticked: the prompt then comes with the open auto-pilot cards and how to take one. Each hour the agent takes a card through MCP, works in the project's directory, comments what it did, and moves the card to done, or to Review with the reason.
+
+</Steps>
+
+A card tagged `auto-pilot` is also worked by the project's playbook when the project's worker is on (a new project's playbook is one Claude step). To have a failing command's card fixed that way, put `auto-pilot` in the job's **Tags of that card**. More in [cron jobs](/guides/schedules/).
 
 <Aside>
   Project instructions can live in the directory (`CLAUDE.md`, `.claude-worker/prompt.md`) and in
   **Extra rules** in the project's settings.
 </Aside>
 
-To add cards from Claude Code instead, see [Claude Code and MCP](/guides/mcp/).
+To add cards from Claude Code instead, see [agents and MCP](/guides/mcp/).

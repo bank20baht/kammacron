@@ -1,19 +1,19 @@
 ---
 title: Your chores, on the clock
-description: An easy scheduler with a board, on your own machine. Run any command on an interval, and Claude Code if you want it.
+description: A Kanban board and a cron-job GUI on your own machine. Schedule Claude or Codex with your own prompt, or any command, and only look when something needs you.
 template: splash
 hero:
   title: kammacron
   # html, not file: Starlight sizes a file to a 400x400 square, which crops the 3:2 logo's sides
   image:
     html: '<img src="/brand/app-icon.webp?v=transparent-2" width="768" height="512" alt="kammacron" fetchpriority="high" />'
-  tagline: An easy scheduler on your own machine. Run commands on an interval, and only look when one fails or needs a decision.
+  tagline: A Kanban board and cron jobs you make in a GUI. Let Claude or Codex take the cards you tagged auto pilot, on your schedule, and only look when one needs a decision.
   actions:
     - text: Get started
       link: /start/install/
       icon: right-arrow
-    - text: How a card is worked
-      link: /guides/worker/
+    - text: Cron jobs
+      link: /guides/schedules/
       variant: minimal
 ---
 
@@ -30,7 +30,15 @@ bunx kammacron start          # http://127.0.0.1:7420
 ![The board of one project: To do, Doing, Review and Done](../../assets/board.png)
 
 <CardGrid>
-  <Card title="Any command, on an interval" icon="seti:shell">
+  <Card title="Cron jobs, in a GUI" icon="seti:clock">
+    Every N minutes, hourly, daily, weekdays, weekly, or a cron expression you type. Each job runs
+    Claude or Codex with your prompt, a command, or a playbook.
+  </Card>
+  <Card title="A board agents can work" icon="seti:todo">
+    Tag a card `auto pilot` and an agent may take it. Through MCP it reads the board, moves the
+    card, and writes what it did on it. Tick **Use the Kanban board**, or say so in the prompt.
+  </Card>
+  <Card title="Any command" icon="seti:shell">
     Ping a server, run tests, back up a database. A failure opens a card and notifies you; while it
     is open, later failures are added to it.
   </Card>
@@ -42,9 +50,9 @@ bunx kammacron start          # http://127.0.0.1:7420
     What failed or was handed over waits with its reason and output. Approve it, send it back with a
     note, or take it yourself.
   </Card>
-  <Card title="Claude, if you want it" icon="puzzle">
-    A playbook step can be `claude -p`, using the Claude Code you already signed in to. It gets a
-    tool allowlist, never `--dangerously-skip-permissions`.
+  <Card title="Claude or Codex, with your login" icon="puzzle">
+    `claude -p` and `codex exec` run with the logins you already have; kammacron keeps none. Claude
+    gets a tool allowlist, Codex a sandbox that writes only the project's directory.
   </Card>
   <Card title="Every run, on the record" icon="document">
     Each step and how it ended, its output, and a calendar of what runs when.

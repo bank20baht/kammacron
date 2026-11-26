@@ -1,6 +1,6 @@
 ---
-title: Claude Code and MCP
-description: The board as MCP tools for Claude Code, Claude Desktop and claude.ai.
+title: Agents and MCP
+description: The board as MCP tools for Claude Code, Codex, Claude Desktop and claude.ai.
 ---
 
 kammacron serves an MCP server at `/mcp`. The worker uses it in every run, and so can you: plan with Claude Code and let it write the cards.
@@ -38,3 +38,7 @@ They connect over OAuth, which needs an `https://` address: put a tunnel in fron
 | `get_calendar`  | The cron jobs (worker rounds, schedules, housekeeping) with their next run, and runs in a range |
 
 Settings, review decisions and the token are never tools: they stay in the web app and the CLI.
+
+## The worker's own tokens
+
+Each run gets a token of its own for `/mcp`, gone when the run ends. A worker round's run may write to the one card it works on. An agent cron job's run (Claude or Codex with your prompt) has no card of its own: it may write to the cards of its project, and to no other project's. Either way, ending a review stays the person's.

@@ -3,7 +3,7 @@ title: How a card is worked
 description: A project's round, the playbook per card, and what happens when a run does not finish.
 ---
 
-Every project with its worker on is checked on its **interval** (30 minutes by default). A round with nothing to pick ends there, without calling Claude. Otherwise the worker takes up to **max cards per run** (3 by default), one at a time:
+Every project with its worker on is checked on its **interval** (30 minutes by default). It picks cards tagged `auto-pilot` (or `playbook:<name>`) that are in To do, not a person's, and wait on nothing open. A round with nothing to pick ends there, without calling Claude. Otherwise the worker takes up to **max cards per run** (3 by default), one at a time:
 
 1. **Claims** the card: a run, and the card moves to **Doing**.
 2. **Runs the project's playbook** on it, step by step, in the project's directory as it is. A new project's playbook is one Claude step; add commands (tests, `ssh`, a deploy) around it. See [playbooks](/guides/playbook/).
@@ -11,6 +11,8 @@ Every project with its worker on is checked on its **interval** (30 minutes by d
 4. **Settles the card**: every step passed, it is done; a step failed, it goes to **Review** with the step's name and output; Claude handed it to a person, it stays where Claude put it.
 
 Then it sets the project's next round.
+
+This is the worker's own loop, one card at a time with the project's playbook. To run Claude or Codex with a prompt of your own on a timer, and let it pick the card, use a [cron job](/guides/schedules/) instead; both take `auto-pilot` cards, and a card one of them moved to doing is not taken by the other.
 
 ![A run whose Migrate step failed: its steps, the command and the end of its output](../../../assets/run.png)
 

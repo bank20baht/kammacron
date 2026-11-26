@@ -10,7 +10,7 @@ export default defineConfig({
     starlight({
       title: 'kammacron',
       description:
-        'An easy scheduler with a board, on your own machine. Run any command on an interval, and Claude Code if you want it.',
+        'A Kanban board and a cron-job GUI on your own machine. Schedule Claude or Codex with your own prompt, or any command, and only look when something needs you.',
       logo: { src: './src/assets/app-mark.webp', replacesTitle: false },
       favicon: '/favicon.ico?v=buffalo-1',
       social: [
@@ -35,12 +35,12 @@ export default defineConfig({
           label: 'Guides',
           items: [
             { slug: 'guides/board', label: 'The board' },
+            { slug: 'guides/schedules', label: 'Cron jobs and the calendar' },
             { slug: 'guides/worker', label: 'How a card is worked' },
             { slug: 'guides/playbook', label: 'Playbooks' },
             { slug: 'guides/review', label: 'Review' },
             { slug: 'guides/permissions', label: 'Permissions and safety' },
-            { slug: 'guides/schedules', label: 'Schedules and the calendar' },
-            { slug: 'guides/mcp', label: 'Claude Code and MCP' },
+            { slug: 'guides/mcp', label: 'Agents and MCP' },
             { slug: 'guides/notifications', label: 'Alerts and notifications' },
             { slug: 'guides/remote', label: 'Reaching it from elsewhere' },
           ],

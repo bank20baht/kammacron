@@ -7,11 +7,11 @@ Under **Settings → Projects → (a project)**, in six sections.
 
 ## General
 
-| Setting                          | Default | What it does                                                              |
-| -------------------------------- | ------- | ------------------------------------------------------------------------- |
-| Name                             |         | Shown on the board                                                        |
-| Run this project on its schedule | off     | The worker's switch for this project: its schedules and cards             |
-| Directory                        | empty   | Where runs happen, as it is (git or not). Empty: a board without a worker |
+| Setting                          | Default | What it does                                                                       |
+| -------------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| Name                             |         | Shown on the board                                                                 |
+| Run this project on its schedule | off     | The worker's switch: its rounds take `auto-pilot` cards (cron jobs run without it) |
+| Directory                        | empty   | Where runs happen, as it is (git or not). Empty: a board without a worker          |
 
 **Check the directory** says whether it is there, its git branch, and which Claude instructions (`CLAUDE.md`, `.claude/CLAUDE.md`, `.claude-worker/prompt.md`) it found.
 
@@ -43,4 +43,4 @@ The steps a run takes with a card: one Claude step by default. See [playbooks](/
 | ---------------------- | ------- | --------------------------------------------------------- |
 | Extra rules for Claude | empty   | Appended to the rules of every Claude step of the project |
 
-**Schedules** has its own section: see [schedules and the calendar](/guides/schedules/).
+**Schedules** has its own section, for the project's cron jobs: see [cron jobs and the calendar](/guides/schedules/).

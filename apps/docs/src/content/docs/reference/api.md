@@ -15,4 +15,12 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7420/api/cards?project_i
 
 Card writes accept an `Idempotency-Key` header, so a retried request does not create a card twice.
 
-The routes marked as tools are also served over MCP: see [Claude Code and MCP](/guides/mcp/).
+A cron job runs exactly one of `command`, `playbook` or `agent` (`claude` or `codex`, with a `prompt`), on a `cron` expression or every `interval_minutes`:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"hourly codex","agent":"codex","prompt":"Take one auto-pilot card, do it, and write the result on the card.","use_board":true,"cron":"0 * * * *"}' \
+  http://127.0.0.1:7420/api/projects/1/schedules
+```
+
+The routes marked as tools are also served over MCP: see [agents and MCP](/guides/mcp/).

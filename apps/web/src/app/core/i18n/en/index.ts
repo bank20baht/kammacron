@@ -2,6 +2,7 @@ import { board } from './board'
 import { calendar } from './calendar'
 import { card } from './card'
 import { common } from './common'
+import { cron } from './cron'
 import { forms } from './forms'
 import { kanban } from './kanban'
 import { project } from './project'
@@ -24,6 +25,7 @@ export const en = {
     philosophy: 'You plan. It runs on time. You decide.',
   },
   common,
+  cron,
   nav,
   titles,
   statusBar,

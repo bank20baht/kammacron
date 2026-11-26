@@ -28,6 +28,11 @@ describe('cron expressions', () => {
     expect(nextCron('0 0 * * 7', from)).toEqual(at('2026-11-29T00:00:00')) // 7 is Sunday
   })
 
+  test('some days of the week, as an alarm clock is set (Tue and Thu)', () => {
+    expect(nextCron('30 7 * * 2,4', at('2026-11-26T12:00'))).toEqual(at('2026-12-01T07:30:00')) // Thu noon → Tue
+    expect(nextCron('30 7 * * 2,4', at('2026-12-01T08:00'))).toEqual(at('2026-12-03T07:30:00')) // Tue → Thu
+  })
+
   test('both day fields restricted: a day matching either runs', () => {
     // the 1st of the month, or a Monday
     expect(nextCron('0 0 1 * 1', at('2026-11-26T12:00'))).toEqual(at('2026-11-30T00:00:00'))

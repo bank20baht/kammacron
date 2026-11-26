@@ -19,6 +19,8 @@ export default knip({
     '@fontsource/jetbrains-mono',
     // apps/docs: imported only by the scripts of .astro components, which knip does not read
     '@20baht/stickers',
+    // apps/web: named only in a `declare module` that adds the schedule field type (LIB_GAP.md)
+    '@20baht/engine',
   ],
   workspaces: {
     '.': { entry: ['scripts/*.ts'], project: ['scripts/**/*.ts'] },

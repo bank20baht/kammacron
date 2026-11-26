@@ -1,5 +1,5 @@
 import { t } from '../i18n/i18n.service'
-import { NAV, currentKey } from './navigation'
+import { NAV, currentKey, navWith } from './navigation'
 
 describe('currentKey', () => {
   const keys = ['', 'orders', 'orders/archive', 'order']
@@ -21,15 +21,47 @@ describe('currentKey', () => {
 })
 
 describe('NAV', () => {
-  it('is the four pages of the spec, the calendar and stats, each at its own path', () => {
+  it('is every page, each at its own path, the cron jobs page among them', () => {
     expect(NAV(t).map((item) => item.key)).toEqual([
       'board',
       'review',
+      'cron',
       'runs',
       'calendar',
       'stats',
       'settings',
     ])
     for (const item of NAV(t)) expect(item.href).toBe(`/${item.key}`)
+  })
+
+  it('groups the pages by what they are about', () => {
+    const groups = Object.fromEntries(NAV(t).map((item) => [item.key, item.group]))
+    expect(groups).toEqual({
+      board: 'Kanban',
+      review: 'Kanban',
+      cron: 'Cron',
+      runs: 'Cron',
+      calendar: 'Cron',
+      stats: 'System',
+      settings: 'System',
+    })
+  })
+})
+
+describe('navWith', () => {
+  it('puts the projects between the cron pages and System, and counts the reviews', () => {
+    const items = navWith(t, 2, [{ slug: 'shop', name: 'Baan Kanom' }])
+    expect(items.map((item) => item.key)).toEqual([
+      'board',
+      'review',
+      'cron',
+      'runs',
+      'calendar',
+      'board/shop',
+      'stats',
+      'settings',
+    ])
+    expect(items.find((item) => item.key === 'review')?.badge).toBe(2)
+    expect(items.find((item) => item.key === 'board/shop')?.group).toBe('Projects')
   })
 })

@@ -34,6 +34,11 @@ export const routes: Routes = [
           import('./modules/review/review.component').then((m) => m.ReviewComponent),
       },
       {
+        path: 'cron',
+        title: 'titles.cron' satisfies MessageKey,
+        loadComponent: () => import('./modules/cron/cron.component').then((m) => m.CronComponent),
+      },
+      {
         path: 'runs',
         title: 'titles.runs' satisfies MessageKey,
         loadComponent: () => import('./modules/runs/runs.component').then((m) => m.RunsComponent),

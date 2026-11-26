@@ -2,7 +2,8 @@ import type { Registry } from '@20baht/ui'
 import { defineForm } from '@20baht/ui/engine'
 
 import type { Translate } from '../core/i18n/i18n.service'
-import type { ScheduleKind, Timing } from './schedule'
+import { SCHEDULE_KINDS, type ScheduleKind } from './schedule'
+import { SCHEDULE_FIELD } from './schedule-input'
 import { uploadImage } from './upload'
 
 /*
@@ -17,6 +18,8 @@ export const sameOriginImage = (href: string) => href.startsWith('/files/')
 export const REGISTRY: Registry = {
   uploaders: { attachments: uploadImage },
   markdownImage: sameOriginImage,
+  // when a cron job runs, picked like an alarm clock (LIB_GAP.md: a `schedule` type for the library)
+  fieldTypes: { schedule: SCHEDULE_FIELD },
 }
 
 const body = (t: Translate) =>
@@ -30,8 +33,18 @@ const body = (t: Translate) =>
   }) as const
 
 const owners = (t: Translate) => [
-  { key: 'autopilot', label: t('forms.card.ownerAutopilot') },
-  { key: 'human', label: t('forms.card.ownerHuman') },
+  {
+    key: 'autopilot',
+    label: t('forms.card.ownerAutopilot'),
+    description: t('forms.card.ownerAutopilotHelp'),
+    icon: 'sparkles',
+  },
+  {
+    key: 'human',
+    label: t('forms.card.ownerHuman'),
+    description: t('forms.card.ownerHumanHelp'),
+    icon: 'users',
+  },
 ]
 
 export const newCardForm = (t: Translate) =>
@@ -51,6 +64,7 @@ export const newCardForm = (t: Translate) =>
       {
         order: 2,
         type: 'radio',
+        variant: 'card',
         key: 'owner',
         label: t('forms.card.owner'),
         required: true,
@@ -87,23 +101,31 @@ export const cardForm = (t: Translate) =>
       body(t),
       {
         order: 3,
-        type: 'dropdown',
+        type: 'radio',
+        variant: 'card',
         key: 'status',
         label: t('forms.card.status'),
-        width: '1/3',
         options: [
-          { key: 'todo', label: t('status.card.todo') },
-          { key: 'doing', label: t('status.card.doing') },
-          { key: 'done', label: t('status.card.done') },
+          { key: 'todo', label: t('status.card.todo'), icon: 'plus-circle' },
+          { key: 'doing', label: t('status.card.doing'), icon: 'play' },
+          { key: 'done', label: t('status.card.done'), icon: 'check' },
         ],
       },
       {
         order: 4,
-        type: 'dropdown',
+        type: 'radio',
+        variant: 'card',
         key: 'owner',
         label: t('forms.card.owner'),
-        width: '1/3',
-        options: [...owners(t), { key: 'none', label: t('forms.card.ownerNone') }],
+        options: [
+          ...owners(t),
+          {
+            key: 'none',
+            label: t('forms.card.ownerNone'),
+            description: t('forms.card.ownerNoneHelp'),
+            icon: 'close',
+          },
+        ],
       },
       {
         order: 5,
@@ -282,13 +304,23 @@ export const projectForm = (t: Translate) =>
       },
       {
         order: 6,
-        type: 'dropdown',
+        type: 'radio',
+        variant: 'card',
         key: 'mode',
         label: t('forms.project.mode'),
-        width: '1/2',
         options: [
-          { key: 'autopilot', label: t('forms.project.modeAutopilot') },
-          { key: 'watch', label: t('forms.project.modeWatch') },
+          {
+            key: 'autopilot',
+            label: t('forms.project.modeAutopilot'),
+            description: t('forms.project.modeAutopilotHelp'),
+            icon: 'sparkles',
+          },
+          {
+            key: 'watch',
+            label: t('forms.project.modeWatch'),
+            description: t('forms.project.modeWatchHelp'),
+            icon: 'search',
+          },
         ],
       },
       {
@@ -350,18 +382,41 @@ export const projectForm = (t: Translate) =>
  * A schedule: its name, what it runs (only the fields of `kind`) and when (only the fields of
  * `timing`). The page picks kind and timing with tabs above the form.
  */
-export const scheduleForm = (
-  t: Translate,
-  kind: ScheduleKind,
-  timing: Timing,
-  playbooks: readonly string[],
-) =>
+/** The icons of what a job runs, from the library's curated set (it has no robot: LIB_GAP.md). */
+const KIND_ICONS: Record<ScheduleKind, string> = {
+  claude: 'sparkles',
+  codex: 'code',
+  command: 'terminal',
+  playbook: 'layers',
+}
+export const scheduleForm = (t: Translate, kind: ScheduleKind, playbooks: readonly string[]) =>
   defineForm({
     form_id: 'schedule',
     form_name: t('forms.schedule.name'),
     fields: [
       {
         order: 1,
+        type: 'radio',
+        variant: 'card',
+        key: 'runs',
+        label: t('project.schedules.runs'),
+        required: true,
+        options: SCHEDULE_KINDS.map((key) => ({
+          key,
+          label: t(`project.schedules.kind.${key}`),
+          description: t(`forms.schedule.kindHelp.${key}`),
+          icon: KIND_ICONS[key],
+        })),
+      },
+      {
+        order: 2,
+        type: 'schedule',
+        key: 'when',
+        label: t('project.schedules.when'),
+        required: true,
+      },
+      {
+        order: 3,
         type: 'text',
         key: 'name',
         label: t('forms.schedule.scheduleName'),
@@ -370,7 +425,6 @@ export const scheduleForm = (
         width: '1/2',
       },
       ...runsFields(t, kind, playbooks),
-      ...timingFields(t, timing),
     ],
   })
 
@@ -380,7 +434,7 @@ const runsFields = (t: Translate, kind: ScheduleKind, playbooks: readonly string
     case 'codex':
       return [
         {
-          order: 2,
+          order: 4,
           type: 'text',
           key: 'model',
           label: t('forms.schedule.model'),
@@ -388,7 +442,7 @@ const runsFields = (t: Translate, kind: ScheduleKind, playbooks: readonly string
           width: '1/2',
         },
         {
-          order: 3,
+          order: 5,
           type: 'textarea',
           key: 'prompt',
           label: t('forms.schedule.prompt'),
@@ -397,7 +451,7 @@ const runsFields = (t: Translate, kind: ScheduleKind, playbooks: readonly string
           required: true,
         },
         {
-          order: 4,
+          order: 6,
           type: 'checkbox',
           key: 'use_board',
           label: t('forms.schedule.useBoard'),
@@ -407,7 +461,7 @@ const runsFields = (t: Translate, kind: ScheduleKind, playbooks: readonly string
     case 'playbook':
       return [
         {
-          order: 2,
+          order: 4,
           type: 'dropdown',
           key: 'playbook',
           label: t('forms.schedule.playbook'),
@@ -420,7 +474,7 @@ const runsFields = (t: Translate, kind: ScheduleKind, playbooks: readonly string
     case 'command':
       return [
         {
-          order: 2,
+          order: 4,
           type: 'text',
           key: 'command',
           label: t('forms.schedule.command'),
@@ -429,81 +483,11 @@ const runsFields = (t: Translate, kind: ScheduleKind, playbooks: readonly string
           required: true,
         },
         {
-          order: 3,
+          order: 5,
           type: 'tags',
           key: 'card_tags',
           label: t('forms.schedule.cardTags'),
           help: t('forms.schedule.cardTagsHelp'),
-        },
-      ] as const
-  }
-}
-
-/** Cron's day numbers, Sunday first. */
-const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
-
-const timingFields = (t: Translate, timing: Timing) => {
-  const time = {
-    order: 11,
-    type: 'time',
-    key: 'time',
-    label: t('forms.schedule.time'),
-    required: true,
-    width: '1/3',
-  } as const
-  switch (timing) {
-    case 'interval':
-      return [
-        {
-          order: 10,
-          type: 'number',
-          key: 'interval_minutes',
-          label: t('forms.schedule.interval'),
-          required: true,
-          width: '1/3',
-        },
-      ] as const
-    case 'hourly':
-      return [
-        {
-          order: 10,
-          type: 'number',
-          key: 'minute',
-          label: t('forms.schedule.minute'),
-          help: t('forms.schedule.minuteHelp'),
-          width: '1/3',
-        },
-      ] as const
-    case 'daily':
-    case 'weekdays':
-      return [time] as const
-    case 'weekly':
-      return [
-        {
-          order: 10,
-          type: 'dropdown',
-          key: 'weekday',
-          label: t('forms.schedule.weekday'),
-          required: true,
-          width: '1/3',
-          options: WEEKDAYS.map((d, i) => ({
-            key: String(i),
-            label: t(`forms.schedule.day.${d}`),
-          })),
-        },
-        time,
-      ] as const
-    case 'cron':
-      return [
-        {
-          order: 10,
-          type: 'text',
-          key: 'cron',
-          label: t('forms.schedule.cron'),
-          placeholder: '0 */2 * * 1-5',
-          help: t('forms.schedule.cronHelp'),
-          required: true,
-          width: '1/2',
         },
       ] as const
   }

@@ -2,11 +2,17 @@
 export const nav = {
   board: 'Board',
   review: 'Review',
+  cron: 'Cron jobs',
   runs: 'Runs',
   calendar: 'Calendar',
   stats: 'Stats',
   settings: 'Settings',
   projects: 'Projects',
+  groups: {
+    kanban: 'Kanban',
+    cron: 'Cron',
+    system: 'System',
+  },
   hide: 'Hide the navigator',
   show: 'Show the navigator',
 } as const
@@ -17,6 +23,7 @@ export const titles = {
   open: 'Open',
   board: 'Board',
   review: 'Review',
+  cron: 'Cron jobs',
   runs: 'Runs',
   run: 'Run',
   calendar: 'Calendar',

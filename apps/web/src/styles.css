@@ -12,6 +12,10 @@
     display: none;
   }
 }
+/* the toggle sits by the brand; below 900px the navigator is a strip already, so no toggle */
+baht-app-shell .nav-toggle {
+  margin-inline-start: var(--baht-space-2);
+}
 @media (max-width: 900px) {
   baht-app-shell .nav-toggle {
     display: none;
@@ -27,39 +31,39 @@ body {
 }
 
 /*
- * Thai-cloud palette, following konmek's white surfaces and cobalt ink through library tokens,
- * and a dark one with a blue cast and three clear layers (page, column or panel,
- * card) instead of three near-blacks.
+ * Neutral greys: the page a soft grey (not white), cards and panels white on it, and sunken
+ * columns a step darker; no blue or silver cast in the greys. Dark: charcoal layers, page,
+ * column, card, each a clear step apart. The primary stays cobalt for actions and links.
  */
 html:not([data-baht-theme='dark']) {
   --baht-primary: #2449c4;
   --baht-accent: #ff7417;
-  --baht-accent-content: #142b49;
+  --baht-accent-content: #1c1c1e;
   --baht-base-100: #ffffff; /* surfaces: cards, tiles, panels */
-  --baht-base-200: #ffffff; /* white paper, like konmek */
-  --baht-base-300: #f2f5fb; /* sunken: board columns, selected rows */
-  --baht-row-alt: #f8fafd;
-  --baht-color-border: #d7e2f4;
-  --baht-color-border-strong: #b5c8e5;
-  --baht-color-divider: #e6edf8;
-  --baht-color-text: #142b49;
-  --baht-color-text-muted: #5b6980;
+  --baht-base-200: #ebebe8; /* the page */
+  --baht-base-300: #e1e1dd; /* sunken: board columns, selected rows */
+  --baht-row-alt: #f6f6f4;
+  --baht-color-border: #d6d6d1;
+  --baht-color-border-strong: #b9b9b3;
+  --baht-color-divider: #e3e3df;
+  --baht-color-text: #1c1c1e;
+  --baht-color-text-muted: #5f5f63;
 }
 
 html[data-baht-theme='dark'] {
   --baht-primary: #8db8ff;
-  --baht-primary-content: #142b49;
+  --baht-primary-content: #1c1c1e;
   --baht-accent: #ff944f;
-  --baht-accent-content: #142b49;
-  --baht-base-200: #0d1017; /* the page */
-  --baht-base-300: #141922; /* sunken: board columns */
-  --baht-base-100: #1b212d; /* surfaces: cards, tiles, panels */
-  --baht-row-alt: #181e29;
-  --baht-color-surface-alt: #222938;
-  --baht-color-border: #2a3243;
-  --baht-color-border-strong: #3d485e;
-  --baht-color-divider: #232a38;
-  --baht-color-text-muted: #9aa6bb;
+  --baht-accent-content: #1c1c1e;
+  --baht-base-200: #18181a; /* the page */
+  --baht-base-300: #202022; /* sunken: board columns */
+  --baht-base-100: #2a2a2d; /* surfaces: cards, tiles, panels */
+  --baht-row-alt: #252528;
+  --baht-color-surface-alt: #323236;
+  --baht-color-border: #39393d;
+  --baht-color-border-strong: #4c4c51;
+  --baht-color-divider: #2f2f33;
+  --baht-color-text-muted: #a3a3a8;
 }
 
 /* The shell: a header band on the surface colour, with a hairline under it; the current link
@@ -112,5 +116,147 @@ baht-page-header[size='lg'] {
   }
   baht-page-header[size='lg'] {
     --baht-page-header-art-size: 12rem;
+  }
+}
+
+/*
+ * <kc-schedule>: when a cron job runs, set like an alarm clock (shared/schedule-input.ts).
+ * Built from the library's tokens so it reads as one of its controls (LIB_GAP.md asks for it there).
+ */
+kc-schedule {
+  display: block;
+}
+.kc-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--baht-space-3);
+}
+.kc-schedule-modes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--baht-space-3);
+}
+.kc-schedule-mode {
+  display: flex;
+  align-items: center;
+  gap: var(--baht-space-3);
+  padding: var(--baht-space-3) var(--baht-space-4);
+  border: 1px solid var(--baht-color-border);
+  border-radius: var(--baht-radius-md);
+  background: var(--baht-color-surface);
+  font-weight: var(--baht-font-weight-label, 600);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.kc-schedule-mode:hover {
+  border-color: var(--baht-color-border-strong);
+}
+.kc-schedule-mode.is-on {
+  border-color: var(--baht-color-primary);
+  background: var(--baht-color-primary-tint);
+}
+.kc-schedule-mode input {
+  accent-color: var(--baht-color-primary);
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+}
+.kc-schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--baht-space-3);
+}
+.kc-schedule .baht-label {
+  margin-bottom: 0;
+}
+.kc-schedule-time {
+  width: 11rem;
+}
+.kc-schedule-num {
+  width: 7rem;
+}
+.kc-cron-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--baht-space-2);
+}
+/* one box a cron field, as a one-time code is typed */
+.kc-cron-part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--baht-space-1);
+  font-size: var(--baht-text-sm);
+  color: var(--baht-color-text-muted);
+}
+.kc-cron-box {
+  width: 6.5rem;
+  font-family: var(--baht-font-mono);
+  font-size: 1.15rem;
+  text-align: center;
+}
+.kc-cron-box[aria-invalid='true'] {
+  border-color: var(--baht-color-danger);
+}
+.kc-schedule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--baht-space-2);
+}
+.kc-schedule-chip {
+  min-width: 3.25rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--baht-color-border);
+  border-radius: var(--baht-radius-md);
+  background: var(--baht-color-surface);
+  color: var(--baht-color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.kc-schedule-chip:hover {
+  border-color: var(--baht-color-border-strong);
+}
+.kc-schedule-chip.is-on {
+  border-color: var(--baht-color-primary);
+  background: var(--baht-color-primary);
+  color: var(--baht-color-primary-contrast);
+}
+.kc-schedule-chip:focus-visible {
+  outline: 2px solid var(--baht-color-focus, var(--baht-color-primary));
+  outline-offset: 2px;
+}
+.kc-schedule-summary {
+  margin: 0;
+  color: var(--baht-color-text);
+}
+.kc-schedule-help,
+.kc-schedule-error {
+  margin: 0;
+  font-size: var(--baht-text-sm);
+  color: var(--baht-color-text-muted);
+}
+.kc-schedule-error {
+  color: var(--baht-color-danger);
+}
+.kc-schedule-error:empty {
+  display: none;
+}
+@media (max-width: 900px) {
+  .kc-schedule-modes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kc-schedule-mode,
+  .kc-schedule-chip {
+    transition: none;
   }
 }

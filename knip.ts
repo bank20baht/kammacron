@@ -17,6 +17,8 @@ export default knip({
     'sharp',
     '@fontsource/anuphan',
     '@fontsource/jetbrains-mono',
+    // apps/docs: imported only by the scripts of .astro components, which knip does not read
+    '@20baht/stickers',
   ],
   workspaces: {
     '.': { entry: ['scripts/*.ts'], project: ['scripts/**/*.ts'] },

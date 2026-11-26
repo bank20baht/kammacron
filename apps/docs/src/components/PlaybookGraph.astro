@@ -1,0 +1,69 @@
+---
+/**
+ * A playbook as machines talking: kammacron on your machine runs Claude in the project's
+ * directory, then ssh's to a server to deploy and to the database to migrate. It explains the
+ * page, so the packets move while it is in view (still under reduced motion).
+ */
+---
+
+<figure class="graph">
+  <baht-sticker-graph
+    id="playbook-graph"
+    label="A playbook: Claude, then ssh to a server and to the database"
+    step-ms="1100"></baht-sticker-graph>
+  <figcaption>
+    One run of a <code>deploy</code> playbook: a Claude step in the project's directory, then
+    commands that <code>ssh</code> to the web server and to the database.
+  </figcaption>
+</figure>
+
+<script>
+  import '@20baht/stickers/graph'
+  import '@20baht/stickers/element'
+  import { registerSticker } from '@20baht/stickers'
+  import { aiAgent } from '@20baht/stickers/icons/ai-agent'
+  import { database } from '@20baht/stickers/icons/database'
+  import { laptop } from '@20baht/stickers/icons/laptop'
+  import { server } from '@20baht/stickers/icons/server'
+
+  for (const icon of [laptop, aiAgent, server, database]) registerSticker(icon)
+
+  const el = document.getElementById('playbook-graph') as (HTMLElement & { graph: unknown }) | null
+  if (el)
+    el.graph = {
+      nodes: [
+        { id: 'you', sticker: 'laptop', label: 'kammacron', sub: 'your machine', x: 0, y: 1 },
+        { id: 'claude', sticker: 'ai-agent', label: 'Claude step', sub: 'claude -p', x: 1, y: 3 },
+        { id: 'web', sticker: 'server', label: 'Web server', sub: 'ssh deploy', x: 3, y: 0 },
+        { id: 'db', sticker: 'database', label: 'Database', sub: 'ssh migrate', x: 4, y: 2 },
+      ],
+      links: [
+        { from: 'you', to: 'claude', dir: 'both' },
+        { from: 'you', to: 'web', dir: 'both' },
+        { from: 'you', to: 'db', dir: 'both' },
+      ],
+      flow: [
+        { from: 'you', to: 'claude', tone: 'main', label: 'the card' },
+        { from: 'claude', to: 'you', tone: 'ok', label: 'done' },
+        { from: 'you', to: 'web', tone: 'gold', label: 'deploy.sh' },
+        { from: 'web', to: 'you', tone: 'ok', label: 'exit 0' },
+        { from: 'you', to: 'db', tone: 'gold', label: 'migrate.sh' },
+        { from: 'db', to: 'you', tone: 'ok', label: 'exit 0' },
+      ],
+    }
+</script>
+
+<style>
+  .graph {
+    margin: 1.5rem 0;
+  }
+  baht-sticker-graph {
+    display: block;
+    max-width: 40rem;
+  }
+  figcaption {
+    margin-top: 0.5rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+</style>

@@ -45,3 +45,43 @@
 .sl-markdown-content img[src*='board'] {
   box-shadow: 0.5rem 0.5rem 0 var(--sl-color-accent);
 }
+
+/*
+ * The stickers' colours (<baht-sticker> reads these --baht-* tokens): the docs' cobalt for bodies,
+ * deep ink for the second colour, and the app's orange for gold.
+ */
+:root {
+  --baht-primary: #5b79e4;
+  --baht-neutral: #c9d4f7;
+  --baht-color-primary-tint: #1b2a52;
+  --baht-gold-400: #ff944f;
+  --baht-success: #3fb37f;
+  --baht-error: #e5534b;
+}
+:root[data-theme='light'] {
+  --baht-primary: #2449c4;
+  --baht-neutral: #142b49;
+  --baht-color-primary-tint: #dfe7fb;
+  --baht-gold-400: #ff7417;
+  --baht-success: #1f8a5b;
+  --baht-error: #c8372d;
+}
+
+/*
+ * Press feedback: the hero's buttons give a little when pressed, so a click feels heard. Only
+ * transform moves, on a strong ease-out; nothing moves under reduced motion.
+ */
+.sl-link-button {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.sl-link-button:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sl-link-button {
+    transition: none;
+  }
+  .sl-link-button:active {
+    transform: none;
+  }
+}

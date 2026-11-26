@@ -3,6 +3,8 @@ title: Playbooks
 description: What a run does with a card, step by step, in the project's directory.
 ---
 
+import PlaybookGraph from '../../../components/PlaybookGraph.astro'
+
 A project points kammacron at a **directory** on this machine. kammacron does not branch, reset, check or push it: what happens there is the project's **playbook**, and the project's own instructions (`CLAUDE.md`, `.claude-worker/prompt.md`).
 
 A playbook is a list of steps, run in order for each card the worker picks:
@@ -33,6 +35,8 @@ A playbook that has Claude do the card, tests it, then deploys and migrates over
 | 3   | Test    | Command | `bun test`                                                    |
 | 4   | Deploy  | Command | `ssh deploy@app-1 'cd /srv/shop && git pull && ./restart.sh'` |
 | 5   | Migrate | Command | `ssh db-1 ./migrate.sh`                                       |
+
+<PlaybookGraph />
 
 SSH uses this machine's keys, agent (`SSH_AUTH_SOCK`) and `~/.ssh/config`, as you would from a terminal. Or leave the SSH to Claude: allow `Bash(ssh app-1:*)` on its step and say what to do in the step's words.
 

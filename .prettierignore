@@ -4,3 +4,6 @@ bun.lock
 coverage
 .angular
 .astro
+
+# skills copied verbatim from the 20baht repo
+.claude

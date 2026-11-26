@@ -4,6 +4,10 @@
       "type": "stdio",
       "command": "zg",
       "args": ["server", "--stdio"]
+    },
+    "20baht": {
+      "type": "http",
+      "url": "https://bahtui-mcp.20baht-bank.workers.dev/mcp"
     }
   }
 }

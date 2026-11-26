@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { banner, bannerText } from '../src/banner'
 import { launchdPlist, systemdUnit } from '../src/service'
 import { linkedIds, sniffImage } from '../src/services/attachments'
 import { staticRoutes } from '../src/static'
@@ -211,5 +212,20 @@ describe('static', () => {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('the CLI banner', () => {
+  test('shows for a person at a terminal, never into a pipe or a log', () => {
+    expect(banner('1.2.3', { isTTY: false })).toBe('')
+    expect(banner('1.2.3', { isTTY: true })).toContain('v1.2.3')
+  })
+
+  test('plain when colour is off', () => {
+    const text = bannerText('1.2.3', false)
+    expect(text).not.toContain('\u001B[')
+    expect(text).toContain('| $$$$$$/')
+    expect(bannerText('1.2.3', false, 80)).toContain('┴ ┴┴ ┴')
+    expect(text).toContain('* * * * *  board · cron · agents   v1.2.3')
   })
 })

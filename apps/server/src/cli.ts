@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { identityProof } from './auth'
+import { banner } from './banner'
 import { newToken, readSecrets, sameSecret, secretsPath } from './secrets'
 import { clientHost, DEFAULT_PORT, readLock, resolveDataDir, startServer } from './server'
 import { installService, uninstallService } from './service'
@@ -114,7 +115,10 @@ switch (command) {
       dataDir,
       worker: !values['no-worker'],
     }).catch((error: unknown) => die(error instanceof Error ? error.message : String(error)))
-    console.log(`kammacron ${await version()} on ${handle.url} (data: ${dataDir})`)
+    const v = await version()
+    const top = banner(v)
+    if (top) console.log(top)
+    console.log(`kammacron ${v} on ${handle.url} (data: ${dataDir})`)
     const stop = () => {
       // exit however stopping ends, and within 10 s even if something hangs
       setTimeout(() => process.exit(1), 10_000).unref()
@@ -231,6 +235,9 @@ switch (command) {
   case 'version':
     console.log(await version())
     break
-  default:
+  default: {
+    const top = banner(await version())
+    if (top) console.log(top)
     console.log(HELP)
+  }
 }

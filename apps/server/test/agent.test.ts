@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 
 import { schedules } from '../src/db/schema'
+import { claudeAgents, codexModels, parseAgent } from '../src/services/agents'
 import { getCard, type Card } from '../src/services/cards'
 import { cronTimes, nextCron, nextScheduleRun, parseCron } from '../src/services/cron'
 import { getRunWithEvents, listRuns } from '../src/services/runs'
@@ -14,6 +15,89 @@ import { createScheduler } from '../src/worker/scheduler'
 import { must, testApp, type TestApp } from './helpers'
 
 const FAKE_CODEX = join(import.meta.dir, 'fixtures', 'fake-codex.ts')
+const FAKE_CLAUDE = join(import.meta.dir, 'fixtures', 'fake-claude.ts')
+
+/** A Claude Code agent file, as `.claude/agents/<name>.md` holds one. */
+const agentFile = (name: string, extra = '') =>
+  `---\nname: ${name}\ndescription: Reviews the code ${name}\n${extra}---\nYou review code.\n`
+
+describe('Claude Code agents and the models on offer', () => {
+  let home: string
+  let project: string
+  const saved = { claude: process.env['CLAUDE_CONFIG_DIR'], codex: process.env['CODEX_HOME'] }
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'kammacron-home-'))
+    project = await mkdtemp(join(tmpdir(), 'kammacron-proj-'))
+    process.env['CLAUDE_CONFIG_DIR'] = join(home, 'claude')
+    process.env['CODEX_HOME'] = join(home, 'codex')
+  })
+  afterEach(async () => {
+    if (saved.claude === undefined) delete process.env['CLAUDE_CONFIG_DIR']
+    else process.env['CLAUDE_CONFIG_DIR'] = saved.claude
+    if (saved.codex === undefined) delete process.env['CODEX_HOME']
+    else process.env['CODEX_HOME'] = saved.codex
+    await rm(home, { recursive: true, force: true })
+    await rm(project, { recursive: true, force: true })
+  })
+
+  test('reads an agent file: its name, words, model and tools', () => {
+    const agent = parseAgent(agentFile('rev', 'model: haiku\ntools: Read, Grep\n'), 'project')
+    expect(agent).toMatchObject({ name: 'rev', model: 'haiku', tools: ['Read', 'Grep'] })
+    expect(agent?.prompt).toBe('You review code.')
+    expect(parseAgent(agentFile('x', 'model: inherit\n'), 'user')?.model).toBeNull()
+    expect(parseAgent('no front matter', 'user')).toBeNull()
+  })
+
+  test("the project's agents, the person's, and those of the plugins they turned on", async () => {
+    await Bun.write(join(project, '.claude', 'agents', 'rev.md'), agentFile('rev'))
+    await Bun.write(join(home, 'claude', 'agents', 'rev.md'), agentFile('rev', 'model: opus\n'))
+    await Bun.write(join(home, 'claude', 'agents', 'mine.md'), agentFile('mine'))
+    const plugin = join(home, 'claude', 'plugins', 'cache', 'tidy')
+    await Bun.write(join(plugin, 'agents', 'sweep.md'), agentFile('sweep'))
+    await Bun.write(
+      join(home, 'claude', 'plugins', 'cache', 'off', 'agents', 'no.md'),
+      agentFile('no'),
+    )
+    await Bun.write(
+      join(home, 'claude', 'plugins', 'installed_plugins.json'),
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          'tidy@market': [{ scope: 'user', installPath: plugin }],
+          'off@market': [
+            { scope: 'user', installPath: join(home, 'claude', 'plugins', 'cache', 'off') },
+          ],
+        },
+      }),
+    )
+    await Bun.write(
+      join(home, 'claude', 'settings.json'),
+      JSON.stringify({ enabledPlugins: { 'tidy@market': true, 'off@market': false } }),
+    )
+    const agents = await claudeAgents(project)
+    expect(agents.map((a) => `${a.source}:${a.name}`)).toEqual([
+      'project:rev', // the project's wins over the person's of the same name
+      'user:mine',
+      'plugin:tidy:sweep',
+    ])
+  })
+
+  test("Codex's models from its cache, hidden ones left out; none without one", async () => {
+    expect(await codexModels()).toEqual([])
+    await Bun.write(
+      join(home, 'codex', 'models_cache.json'),
+      JSON.stringify({
+        models: [
+          { slug: 'b', display_name: 'B', description: 'second', priority: 2, visibility: 'list' },
+          { slug: 'h', display_name: 'H', priority: 0, visibility: 'hide' },
+          { slug: 'a', display_name: 'A', description: 'first', priority: 1, visibility: 'list' },
+        ],
+      }),
+    )
+    expect((await codexModels()).map((m) => m.id)).toEqual(['a', 'b'])
+  })
+})
 
 describe('cron expressions', () => {
   const at = (s: string) => new Date(s)
@@ -243,5 +327,62 @@ describe('agent schedules', () => {
     expect((await post({ command: 'true', cron: '61 * * * *' })).status).toBe(422)
     expect((await post({ command: 'true', cron: '0 0 31 2 *' })).status).toBe(422)
     expect((await post({ agent: 'claude', prompt: 'p', cron: '0 9 * * 1-5' })).status).toBe(200)
+  })
+
+  test('the options: the CLIs this machine has, the agents, and the models', async () => {
+    await Bun.write(join(dir, '.claude', 'agents', 'rev.md'), agentFile('rev'))
+    type Options = {
+      claude: { agents: { name: string; source: string }[]; models: { id: string }[] } | null
+      codex: { models: unknown[] } | null
+    }
+    const options = () => t.json<Options>('GET', `/api/projects/${String(projectId)}/agents`)
+    t.ctx.worker.claudeBin = FAKE_CLAUDE
+    const both = await options()
+    expect(both.claude?.agents.map((a) => `${a.source}:${a.name}`)).toContain('project:rev')
+    expect(both.claude?.models.map((m) => m.id)).toEqual(['fable', 'opus', 'sonnet', 'haiku'])
+    expect(both.codex).not.toBeNull()
+    // a CLI this machine has not: no options for it at all
+    t.ctx.worker.claudeBin = join(dir, 'no-claude-here')
+    t.ctx.worker.codexBin = 'kammacron-no-such-codex'
+    expect(await options()).toEqual({ claude: null, codex: null })
+  })
+
+  test("a Claude cron job runs as the project's agent, which keeps the board's tools", async () => {
+    t.ctx.worker.claudeBin = FAKE_CLAUDE
+    await Bun.write(
+      join(dir, '.claude', 'agents', 'rev.md'),
+      agentFile('rev', 'model: haiku\ntools: Read\n'),
+    )
+    const post = (body: Record<string, unknown>) =>
+      t.call('POST', `/api/projects/${String(projectId)}/schedules`, {
+        name: 'review',
+        agent: 'claude',
+        prompt: 'Review the last commit.',
+        cron: '0 * * * *',
+        ...body,
+      })
+    // an agent the project has not, or one for Codex, is refused
+    expect((await post({ claude_agent: 'nobody' })).status).toBe(422)
+    expect((await post({ agent: 'codex', claude_agent: 'rev' })).status).toBe(422)
+    expect((await post({ claude_agent: 'rev' })).status).toBe(200)
+
+    await fire('args')
+    const [run] = await listRuns(t.ctx.db, { project_id: projectId })
+    const said = JSON.parse(must(run).summary ?? '{}') as {
+      agent: string
+      agents: Record<string, { prompt: string; tools: string[]; model: string }>
+      model: string
+    }
+    expect(said.agent).toBe('rev')
+    expect(said.model).toBe('haiku') // the agent's own, as the schedule names none
+    expect(said.agents['rev']?.prompt).toBe('You review code.')
+    expect(said.agents['rev']?.tools).toEqual(['Read', 'mcp__kammacron'])
+
+    // the agent's file gone: the run fails and says why
+    await rm(join(dir, '.claude'), { recursive: true })
+    await fire('args')
+    const [failed] = await listRuns(t.ctx.db, { project_id: projectId })
+    expect(must(failed).status).toBe('failed')
+    expect(must(failed).error).toContain('no Claude Code agent "rev"')
   })
 })

@@ -134,4 +134,16 @@ switch (scenario) {
     await Bun.sleep(60_000)
     result()
     break
+  case 'args': {
+    // says how it was started: the agent it runs as, that agent's definition, and the model
+    const after = (flag: string) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : null)
+    result({
+      result: JSON.stringify({
+        agent: after('--agent'),
+        agents: JSON.parse(after('--agents') ?? 'null') as unknown,
+        model: after('--model'),
+      }),
+    })
+    break
+  }
 }

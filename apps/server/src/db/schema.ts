@@ -310,6 +310,11 @@ export const schedules = pgTable('schedules', {
   use_board: boolean('use_board').notNull().default(true),
   /** An agent's model; null: the agent's own default. */
   model: text('model'),
+  /**
+   * A Claude Code agent (`--agent`) Claude runs as: a name from the project's `.claude/agents`,
+   * the person's, or a plugin's (`<plugin>:<name>`); null: Claude itself.
+   */
+  claude_agent: text('claude_agent'),
   /** When it runs: a 5-field cron expression (local time), or null for every `interval_minutes`. */
   cron: text('cron'),
   interval_minutes: integer('interval_minutes').notNull().default(1440),

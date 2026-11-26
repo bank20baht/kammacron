@@ -5,6 +5,7 @@ import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
 import { AGENTS, cards, projects, RUN_STATUSES, runs, schedules } from '../db/schema'
+import { CLAUDE_MODELS, claudeAgents, codexModels, hasCli } from '../services/agents'
 import { listAlerts, markAlertsRead } from '../services/alerts'
 import { listCronJobs, runsBetween } from '../services/calendar'
 import { getCard, moveCard, updateCard } from '../services/cards'
@@ -25,14 +26,16 @@ type ScheduleShape = {
   playbook?: string | null | undefined
   agent?: string | null | undefined
   prompt?: string | null | undefined
+  claude_agent?: string | null | undefined
   cron?: string | null | undefined
 }
 
 /**
  * A schedule runs exactly one of a command, a playbook of its project or an agent (with a
- * prompt); its cron expression, when it has one, must name a time that comes.
+ * prompt), Claude perhaps as one of the project's Claude Code agents; its cron expression, when it
+ * has one, must name a time that comes.
  */
-const checkSchedule = (project: Project, s: ScheduleShape) => {
+const checkSchedule = async (project: Project, s: ScheduleShape) => {
   if ([s.command, s.playbook, s.agent].filter(Boolean).length !== 1)
     throw invalid(
       'BAD_SCHEDULE',
@@ -42,6 +45,13 @@ const checkSchedule = (project: Project, s: ScheduleShape) => {
     throw invalid('BAD_SCHEDULE', `${project.name} has no playbook "${s.playbook}"`)
   if (s.agent && !s.prompt?.trim())
     throw invalid('BAD_SCHEDULE', 'an agent schedule needs a prompt')
+  if (s.claude_agent) {
+    if (s.agent !== 'claude')
+      throw invalid('BAD_SCHEDULE', 'only a Claude cron job runs as a Claude Code agent')
+    const agents = await claudeAgents(project.repo_path)
+    if (!agents.some((a) => a.name === s.claude_agent))
+      throw invalid('BAD_SCHEDULE', `${project.name} has no Claude Code agent "${s.claude_agent}"`)
+  }
   if (s.cron && nextCron(s.cron) === null)
     throw invalid('BAD_CRON', `"${s.cron}" never comes (no such day)`)
 }
@@ -61,6 +71,14 @@ const scheduleFields = {
     description: "The agent's prompt comes with the open auto-pilot cards and how to take one",
   }),
   model: t.Nullable(t.String({ description: "The agent's model; empty: its default" })),
+  claude_agent: t.Nullable(
+    t.String({
+      minLength: 1,
+      maxLength: 200,
+      description:
+        'Claude runs as this Claude Code agent (list_agent_options); null: Claude itself',
+    }),
+  ),
   cron: t.Nullable(
     t.String({
       minLength: 1,
@@ -346,6 +364,40 @@ export const runRoutes = (ctx: AppContext) =>
       },
     )
     .get(
+      '/projects/:id/agents',
+      async ({ params }) => {
+        const project = await getProject(ctx.db, Number(params.id))
+        const path = (await childEnv(ctx.worker))['PATH'] ?? ''
+        const claude = hasCli(ctx.worker.claudeBin, path)
+        const codex = hasCli(ctx.worker.codexBin, path)
+        return {
+          claude: claude
+            ? {
+                agents: (await claudeAgents(project.repo_path)).map(
+                  ({ name, description, source, model, tools }) => ({
+                    name,
+                    description,
+                    source,
+                    model,
+                    tools,
+                  }),
+                ),
+                models: CLAUDE_MODELS,
+              }
+            : null,
+          codex: codex ? { models: await codexModels() } : null,
+        }
+      },
+      {
+        params: Id,
+        detail: {
+          operationId: 'list_agent_options',
+          summary:
+            "What a project's cron job can run: Claude and Codex when this machine has them (null when not), Claude Code agents the project can call on, and each one's models",
+        },
+      },
+    )
+    .get(
       '/projects/:id/schedules',
       ({ params }) =>
         ctx.db
@@ -364,7 +416,7 @@ export const runRoutes = (ctx: AppContext) =>
     .post(
       '/projects/:id/schedules',
       async ({ params, body }) => {
-        checkSchedule(await getProject(ctx.db, Number(params.id)), body)
+        await checkSchedule(await getProject(ctx.db, Number(params.id)), body)
         const [row] = await ctx.db
           .insert(schedules)
           // a failure's card is for a person unless the schedule says who else takes it
@@ -397,7 +449,7 @@ export const runRoutes = (ctx: AppContext) =>
           .from(schedules)
           .where(eq(schedules.id, Number(params.id)))
         if (!current) throw notFound('schedule', params.id)
-        checkSchedule(await getProject(ctx.db, current.project_id), { ...current, ...body })
+        await checkSchedule(await getProject(ctx.db, current.project_id), { ...current, ...body })
         const [row] = await ctx.db
           .update(schedules)
           .set({ ...body, ...('cron' in body ? firstRun(body) : {}) })

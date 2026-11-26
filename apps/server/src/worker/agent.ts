@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import type { schedules } from '../db/schema'
 import { newToken } from '../secrets'
+import { claudeAgents, type ClaudeAgent } from '../services/agents'
 import { addAlert } from '../services/alerts'
 import { autopilotCards } from '../services/cards'
 import type { Project } from '../services/projects'
@@ -30,7 +31,43 @@ export type AgentOutcome = { run: Run | null; result: string }
 /** What a spawn needs beyond the agent's own arguments. */
 type Common = Omit<AgentSpawn, 'bin' | 'args'>
 
-/** `claude -p` with the schedule's prompt, the worker's tool allowlist and the board's MCP. */
+/**
+ * The schedule's Claude Code agent, read by kammacron itself: Claude runs without the project's
+ * settings (`--setting-sources user`) and would not find a project's agent. Null when the schedule
+ * names none; it throws when the agent is gone, and the run fails saying so.
+ */
+const scheduleAgent = async (schedule: Schedule, dir: string) => {
+  if (!schedule.claude_agent) return null
+  const agent = (await claudeAgents(dir)).find((a) => a.name === schedule.claude_agent)
+  if (!agent) throw new Error(`no Claude Code agent "${schedule.claude_agent}" any more`)
+  return agent
+}
+
+/**
+ * An agent as `--agents` takes it. One that names its tools gets the board's MCP (and the
+ * approved servers') too, or it could not reach the board.
+ */
+const agentsJson = (agent: ClaudeAgent, servers: readonly string[], model: string | null) => {
+  const tools = agent.tools && [
+    ...agent.tools,
+    'mcp__kammacron',
+    ...servers.map((name) => `mcp__${name}`),
+  ]
+  return JSON.stringify({
+    [agent.name]: {
+      description: agent.description || agent.name,
+      prompt: agent.prompt,
+      ...(tools ? { tools } : {}),
+      ...(model ? { model } : {}),
+    },
+  })
+}
+
+/**
+ * `claude -p` with the schedule's prompt, the worker's tool allowlist and the board's MCP; as the
+ * schedule's Claude Code agent when it names one. The model is the schedule's, else the agent's,
+ * else the project's.
+ */
 const claudeSpawn = async (
   env: WorkerEnv,
   project: Project,
@@ -47,7 +84,8 @@ const claudeSpawn = async (
     mcp.servers,
     env.dataDir,
   )
-  const model = schedule.model ?? project.model
+  const agent = await scheduleAgent(schedule, dir)
+  const model = schedule.model ?? agent?.model ?? project.model
   return spawnClaude({
     ...common,
     bin: env.claudeBin,
@@ -69,6 +107,7 @@ const claudeSpawn = async (
       'user',
       '--append-system-prompt',
       rules,
+      ...(agent ? ['--agents', agentsJson(agent, mcp.servers, model), '--agent', agent.name] : []),
       ...(model ? ['--model', model] : []),
     ],
   })

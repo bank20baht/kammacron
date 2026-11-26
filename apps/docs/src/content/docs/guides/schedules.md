@@ -51,6 +51,15 @@ A project's agent wins over one of yours with the same name. kammacron reads the
 
 **A playbook** of the project, such as a nightly backup or a weekly deploy. Each time, kammacron opens a card titled with the job's name and the time, tagged `playbook:<name>`, and the worker runs it right after (when the project's worker is on). While the last such card is still open (it failed and waits in Review, say), no new one is opened.
 
+### Usage limits
+
+At the top of the Cron jobs page, a card for each agent this machine has shows how much of its usage windows is spent, the mark where spending at an even pace would be by now, and when each window starts over:
+
+- **Claude**: the 5-hour and 7-day windows, as kammacron's last Claude run reported them (a cron job's or a card's). They are as fresh as that run; the card says which run and when.
+- **Codex**: its 7-day window and your plan, from Codex's own session files on this machine, so your own Codex sessions count too.
+
+Neither agent documents these numbers; when a new version writes them otherwise, the card says it has none rather than guess.
+
 ## The calendar
 
 ![The calendar's month: worker rounds, schedules and housekeeping ahead (dashed), runs behind (solid)](../../../assets/calendar.png)

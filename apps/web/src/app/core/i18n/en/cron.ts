@@ -12,4 +12,18 @@ export const cron = {
   noProject: 'No project yet',
   noProjectHelp: 'A cron job runs in a project’s directory. Add a project first.',
   addProject: 'Add a project',
+  limits: {
+    claude: 'Claude',
+    codex: 'Codex',
+    hours: '{n} hours',
+    days: '{n} days',
+    minutes: '{n} minutes',
+    resets: 'Starts over {when}',
+    asOfRun: 'as of run {run}, {when}',
+    asOf: 'as of {when}',
+    none: {
+      claude: 'No numbers yet: Claude reports them on its next run here.',
+      codex: 'No numbers yet: Codex keeps them once it has run on this machine.',
+    },
+  },
 } as const

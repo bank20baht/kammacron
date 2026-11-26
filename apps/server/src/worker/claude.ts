@@ -17,6 +17,8 @@ type StreamLine = {
   total_cost_usd?: number
   usage?: unknown
   permission_denials?: unknown[]
+  /** A `rate_limit_event`'s: the usage windows and how much of each is spent. */
+  rate_limit_info?: unknown
 }
 
 export type RunEvent = { type: RunEventType; summary: string; data: unknown }
@@ -33,6 +35,8 @@ export type ClaudeResult = {
   /** Why it did not end normally; null when it did. */
   errorKind: 'auth' | 'rate_limit' | 'max_turns' | 'stopped' | 'crash' | null
   error: string | null
+  /** The last `rate_limit_event`'s info: Claude's usage windows; null when none came. */
+  rateLimit: unknown
 }
 
 export const SUMMARY_MAX = 300
@@ -246,9 +250,12 @@ export const spawnJsonLines = <L, T>(
 export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {
   let last: StreamLine | null = null
   let sessionId: string | null = null
+  let rateLimit: unknown = null
   const errors: string[] = []
   return spawnJsonLines<StreamLine, ClaudeResult>(options, {
     onJson: (parsed) => {
+      if (parsed.type === 'rate_limit_event' && parsed.rate_limit_info)
+        rateLimit = parsed.rate_limit_info
       if (parsed.session_id) sessionId = parsed.session_id
       if (parsed.type === 'assistant' && parsed.error) errors.push(parsed.error)
       if (parsed.type === 'result') last = parsed
@@ -271,6 +278,7 @@ export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {
           errorKind === null
             ? null
             : clip(r?.result ?? (stderr.trim() || `claude exited with ${String(exitCode)}`), 2000),
+        rateLimit,
       }
     },
   })

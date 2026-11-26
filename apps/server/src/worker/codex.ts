@@ -146,6 +146,8 @@ export const spawnCodex = (options: AgentSpawn): AgentHandle<ClaudeResult> => {
           errorKind === null
             ? null
             : clip(message ?? `codex exited with ${String(exitCode)}`, 2000),
+        // Codex keeps its usage windows in its own session files (services/limits.ts)
+        rateLimit: null,
       }
     },
   })

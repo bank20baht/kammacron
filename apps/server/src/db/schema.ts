@@ -40,6 +40,11 @@ export const settings = pgTable('settings', {
    * /mcp (claude.ai and Claude Desktop connect through it) and its host is allowed. Read at start.
    */
   public_url: text('public_url'),
+  /**
+   * Claude's usage windows as its last run here reported them (`rate_limit_event`):
+   * `{ windows, run_id, at }`; null until a run reports them.
+   */
+  claude_limits: jsonb('claude_limits'),
   ...timestamps,
 })
 

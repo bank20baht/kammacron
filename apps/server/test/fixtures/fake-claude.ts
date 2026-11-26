@@ -19,6 +19,18 @@ const mcp = (
 const out = (line: unknown) => {
   console.log(JSON.stringify(line))
 }
+
+// as the real one does early on: how much of each usage window is spent
+out({
+  type: 'rate_limit_event',
+  rate_limit_info: {
+    status: 'allowed',
+    unifiedWindows: {
+      five_hour: { utilization: 0.28, resetsAt: 1795728600, status: 'allowed' },
+      seven_day: { utilization: 0.6, resetsAt: 1795928400, status: 'allowed' },
+    },
+  },
+})
 const sh = (cmd: string[]) => {
   const r = Bun.spawnSync(cmd, { stdout: 'pipe', stderr: 'pipe' })
   out({

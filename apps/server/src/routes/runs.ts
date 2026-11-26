@@ -7,6 +7,7 @@ import type { AppContext } from '../context'
 import { AGENTS, cards, projects, RUN_STATUSES, runs, schedules } from '../db/schema'
 import { CLAUDE_MODELS, claudeAgents, codexModels, hasCli } from '../services/agents'
 import { listAlerts, markAlertsRead } from '../services/alerts'
+import { claudeLimits, codexLimits } from '../services/limits'
 import { listCronJobs, runsBetween } from '../services/calendar'
 import { getCard, moveCard, updateCard } from '../services/cards'
 import { conflict, invalid, notFound } from '../services/errors'
@@ -314,6 +315,23 @@ export const runRoutes = (ctx: AppContext) =>
         detail: {
           operationId: 'get_status',
           summary: 'Paused or working, the run going, cards in review',
+        },
+      },
+    )
+    .get(
+      '/limits',
+      async () => {
+        const path = (await childEnv(ctx.worker))['PATH'] ?? ''
+        return {
+          claude: hasCli(ctx.worker.claudeBin, path) ? await claudeLimits(ctx.db) : null,
+          codex: hasCli(ctx.worker.codexBin, path) ? await codexLimits() : null,
+        }
+      },
+      {
+        detail: {
+          operationId: 'get_usage_limits',
+          summary:
+            "How much of Claude's and Codex's usage windows is spent (null for a CLI this machine has not): Claude's as kammacron's last Claude run reported them, Codex's from its session files",
         },
       },
     )

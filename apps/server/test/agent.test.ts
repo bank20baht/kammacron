@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm'
 
 import { schedules } from '../src/db/schema'
 import { claudeAgents, codexModels, parseAgent } from '../src/services/agents'
+import { claudeWindows, codexLimits } from '../src/services/limits'
 import { getCard, type Card } from '../src/services/cards'
 import { cronTimes, nextCron, nextScheduleRun, parseCron } from '../src/services/cron'
 import { getRunWithEvents, listRuns } from '../src/services/runs'
@@ -81,6 +82,49 @@ describe('Claude Code agents and the models on offer', () => {
       'user:mine',
       'plugin:tidy:sweep',
     ])
+  })
+
+  test("Codex's usage windows from its newest session file; none without one", async () => {
+    expect((await codexLimits()).windows).toEqual([])
+    const day = join(home, 'codex', 'sessions', '2026', '11', '26')
+    const line = (used: number) =>
+      JSON.stringify({
+        timestamp: '2026-11-26T04:54:10.805Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          rate_limits: {
+            primary: { used_percent: used, window_minutes: 10080, resets_at: 1796016399 },
+            secondary: null,
+            plan_type: 'plus',
+          },
+        },
+      })
+    await Bun.write(join(day, 'rollout-a.jsonl'), `${line(10)}\n{"type":"other"}\n${line(20)}\n`)
+    expect(await codexLimits()).toEqual({
+      windows: [
+        { key: 'primary', minutes: 10080, used: 0.2, resets_at: '2026-11-30T05:26:39.000Z' },
+      ],
+      plan: 'plus',
+      as_of: '2026-11-26T04:54:10.805Z',
+      run_id: null,
+    })
+  })
+
+  test("Claude's windows from its rate limit event; what it does not know is left out", () => {
+    expect(
+      claudeWindows({
+        unifiedWindows: {
+          five_hour: { utilization: 0.28, resetsAt: 1795728600 },
+          seven_day: { utilization: 0.6, resetsAt: 1795928400 },
+          someday: { utilization: 0.1 },
+        },
+      }).map((w) => [w.key, w.minutes, w.used]),
+    ).toEqual([
+      ['five_hour', 300, 0.28],
+      ['seven_day', 10080, 0.6],
+    ])
+    expect(claudeWindows(null)).toEqual([])
   })
 
   test("Codex's models from its cache, hidden ones left out; none without one", async () => {
@@ -377,6 +421,16 @@ describe('agent schedules', () => {
     expect(said.model).toBe('haiku') // the agent's own, as the schedule names none
     expect(said.agents['rev']?.prompt).toBe('You review code.')
     expect(said.agents['rev']?.tools).toEqual(['Read', 'mcp__kammacron'])
+
+    // the run told how much of Claude's usage is spent: the limits say so, from this run
+    const limits = await t.json<{
+      claude: { windows: { key: string; used: number }[]; run_id: number } | null
+    }>('GET', '/api/limits')
+    expect(limits.claude?.windows.map((w) => [w.key, w.used])).toEqual([
+      ['five_hour', 0.28],
+      ['seven_day', 0.6],
+    ])
+    expect(limits.claude?.run_id).toBe(must(run).id)
 
     // the agent's file gone: the run fails and says why
     await rm(join(dir, '.claude'), { recursive: true })

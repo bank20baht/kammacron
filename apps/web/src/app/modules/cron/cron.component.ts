@@ -8,6 +8,7 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { CronJobsComponent } from './cron-jobs.component'
+import { UsageLimitsComponent } from './limits.component'
 
 /**
  * Cron jobs, where they are looked for: a project picked with tabs (`?project=<slug>`, the first
@@ -15,7 +16,7 @@ import { CronJobsComponent } from './cron-jobs.component'
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, CronJobsComponent, IllustrationComponent],
+  imports: [BAHT_UI, CronJobsComponent, IllustrationComponent, UsageLimitsComponent],
   selector: 'web-cron',
   styles: `
     .projects {
@@ -28,6 +29,7 @@ import { CronJobsComponent } from './cron-jobs.component'
       <baht-page-header [heading]="t('cron.heading')" [description]="t('cron.description')">
         <app-illustration data-slot="art" art="clock" />
       </baht-page-header>
+      <web-usage-limits></web-usage-limits>
       @if (projects().data; as list) {
         @if (list.length === 0) {
           <baht-empty-state [message]="t('cron.noProject')" [hint]="t('cron.noProjectHelp')">

@@ -64,6 +64,13 @@
       "when": 1795717962767,
       "tag": "0008_schedule_claude_agent",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795719705646,
+      "tag": "0009_claude_limits",
+      "breakpoints": true
     }
   ]
 }

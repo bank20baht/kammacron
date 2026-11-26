@@ -27,6 +27,7 @@ import {
   updateRun,
   type Run,
 } from '../services/runs'
+import { recordClaudeLimits } from '../services/limits'
 import { getSettings } from '../services/settings'
 import { spawnClaude, type ClaudeResult } from './claude'
 import { childEnv, holdClaude, passedSecrets, type RunHandle, type WorkerEnv } from './env'
@@ -351,6 +352,9 @@ export const trackRun = async <T>(
   const entry: RunHandle = { stop: handle.stop, stoppedByUser: false }
   env.handles.set(runId, entry)
   const result = await handle.result.finally(() => env.handles.delete(runId))
+  // a Claude run says how much of its usage windows is spent: kept for the limits bar
+  const rateLimit = (result as { rateLimit?: unknown } | null)?.rateLimit
+  if (rateLimit) await recordClaudeLimits(env.db, runId, rateLimit)
   return { result, stoppedByUser: entry.stoppedByUser }
 }
 

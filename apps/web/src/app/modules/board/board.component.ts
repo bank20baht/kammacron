@@ -40,7 +40,7 @@ const ACCENT: Record<CardStatus, string> = {
 }
 const isStatus = (value: string): value is CardStatus => COLUMNS.some((c) => c === value)
 
-/** Four columns, live; drag a card (or Alt+arrows) to move it, open it in the drawer, add one in To do. */
+/** Four columns, live; drag a card (or Alt+arrows) to move it, open it in a modal, add one in To do. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

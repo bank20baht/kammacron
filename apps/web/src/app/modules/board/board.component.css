@@ -7,9 +7,6 @@
   flex: 1;
   min-width: 0;
 }
-.board-page {
-  max-width: none;
-}
 .meta,
 .badges,
 .banner,

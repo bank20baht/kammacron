@@ -70,13 +70,12 @@ html {
   text-transform: uppercase;
 }
 
-/* The width every routed page keeps to inside the shell. */
+/* Every routed page: the shell's full width, so nothing is left blank on the right. */
 .app-page {
   display: flex;
   flex-direction: column;
   gap: var(--baht-space-5);
   box-sizing: border-box;
-  max-width: 1200px;
   padding: var(--baht-space-5);
 }
 

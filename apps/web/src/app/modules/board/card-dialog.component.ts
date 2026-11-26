@@ -49,7 +49,7 @@ const menu = (t: Translate): MenuItem[] => [
 
 /**
  * One card, always editable: its fields (saved with Save), its review decision when it waits on
- * one, the last run, the files and the comments. In the board's drawer and the Review page.
+ * one, the last run, the files and the comments. In the board's modal and the Review page.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -166,7 +166,7 @@
     }
   </div>
 
-  <baht-panel
+  <baht-modal
     size="lg"
     [heading]="openCard() ? t('card.heading', { id: openCard() ?? '' }) : ''"
     [open]="openCard() !== null"
@@ -175,7 +175,7 @@
     @if (openCard(); as id) {
       <app-card-dialog [cardId]="id" (closed)="open(null)"></app-card-dialog>
     }
-  </baht-panel>
+  </baht-modal>
 </div>
 
 <baht-form-modal

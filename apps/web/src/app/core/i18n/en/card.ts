@@ -1,4 +1,4 @@
-/** One card (the board's drawer, the Review page): its review decision, last run and discussion. */
+/** One card (the board's modal, the Review page): its review decision, last run and discussion. */
 export const card = {
   heading: 'Card #{id}',
   human: 'Human',

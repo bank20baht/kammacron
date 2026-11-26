@@ -21,6 +21,11 @@ const project = (patch: Partial<Project> = {}) =>
 describe('toolLists', () => {
   test('git as the project decides (push included), what loses work denied, MCP and allowed_bash', () => {
     const { allowed, denied } = toolLists(project(), { kind: 'claude', name: 'Claude' }, ['zvec'])
+    expect(allowed).toContain('Edit(./**)')
+    expect(allowed).toContain('Grep(./**)')
+    for (const bare of ['Read', 'Edit', 'Write', 'Glob', 'Grep'])
+      expect(allowed).not.toContain(bare)
+    expect(denied).toContain('Bash(git rebase -fx*)')
     expect(allowed).toContain('Bash(git push:*)')
     expect(allowed).toContain('Bash(git worktree:*)')
     expect(allowed).toContain('mcp__kammacron')
@@ -146,7 +151,9 @@ describe('service files', () => {
     const unit = systemdUnit(spec)
     expect(unit).toContain('Environment="PATH=/opt/bun/bin:/usr/bin"')
     expect(unit).toContain('Restart=always')
-    expect(unit).toContain('ExecStart="/opt/bun/bin/bun" "/g/kammacron/cli.js" start --port 7420')
+    expect(unit).toContain(
+      'ExecStart="/opt/bun/bin/bun" --no-env-file --config=/dev/null "/g/kammacron/cli.js" start --port 7420',
+    )
   })
 })
 
@@ -158,9 +165,9 @@ describe('checkDir', () => {
       const plain = await checkDir(dir)
       expect(plain.ok).toBe(true)
       expect(plain.checks.find((c) => c.name === 'git')?.detail).toContain('not a git repository')
-      expect((await localGit(gitIn(dir, {}))).repo).toBe(false)
+      expect((await localGit(gitIn(dir))).repo).toBe(false)
       await exec(['git', 'init', '-q', '-b', 'main', dir], { cwd: dir })
-      expect(await localGit(gitIn(dir, {}))).toMatchObject({ repo: true, branch: 'main' })
+      expect(await localGit(gitIn(dir))).toMatchObject({ repo: true, branch: 'main' })
       await Bun.write(join(dir, 'CLAUDE.md'), '# rules\n')
       const repo = await checkDir(dir)
       expect(repo.checks.find((c) => c.name === 'git')?.detail).toContain('on main')

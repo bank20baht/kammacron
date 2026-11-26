@@ -3,7 +3,7 @@ import { mcpify, verifyWithOAuthProvider } from '@20baht/elysia-openapi-mcp'
 import { bindLive, livePlugin } from '@20baht/live/elysia'
 import { Elysia } from 'elysia'
 
-import { authGuard, isAuthenticated } from './auth'
+import { authGuard, isOwner, runScopeOf } from './auth'
 import type { AppContext } from './context'
 import { OAUTH_SCOPE } from './oauth'
 import { sameSecret } from './secrets'
@@ -29,14 +29,18 @@ To show an image (a screenshot of a bug), upload it with upload_image and put th
  */
 const mcpAuth = (ctx: AppContext) => {
   const oauth = ctx.oauth
-  if (!oauth) return { verify: (request: Request) => isAuthenticated(request, ctx.auth) }
+  if (!oauth)
+    return {
+      verify: (request: Request) =>
+        isOwner(request, ctx.auth) || runScopeOf(request, ctx.auth) !== undefined,
+    }
   const viaProvider = verifyWithOAuthProvider(oauth.provider, oauth.issuer)
   return {
     resource: oauth.resource,
     authorizationServers: [oauth.issuer],
     scopes: [OAUTH_SCOPE],
     verify: (token: string, context: { request: Request }) =>
-      sameSecret(token, ctx.auth.apiToken)
+      sameSecret(token, ctx.auth.apiToken) || ctx.auth.runOf(token) !== undefined
         ? {
             iss: oauth.issuer,
             aud: oauth.resource,
@@ -69,7 +73,8 @@ export const buildApp = (ctx: AppContext) => {
     .use(ctx.oauth?.plugin ?? new Elysia({ name: 'kammacron-no-oauth' }))
     .use(
       openapi({
-        path: '/api/docs',
+        // the spec only: the interactive page would run a CDN's script in the owner's origin
+        provider: null,
         specPath: '/openapi/json',
         documentation: { info: { title: 'kammacron', version: '0.0.0' } },
       }),
@@ -82,9 +87,9 @@ export const buildApp = (ctx: AppContext) => {
         headerParams: true, // so a tool call can send Idempotency-Key
         auth: mcpAuth(ctx),
         headers: (incoming) => {
-          // what reaches the route: the caller's credentials and the worker's run id
+          // what reaches the route: the caller's credentials (a worker's token names its run)
           const out = new Headers()
-          for (const name of ['authorization', 'cookie', 'x-kammacron-run', 'host']) {
+          for (const name of ['authorization', 'cookie', 'host']) {
             const value = incoming.get(name)
             if (value !== null) out.set(name, value)
           }

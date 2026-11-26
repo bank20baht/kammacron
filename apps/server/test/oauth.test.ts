@@ -8,7 +8,7 @@ const REDIRECT = 'https://claude.ai/api/mcp/auth_callback'
 
 let t: TestApp
 beforeEach(async () => {
-  t = await testApp({ publicUrl: PUBLIC, loopback: false })
+  t = await testApp({ publicUrl: PUBLIC })
 })
 afterEach(() => t.close())
 

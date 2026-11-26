@@ -7,6 +7,7 @@ export const exec = async (
   cmd: readonly string[],
   options: {
     cwd: string
+    /** The whole environment, not additions to ours; ours when omitted. */
     env?: Record<string, string | undefined>
     timeoutMs?: number
     input?: string
@@ -14,7 +15,7 @@ export const exec = async (
 ): Promise<Exec> => {
   const proc = Bun.spawn([...cmd], {
     cwd: options.cwd,
-    env: { ...process.env, ...options.env },
+    env: options.env ?? process.env,
     stdin: options.input === undefined ? 'ignore' : new TextEncoder().encode(options.input),
     stdout: 'pipe',
     stderr: 'pipe',
@@ -37,7 +38,7 @@ export const exec = async (
 export type Git = ReturnType<typeof gitIn>
 
 /** git in one directory, with the worker's PATH (hooks need it too). */
-export const gitIn = (cwd: string, env: Record<string, string | undefined> = {}) => {
+export const gitIn = (cwd: string, env: Record<string, string | undefined> = process.env) => {
   const run = (...args: string[]) =>
     exec(['git', ...args], { cwd, env: { GIT_TERMINAL_PROMPT: '0', ...env } })
   const out = async (...args: string[]) => {
@@ -56,7 +57,7 @@ export type DirCheck = {
 /** What Settings shows for a project's directory: is it there, and what kammacron finds in it. */
 export const checkDir = async (
   path: string,
-  env: Record<string, string | undefined> = {},
+  env: Record<string, string | undefined> = process.env,
 ): Promise<DirCheck> => {
   const checks: DirCheck['checks'] = []
   const isDir = (await exec(['test', '-d', path], { cwd: '/' })).code === 0
@@ -76,7 +77,7 @@ export const checkDir = async (
         ? `on ${local.branch}${local.dirty ? ', with uncommitted changes' : ''}`
         : 'a detached HEAD (fine: the playbook decides)',
   })
-  const rules = ['CLAUDE.md', '.claude-worker/prompt.md']
+  const rules = ['CLAUDE.md', '.claude/CLAUDE.md', '.claude-worker/prompt.md']
   const found: string[] = []
   for (const name of rules) if (await Bun.file(join(path, name)).exists()) found.push(name)
   checks.push({

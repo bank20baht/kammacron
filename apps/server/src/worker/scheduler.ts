@@ -13,6 +13,7 @@ import { addComment, createCards, moveCard, pickableCards } from '../services/ca
 import { getProject, type Project } from '../services/projects'
 import { markInterruptedRuns, pruneRunEvents } from '../services/runs'
 import { getSettings } from '../services/settings'
+import { redact } from './redact'
 import { childEnv, type WorkerEnv } from './env'
 import { exec } from './git'
 import { runCard } from './runner'
@@ -37,6 +38,8 @@ export const createScheduler = (env: WorkerEnv) => {
   let timer: ReturnType<typeof setInterval> | undefined
   let lastTick: Date | null = null
   let ticking = false
+  /** Shutting down: nothing new starts. */
+  let stopping = false
 
   /** Cards in `doing` whose run is gone: back to todo, and to review the second time. */
   const sweepStale = async (projectId: number) => {
@@ -83,7 +86,7 @@ export const createScheduler = (env: WorkerEnv) => {
   const runCards = async (project: Project) => {
     let done = 0
     for (; done < project.max_cards_per_run; done++) {
-      if ((await getSettings(env.db)).paused) break
+      if (stopping || (await getSettings(env.db)).paused) break
       const fresh = await getProject(env.db, project.id)
       if (!runnable(fresh)) break
       const [card] = await pickableCards(env.db, project.id, 1)
@@ -91,6 +94,8 @@ export const createScheduler = (env: WorkerEnv) => {
       const outcome = await runCard(env, fresh, card.id)
       const kind = outcome.errorKind
       if (kind === 'auth' || kind === 'rate_limit') return null
+      // Stop put the card back in todo: going on would pick it up again at once
+      if (kind === 'stopped') return { done: done + 1, skipped: null }
       if (outcome.skipped && outcome.skipped !== 'claimed by someone else')
         return { done, skipped: outcome.skipped }
     }
@@ -145,6 +150,7 @@ export const createScheduler = (env: WorkerEnv) => {
       )
     if (due.length === 0 || !project.repo_path) return
     for (const schedule of due) {
+      if (stopping) return
       const cardId = schedule.playbook
         ? await playbookCard(project, schedule)
         : await commandSchedule(project, schedule, project.repo_path)
@@ -198,13 +204,17 @@ export const createScheduler = (env: WorkerEnv) => {
       .set({ last_exit_code: r.code })
       .where(eq(schedules.id, schedule.id))
     if (r.code === 0) return schedule.last_card_id
-    const output = `${r.stdout}\n${r.stderr}`.trim().slice(-3000)
-    const body = `\`${schedule.command ?? ''}\` failed with exit ${String(r.code)}.\n\n\`\`\`\n${output}\n\`\`\``
+    const secrets = [env.apiToken(), env.claudeToken() ?? ''].filter(Boolean)
+    const output = redact(`${r.stdout}\n${r.stderr}`, secrets).trim().slice(-3000)
+    const failed = `\`${schedule.command ?? ''}\` failed with exit ${String(r.code)}.`
+    // Output is whatever a test, a package or a remote host printed. It goes in a comment, which
+    // the worker reads as data, never in the body, which it reads as the task.
+    const printed = `\`\`\`\n${output}\n\`\`\``
     const open = await openCard(schedule.last_card_id)
     if (open) {
       await addComment(env.db, open.id, {
         author: 'claude-worker',
-        body: `Still failing (${new Date().toISOString().slice(0, 16)}).\n\n${body}`,
+        body: `Still failing (${new Date().toISOString().slice(0, 16)}). ${failed}\n\n${printed}`,
       })
       return open.id
     }
@@ -212,17 +222,18 @@ export const createScheduler = (env: WorkerEnv) => {
       {
         project_id: project.id,
         title: `${schedule.name} fails`,
-        body: `Autonomy: claude - opened by the schedule "${schedule.name}"; make it pass again.\n\n${body}`,
+        body: `Autonomy: claude - opened by the schedule "${schedule.name}"; make it pass again.\n\n${failed} What it printed is in the comments.`,
         tags: schedule.card_tags,
       },
     ])
+    if (created) await addComment(env.db, created.id, { author: 'claude-worker', body: printed })
     return created?.id ?? null
   }
 
   const pump = () => {
     void (async () => {
       const settings = await getSettings(env.db)
-      while (queue.length > 0 && active.size < Math.max(1, settings.concurrency)) {
+      while (!stopping && queue.length > 0 && active.size < Math.max(1, settings.concurrency)) {
         const index = queue.findIndex((id) => !active.has(id))
         if (index < 0) return
         const [projectId] = queue.splice(index, 1)
@@ -288,6 +299,7 @@ export const createScheduler = (env: WorkerEnv) => {
   return {
     /** On boot: runs that died with the last process go stale and their cards back to todo. */
     start: async () => {
+      stopping = false
       for (const gone of await markInterruptedRuns(env.db)) {
         const [card] = await env.db.select().from(cards).where(eq(cards.id, gone.card_id))
         if (card?.status === 'doing' && card.claimed_by_run === gone.id)
@@ -302,6 +314,7 @@ export const createScheduler = (env: WorkerEnv) => {
       void housekeeping().catch(() => undefined)
     },
     stop: async () => {
+      stopping = true
       if (timer) clearInterval(timer)
       if (housekeepingTimer) clearInterval(housekeepingTimer)
       queue.length = 0

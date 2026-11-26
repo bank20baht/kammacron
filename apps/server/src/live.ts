@@ -1,7 +1,7 @@
 import { createLive } from '@20baht/live'
 import { pgSource, type PgListener } from '@20baht/live/pg'
 
-import { isAuthenticated, type AuthState } from './auth'
+import { isOwner, type AuthState } from './auth'
 
 /** The one person of an install: a stream is theirs when it carries the token or the session. */
 export type Owner = { id: 'owner' }
@@ -13,10 +13,12 @@ export type Owner = { id: 'owner' }
 export const createLiveHub = (listener: PgListener, auth: AuthState) =>
   createLive<Owner>({
     source: pgSource(listener),
-    caller: async (headers) =>
-      (await isAuthenticated(new Request('http://localhost/', { headers }), auth))
-        ? { id: 'owner' as const }
-        : null,
+    caller: (headers) =>
+      Promise.resolve(
+        isOwner(new Request('http://localhost/', { headers }), auth)
+          ? { id: 'owner' as const }
+          : null,
+      ),
   })
 
 export type LiveHub = ReturnType<typeof createLiveHub>

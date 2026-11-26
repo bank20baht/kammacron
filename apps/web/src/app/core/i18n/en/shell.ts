@@ -46,7 +46,7 @@ export const notFound = {
 export const login = {
   heading: 'Open kammacron',
   subtitle: 'Enter the API token of the machine kammacron runs on.',
-  run: 'On that machine, run:',
+  run: 'On that machine, `kammacron open` signs you in. For the token, run:',
   copy: 'Copy command',
   wrong: 'That token is not this install’s.',
   open: 'Open',

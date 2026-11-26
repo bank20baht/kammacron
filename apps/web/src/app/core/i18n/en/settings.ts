@@ -61,6 +61,7 @@ export const settings = {
     tokenKept: 'Token kept',
     tokenCleared: 'Token cleared',
     claudeAnswered: 'Claude answered: {message}',
-    rotated: 'New token: update every `claude mcp add` that used the old one',
+    rotated:
+      'New token: update every `claude mcp add` that used the old one, and reconnect OAuth clients',
   },
 } as const

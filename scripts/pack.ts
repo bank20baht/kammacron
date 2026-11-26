@@ -58,5 +58,9 @@ await writeFile(join(out, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`)
 await cp(join(root, 'README.md'), join(out, 'README.md'))
 // the bin needs a shebang Bun reads
 const cli = await readFile(join(out, 'cli.js'), 'utf8')
-if (!cli.startsWith('#!')) await writeFile(join(out, 'cli.js'), `#!/usr/bin/env bun\n${cli}`)
+if (!cli.startsWith('#!'))
+  await writeFile(
+    join(out, 'cli.js'),
+    `#!/usr/bin/env -S bun --no-env-file --config=/dev/null\n${cli}`,
+  )
 console.log(`dist/package: kammacron ${version}`)

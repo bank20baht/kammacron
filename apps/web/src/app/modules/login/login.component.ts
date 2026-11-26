@@ -7,7 +7,7 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { SessionService } from '../../services/session.service'
 import { loginForm } from '../../shared/forms'
 
-/** From another machine (a tunnel): the API token, once, for the session cookie. */
+/** The API token, once, for the session cookie; or the code `kammacron open` put in the address. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BAHT_UI],
@@ -69,6 +69,17 @@ export class LoginComponent {
   protected readonly error = signal(false)
   protected readonly t = inject(I18n).t
   protected readonly form = computed(() => loginForm(this.t))
+
+  constructor() {
+    const code = new URLSearchParams(globalThis.location.hash.slice(1)).get('code')
+    if (code) void this.useCode(code)
+  }
+
+  /** The code works once; it leaves the address either way. */
+  private async useCode(code: string): Promise<void> {
+    globalThis.history.replaceState(null, '', globalThis.location.pathname)
+    if (await this.session.loginWithCode(code)) void this.router.navigateByUrl('/board')
+  }
 
   protected async submit(form: BahtForm): Promise<void> {
     const token = form.getData()['token']

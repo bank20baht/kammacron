@@ -45,29 +45,38 @@ describe('auth', () => {
     expect(csrf.status).toBe(403)
   })
 
-  test('a browser on this machine gets a session cookie that opens /api', async () => {
-    const session = await t.app.handle(new Request('http://localhost/api/session'))
+  test('being on this machine opens nothing: a session takes the token or a one-time code', async () => {
+    const bare = await t.app.handle(new Request('http://localhost/api/session'))
+    expect(bare.status).toBe(401)
+    expect(bare.headers.get('set-cookie')).toBeNull()
+
+    const { code } = await t.json<{ code: string }>('POST', '/api/session/code')
+    const open = () =>
+      t.app.handle(
+        new Request('http://localhost/api/session', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ code }),
+        }),
+      )
+    const session = await open()
     expect(session.status).toBe(200)
-    const cookie = must(must(session.headers.get('set-cookie')).split(';')[0])
     expect(session.headers.get('set-cookie')).toContain('HttpOnly')
-    const cards = await t.app.handle(
-      new Request('http://localhost/api/cards', { headers: { cookie } }),
-    )
-    expect(cards.status).toBe(200)
+    expect((await open()).status).toBe(401) // once only
+    const cookie = must(must(session.headers.get('set-cookie')).split(';')[0])
+    for (const path of ['/api/cards', '/api/session'])
+      expect(
+        (await t.app.handle(new Request(`http://localhost${path}`, { headers: { cookie } })))
+          .status,
+      ).toBe(200)
   })
 
-  test('through a tunnel (another host name) the cookie needs the token first', async () => {
-    t.ctx.auth.allowedHosts = ['board.example.net']
-    const viaTunnel = await t.app.handle(new Request('http://board.example.net/api/session'))
-    expect(viaTunnel.status).toBe(401)
-    const withToken = await t.app.handle(
-      new Request('http://board.example.net/api/session', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: t.ctx.auth.apiToken }),
-      }),
-    )
-    expect(withToken.status).toBe(200)
+  test('another port or a sandboxed frame cannot write with the cookie', async () => {
+    const post = (origin: string) =>
+      t.call('POST', '/api/token/rotate', undefined, { origin, host: 'localhost:7420' })
+    expect((await post('http://localhost:3000')).status).toBe(403)
+    expect((await post('null')).status).toBe(403)
+    expect((await post('http://localhost:7420')).status).toBe(200)
   })
 
   test('rotating the token stops the old one', async () => {

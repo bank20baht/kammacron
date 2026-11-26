@@ -4,9 +4,11 @@ import { isToolCall } from '@20baht/elysia-openapi-mcp'
 import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { Elysia, t } from 'elysia'
 
+import { runScopeOf, type AuthState } from '../auth'
 import type { AppContext } from '../context'
 import { idParams, oneOf } from './params'
 import { CARD_STATUSES, idempotencyKeys, type CommentAuthor } from '../db/schema'
+import { invalid } from '../services/errors'
 import {
   addComment,
   archiveCard,
@@ -36,12 +38,23 @@ const IdempotencyHeader = t.Object({
 })
 
 /** Who wrote this: a tool call of the worker's run, another MCP client, or the web app. */
-const authorOf = (request: Request): { author: CommentAuthor; run_id: number | null } => {
+const authorOf = (
+  request: Request,
+  auth: AuthState,
+): { author: CommentAuthor; run_id: number | null } => {
   if (!isToolCall(request)) return { author: 'user', run_id: null }
-  const run = Number(request.headers.get('x-kammacron-run'))
-  return Number.isInteger(run) && run > 0
-    ? { author: 'claude-worker', run_id: run }
-    : { author: 'mcp', run_id: null }
+  const run = runScopeOf(request, auth)
+  return run ? { author: 'claude-worker', run_id: run.runId } : { author: 'mcp', run_id: null }
+}
+
+/** A worker's run writes to the card it holds, and to no other card that exists. */
+const onlyItsCard = (request: Request, auth: AuthState, id: number) => {
+  const run = isToolCall(request) ? runScopeOf(request, auth) : undefined
+  if (run && run.cardId !== id)
+    throw invalid(
+      'NOT_YOUR_CARD',
+      `this run works on card #${String(run.cardId)} only, not #${String(id)}`,
+    )
 }
 
 const NewCard = t.Object({
@@ -65,143 +78,192 @@ const NewCard = t.Object({
   ),
 })
 
-export const cardRoutes = (ctx: AppContext) =>
-  new Elysia()
-    .use(
-      idempotency({
-        store: pgStore({ db: ctx.db, table: idempotencyKeys }),
-        // one person per install: the web app, the API token and MCP all act as the owner
-        scope: () => 'owner',
-      }),
-    )
-    .use(liveMacro(ctx.live))
-    .get('/cards', ({ query }) => listCards(ctx.db, query), {
-      query: t.Object({
-        project_id: t.Optional(
-          t.Numeric({ description: 'Only this project (list_projects for ids)' }),
-        ),
-        status: t.Optional(Status),
-        tag: t.Optional(t.String({ description: 'Only cards with this tag' })),
-        q: t.Optional(t.String({ description: 'Text in the title or body' })),
-        archived: t.Optional(t.BooleanString({ description: 'true: archived cards instead' })),
-      }),
-      live: liveRoute(ctx.live, {
-        topics: () => ['cards', 'card_waits_on', 'runs@status=running'],
-        key: 'id',
-      }),
-      detail: {
-        operationId: 'list_cards',
-        summary: 'Find cards by project, status, tag or text',
-        mcp: true,
-      },
-    })
-    .get('/cards/:id', ({ params }) => getCard(ctx.db, Number(params.id)), {
-      params: Id,
-      live: liveRoute(ctx.live, {
-        topics: ({ params }) => {
-          const id = params['id'] ?? ''
-          return [
-            `cards:${id}`,
-            `comments@card_id=${id}`,
-            `card_waits_on@card_id=${id}`,
-            `runs@card_id=${id}`,
-            `attachments@card_id=${id}`,
-            'cards', // the status of the cards it waits on
-          ]
-        },
-      }),
-      detail: {
-        operationId: 'get_card',
-        summary: 'A card with its comments, what it waits on, its last run and its attachments',
-        mcp: true,
-      },
-    })
-    .post('/cards/batch', ({ body }) => createCards(ctx.db, body.cards), {
-      body: t.Object({
-        cards: t.Array(NewCard, {
-          minItems: 1,
-          maxItems: 50,
-          description: 'The cards to create, 1 to 50',
+export const cardRoutes = (ctx: AppContext) => {
+  /**
+   * What a tool call may not do to a card, whoever makes it: end a review (the person's decision,
+   * so Claude cannot pass its own work) or take back a card a person holds.
+   */
+  const toolWrite = async (
+    request: Request,
+    id: number,
+    change: { leavesReview?: boolean; human?: boolean | undefined },
+  ) => {
+    if (!isToolCall(request)) return
+    onlyItsCard(request, ctx.auth, id)
+    const card = await getCard(ctx.db, id)
+    if (change.leavesReview && card.status === 'review')
+      throw invalid('REVIEW_IS_THE_PERSONS', `card #${String(id)} is in review; the owner decides`)
+    if (change.human === false && card.human)
+      throw invalid('HELD_BY_A_PERSON', `card #${String(id)} is a person's; only they hand it back`)
+  }
+
+  return (
+    new Elysia()
+      .use(
+        idempotency({
+          store: pgStore({ db: ctx.db, table: idempotencyKeys }),
+          // one person per install: the web app, the API token and MCP all act as the owner
+          scope: () => 'owner',
         }),
-      }),
-      headers: IdempotencyHeader,
-      idempotent: true,
-      detail: {
-        operationId: 'create_cards',
-        summary: 'Create one or more cards; cards of one batch can wait on each other by ref',
-        description: CARD_RULES,
-        mcp: true,
-      },
-    })
-    .patch('/cards/:id', ({ params, body }) => updateCard(ctx.db, Number(params.id), body), {
-      params: Id,
-      body: t.Object({
-        title: t.Optional(t.String({ minLength: 1, maxLength: 300, description: 'New title' })),
-        body: t.Optional(t.String({ description: 'New body, markdown; replaces the old one' })),
-        tags: t.Optional(t.Array(t.String(), { description: 'Replaces the whole list' })),
-        human: t.Optional(
-          t.Boolean({ description: 'A person takes this card; the worker never picks it' }),
-        ),
-        priority: t.Optional(t.Integer({ description: 'Higher is picked first' })),
-        waits_on: t.Optional(t.Array(t.Integer(), { description: 'Replaces the whole list' })),
-      }),
-      detail: {
-        operationId: 'update_card',
-        summary: 'Change a card: title, body, tags, human, priority, waits_on',
-        mcp: true,
-      },
-    })
-    .post('/cards/:id/move', ({ params, body }) => moveCard(ctx.db, Number(params.id), body), {
-      params: Id,
-      body: t.Object({
-        status: Status,
-        reason: t.Optional(
-          t.String({ description: 'Required for review: what the person deciding needs to know' }),
-        ),
-        position: t.Optional(
-          t.Number({ description: 'Place in the column; the end when omitted' }),
-        ),
-      }),
-      detail: {
-        operationId: 'move_card',
-        summary: 'Move a card to todo, doing, review or done',
-        mcp: true,
-      },
-    })
-    .post(
-      '/cards/:id/comments',
-      ({ params, body, request }) =>
-        addComment(ctx.db, Number(params.id), { ...authorOf(request), body: body.body }),
-      {
+      )
+      .use(liveMacro(ctx.live))
+      .get('/cards', ({ query }) => listCards(ctx.db, query), {
+        query: t.Object({
+          project_id: t.Optional(
+            t.Numeric({ description: 'Only this project (list_projects for ids)' }),
+          ),
+          status: t.Optional(Status),
+          tag: t.Optional(t.String({ description: 'Only cards with this tag' })),
+          q: t.Optional(t.String({ description: 'Text in the title or body' })),
+          archived: t.Optional(t.BooleanString({ description: 'true: archived cards instead' })),
+        }),
+        live: liveRoute(ctx.live, {
+          topics: () => ['cards', 'card_waits_on', 'runs@status=running'],
+          key: 'id',
+        }),
+        detail: {
+          operationId: 'list_cards',
+          summary: 'Find cards by project, status, tag or text',
+          mcp: true,
+        },
+      })
+      .get('/cards/:id', ({ params }) => getCard(ctx.db, Number(params.id)), {
         params: Id,
-        body: t.Object({ body: t.String({ minLength: 1, description: 'Markdown' }) }),
+        live: liveRoute(ctx.live, {
+          topics: ({ params }) => {
+            const id = params['id'] ?? ''
+            return [
+              `cards:${id}`,
+              `comments@card_id=${id}`,
+              `card_waits_on@card_id=${id}`,
+              `runs@card_id=${id}`,
+              `attachments@card_id=${id}`,
+              'cards', // the status of the cards it waits on
+            ]
+          },
+        }),
+        detail: {
+          operationId: 'get_card',
+          summary: 'A card with its comments, what it waits on, its last run and its attachments',
+          mcp: true,
+        },
+      })
+      .post('/cards/batch', ({ body }) => createCards(ctx.db, body.cards), {
+        body: t.Object({
+          cards: t.Array(NewCard, {
+            minItems: 1,
+            maxItems: 50,
+            description: 'The cards to create, 1 to 50',
+          }),
+        }),
         headers: IdempotencyHeader,
         idempotent: true,
-        detail: { operationId: 'add_comment', summary: 'Comment on a card', mcp: true },
-      },
-    )
-    .post('/cards/:id/archive', ({ params }) => archiveCard(ctx.db, Number(params.id)), {
-      params: Id,
-      detail: {
-        operationId: 'archive_card',
-        summary: 'Archive a card (there is no delete)',
-        mcp: true,
-      },
-    })
-    .post('/cards/:id/unarchive', ({ params }) => archiveCard(ctx.db, Number(params.id), false), {
-      params: Id,
-      detail: { operationId: 'unarchive_card', summary: 'Bring an archived card back' },
-    })
-    // Review decisions are the person's: never tools, so Claude cannot pass its own work.
-    .post(
-      '/cards/:id/send-back',
-      ({ params, body }) => sendBack(ctx.db, Number(params.id), body.comment),
-      {
-        params: Id,
-        body: t.Object({ comment: t.String({ minLength: 1 }) }),
         detail: {
-          operationId: 'send_back_card',
-          summary: 'Return a review card to todo with a comment',
+          operationId: 'create_cards',
+          summary: 'Create one or more cards; cards of one batch can wait on each other by ref',
+          description: CARD_RULES,
+          mcp: true,
         },
-      },
-    )
+      })
+      .patch(
+        '/cards/:id',
+        async ({ params, body, request }) => {
+          await toolWrite(request, Number(params.id), { human: body.human })
+          return updateCard(ctx.db, Number(params.id), body)
+        },
+        {
+          params: Id,
+          body: t.Object({
+            title: t.Optional(t.String({ minLength: 1, maxLength: 300, description: 'New title' })),
+            body: t.Optional(t.String({ description: 'New body, markdown; replaces the old one' })),
+            tags: t.Optional(t.Array(t.String(), { description: 'Replaces the whole list' })),
+            human: t.Optional(
+              t.Boolean({ description: 'A person takes this card; the worker never picks it' }),
+            ),
+            priority: t.Optional(t.Integer({ description: 'Higher is picked first' })),
+            waits_on: t.Optional(t.Array(t.Integer(), { description: 'Replaces the whole list' })),
+          }),
+          detail: {
+            operationId: 'update_card',
+            summary: 'Change a card: title, body, tags, human, priority, waits_on',
+            mcp: true,
+          },
+        },
+      )
+      .post(
+        '/cards/:id/move',
+        async ({ params, body, request }) => {
+          await toolWrite(request, Number(params.id), { leavesReview: true })
+          return moveCard(ctx.db, Number(params.id), body)
+        },
+        {
+          params: Id,
+          body: t.Object({
+            status: Status,
+            reason: t.Optional(
+              t.String({
+                description: 'Required for review: what the person deciding needs to know',
+              }),
+            ),
+            position: t.Optional(
+              t.Number({ description: 'Place in the column; the end when omitted' }),
+            ),
+          }),
+          detail: {
+            operationId: 'move_card',
+            summary: 'Move a card to todo, doing, review or done',
+            mcp: true,
+          },
+        },
+      )
+      .post(
+        '/cards/:id/comments',
+        ({ params, body, request }) => {
+          onlyItsCard(request, ctx.auth, Number(params.id))
+          return addComment(ctx.db, Number(params.id), {
+            ...authorOf(request, ctx.auth),
+            body: body.body,
+          })
+        },
+        {
+          params: Id,
+          body: t.Object({ body: t.String({ minLength: 1, description: 'Markdown' }) }),
+          headers: IdempotencyHeader,
+          idempotent: true,
+          detail: { operationId: 'add_comment', summary: 'Comment on a card', mcp: true },
+        },
+      )
+      .post(
+        '/cards/:id/archive',
+        async ({ params, request }) => {
+          await toolWrite(request, Number(params.id), { leavesReview: true })
+          return archiveCard(ctx.db, Number(params.id))
+        },
+        {
+          params: Id,
+          detail: {
+            operationId: 'archive_card',
+            summary: 'Archive a card (there is no delete)',
+            mcp: true,
+          },
+        },
+      )
+      .post('/cards/:id/unarchive', ({ params }) => archiveCard(ctx.db, Number(params.id), false), {
+        params: Id,
+        detail: { operationId: 'unarchive_card', summary: 'Bring an archived card back' },
+      })
+      // Review decisions are the person's: never tools, so Claude cannot pass its own work.
+      .post(
+        '/cards/:id/send-back',
+        ({ params, body }) => sendBack(ctx.db, Number(params.id), body.comment),
+        {
+          params: Id,
+          body: t.Object({ comment: t.String({ minLength: 1 }) }),
+          detail: {
+            operationId: 'send_back_card',
+            summary: 'Return a review card to todo with a comment',
+          },
+        },
+      )
+  )
+}

@@ -11,7 +11,7 @@ kammacron needs [Bun](https://bun.sh) 1.3 or later, `git`, and [Claude Code](htt
 bunx kammacron start
 ```
 
-It serves the web app on [http://127.0.0.1:7420](http://127.0.0.1:7420) and keeps its data in `~/.kammacron`. Stop it with Ctrl+C.
+`kammacron open` signs your browser in. It serves the web app on [http://127.0.0.1:7420](http://127.0.0.1:7420) and keeps its data in `~/.kammacron`. Stop it with Ctrl+C.
 
 ## Keep it running
 

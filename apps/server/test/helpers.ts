@@ -27,7 +27,6 @@ export type TestApp = {
 
 export const testApp = async (
   options: {
-    loopback?: boolean
     claudeBin?: string
     serverUrl?: () => string
     publicUrl?: string
@@ -43,7 +42,6 @@ export const testApp = async (
     dataDir,
     worker: false,
     serverUrl: () => options.serverUrl?.() ?? 'http://127.0.0.1:0',
-    isLoopback: () => options.loopback ?? true,
     claudeBin: options.claudeBin,
     notify: () => Promise.resolve(),
     publicUrl: options.publicUrl,

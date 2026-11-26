@@ -136,7 +136,8 @@ kammacron คือตัวที่ปล่อยรันข้ามคื�
 
 - ตอนเริ่มครั้งแรกระบบสร้าง `api_token` (32 byte แบบสุ่ม) เก็บไว้ใน DB
 - `/api` และ `/mcp` ต้องมี `Authorization: Bearer <token>` ตรวจแบบ constant-time
-- หน้าเว็บได้ session cookie (HttpOnly, SameSite=Strict) ตอนเปิดจาก loopback ถ้าเข้ามาจาก host อื่น (ผ่าน tunnel) ต้องใส่ token ครั้งแรกก่อน
+- หน้าเว็บได้ session cookie (HttpOnly, SameSite=Strict) ด้วย token หรือรหัสใช้ครั้งเดียวจาก `kammacron open` เท่านั้น การเปิดจาก loopback อย่างเดียวไม่พอ
+- OAuth token และ token ของแต่ละ run ใช้ได้กับ MCP tool เท่านั้น และ run แก้ได้เฉพาะการ์ดของตัวเอง
 - ทุก request ตรวจ `Host` และ `Origin` กับ allowlist (ค่าเริ่มต้นคือ `localhost`/`127.0.0.1` เพิ่ม host ของ tunnel ได้ใน Settings) เพื่อกัน DNS rebinding และ CSRF
 - หน้า Settings มีปุ่ม rotate token และคำสั่ง `claude mcp add --transport http kammacron http://127.0.0.1:7420/mcp --header "Authorization: Bearer …"` ที่ copy ได้ทันที
 

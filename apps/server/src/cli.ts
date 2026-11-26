@@ -1,10 +1,13 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S bun --no-env-file --config=/dev/null
+// the flags keep the current folder's .env and bunfig.toml out: they could run code as the owner
 import { realpathSync } from 'node:fs'
+import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 
-import { readSecrets, secretsPath } from './secrets'
-import { DEFAULT_PORT, readLock, resolveDataDir, startServer } from './server'
+import { identityProof } from './auth'
+import { newToken, readSecrets, sameSecret, secretsPath } from './secrets'
+import { clientHost, DEFAULT_PORT, readLock, resolveDataDir, startServer } from './server'
 import { installService, uninstallService } from './service'
 import { exec } from './worker/git'
 
@@ -13,7 +16,7 @@ const HELP = `kammacron: Kanban + MCP + a Claude worker, on this machine
 Usage: kammacron <command> [options]
 
   start               run in the foreground (--port ${String(DEFAULT_PORT)}, --host 127.0.0.1, --data-dir ~/.kammacron, --no-worker)
-  open                open the web app in the browser
+  open                open the web app in the browser, signed in
   status              is it running, on which port, paused or not, the run going
   pause | resume      stop or restart the worker everywhere (emergency stop)
   token               the \`claude mcp add\` command, with the token
@@ -51,12 +54,29 @@ const running = async () => {
     )
   const secrets = await readSecrets(secretsPath(dataDir))
   if (!secrets) return die(`no ${secretsPath(dataDir)}`)
-  const host = lock.host === '0.0.0.0' ? '127.0.0.1' : lock.host
-  return { url: `http://${host}:${String(lock.port)}`, token: secrets.api_token, lock }
+  const url = `http://${clientHost(lock.host)}:${String(lock.port)}`
+  return { url, token: secrets.api_token, lock }
+}
+
+/**
+ * A lock left by a dead server may point at a port someone else now holds: the listener must prove
+ * it knows the token before it is sent one.
+ */
+const verified = async () => {
+  const target = await running()
+  const nonce = newToken()
+  const proof = await fetch(`${target.url}/api/identity?nonce=${nonce}`)
+    .then(async (r) => ((await r.json()) as { proof?: string }).proof)
+    .catch(() => undefined)
+  if (!proof || !sameSecret(proof, identityProof(target.token, nonce)))
+    die(
+      `what answers at ${target.url} is not this kammacron; the token was not sent. Is it running?`,
+    )
+  return target
 }
 
 const api = async (method: string, path: string, body?: unknown) => {
-  const { url, token } = await running()
+  const { url, token } = await verified()
   const response = await fetch(`${url}${path}`, {
     method,
     headers: {
@@ -106,14 +126,25 @@ switch (command) {
   }
   case 'open': {
     const { url } = await running()
+    const { code } = (await api('POST', '/api/session/code')) as { code: string }
+    // through a private file, not the opener's arguments, which other accounts can list
+    const file = join(dataDir, 'open.html')
+    const target = JSON.stringify(`${url}/login#code=${code}`)
+    await writeFile(
+      file,
+      `<!doctype html><title>kammacron</title><script>location.replace(${target})</script>\n`,
+      { mode: 0o600 },
+    )
     const opener =
       process.platform === 'darwin'
         ? 'open'
         : process.platform === 'win32'
           ? 'explorer'
           : 'xdg-open'
-    await exec([opener, url], { cwd: '/' })
-    console.log(url)
+    await exec([opener, file], { cwd: '/' })
+    console.log(`${url} (not signed in? run \`kammacron token\` and paste the token)`)
+    await Bun.sleep(5000) // the browser reads the file in its own time
+    await rm(file, { force: true })
     break
   }
   case 'status': {

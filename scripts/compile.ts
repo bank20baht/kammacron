@@ -44,7 +44,7 @@ const assets: [string, string][] = [
   ...(await walk(web)).map((f): [string, string] => [`web/${relative(web, f)}`, f]),
 ]
 const lines = [
-  "import { mkdir, writeFile } from 'node:fs/promises'",
+  "import { chmod, mkdir, writeFile } from 'node:fs/promises'",
   "import { homedir } from 'node:os'",
   "import { dirname, join } from 'node:path'",
   `import pgliteWasm from ${JSON.stringify(join(pglite, 'pglite.wasm'))} with { type: 'file' }`,
@@ -58,6 +58,9 @@ const lines = [
   'const flag = Bun.argv.indexOf("--data-dir")',
   "const dataDir = (flag > 0 ? Bun.argv[flag + 1] : undefined) ?? process.env['KAMMACRON_DATA_DIR'] ?? join(homedir(), '.kammacron')",
   `const app = join(dataDir, 'app', ${JSON.stringify(version)})`,
+  // the data dir holds secrets and the database: closed before anything is put in it
+  'await mkdir(dataDir, { recursive: true, mode: 0o700 })',
+  'await chmod(dataDir, 0o700)',
   "if (!(await Bun.file(join(app, 'ok')).exists())) {",
   '  for (const [name, file] of ASSETS) {',
   '    await mkdir(dirname(join(app, name)), { recursive: true })',
@@ -87,6 +90,9 @@ await run(
     join(work, 'entry.ts'),
     '--compile',
     '--minify',
+    // never the current folder's .env or bunfig.toml: they could run code as the owner
+    '--no-compile-autoload-dotenv',
+    '--no-compile-autoload-bunfig',
     ...(target ? ['--target', target] : []),
     '--outfile',
     outfile,

@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { exec } from './worker/git'
 
 const LABEL = 'dev.kammacron.server'
+/** `bun <entry>` skips the shebang, so its flags are given here too. */
+const BUN_FLAGS = ['--no-env-file', '--config=/dev/null']
 const UNIT = 'kammacron.service'
 
 export type ServiceSpec = {
@@ -30,7 +32,7 @@ export const launchdPlist = (spec: ServiceSpec) => `<?xml version="1.0" encoding
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${xml(spec.bun)}</string>${spec.entry === null ? '' : `\n    <string>${xml(spec.entry)}</string>`}
+    <string>${xml(spec.bun)}</string>${spec.entry === null ? '' : [...BUN_FLAGS, spec.entry].map((a) => `\n    <string>${xml(a)}</string>`).join('')}
     <string>start</string>
     <string>--port</string><string>${String(spec.port)}</string>
     <string>--data-dir</string><string>${xml(spec.dataDir)}</string>
@@ -57,7 +59,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${systemdQuote(spec.bun)}${spec.entry === null ? '' : ` ${systemdQuote(spec.entry)}`} start --port ${String(spec.port)} --data-dir ${systemdQuote(spec.dataDir)}
+ExecStart=${systemdQuote(spec.bun)}${spec.entry === null ? '' : ` ${BUN_FLAGS.join(' ')} ${systemdQuote(spec.entry)}`} start --port ${String(spec.port)} --data-dir ${systemdQuote(spec.dataDir)}
 Environment=${systemdQuote(`PATH=${spec.path}`)}
 Restart=always
 RestartSec=10

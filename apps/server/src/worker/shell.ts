@@ -1,4 +1,4 @@
-import { redact } from './claude'
+import { createRedactor } from './redact'
 
 type ShellResult = {
   exitCode: number
@@ -56,11 +56,15 @@ export const spawnShell = (options: {
   let tail = ''
   const read = async (stream: ReadableStream<Uint8Array>) => {
     const decoder = new TextDecoder()
-    for await (const chunk of stream) {
-      const text = redact(decoder.decode(chunk, { stream: true }), options.secrets)
+    const redactor = createRedactor(options.secrets)
+    const keep = async (text: string) => {
+      if (!text) return
       tail = (tail + text).slice(-TAIL)
       await options.onChunk(text)
     }
+    for await (const chunk of stream)
+      await keep(redactor.push(decoder.decode(chunk, { stream: true })))
+    await keep(redactor.end())
   }
   const result = (async (): Promise<ShellResult> => {
     await Promise.all([read(proc.stdout), read(proc.stderr)])

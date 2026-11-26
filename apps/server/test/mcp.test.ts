@@ -68,12 +68,11 @@ describe('mcp', () => {
     expect(created.body.result?.isError).toBeFalsy()
     const [card] = JSON.parse(must(created.body.result?.content?.[0]).text) as { id: number }[]
 
+    t.ctx.worker.runTokens.set('token-of-run-seven', { runId: 7, cardId: must(card).id })
     await rpc(
       'tools/call',
       { name: 'add_comment', arguments: { id: String(must(card).id), body: 'done in abc123' } },
-      {
-        'x-kammacron-run': '7',
-      },
+      { authorization: 'Bearer token-of-run-seven' },
     )
     await rpc('tools/call', {
       name: 'add_comment',

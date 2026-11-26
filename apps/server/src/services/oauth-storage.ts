@@ -81,3 +81,23 @@ export const dbOAuthStorage = (db: Db): OAuthStorage => ({
 
 /** Expired keys go (housekeeping). */
 export const purgeOAuth = (db: Db) => db.delete(oauthKv).where(lt(oauthKv.expires_at, sql`now()`))
+
+type Grants = {
+  provider: {
+    listGrants: () => Promise<{ id: string; userId: string }[]>
+    revokeGrant: (grantId: string, userId: string) => Promise<void>
+  }
+}
+
+/**
+ * Ends every OAuth connection. With OAuth on, grant by grant (clients stay registered); with it
+ * off there is no provider to ask, and old grants must not come back when it is turned on again.
+ */
+export const disconnectOAuth = async (db: Db, oauth: Grants | null) => {
+  if (!oauth) {
+    await db.delete(oauthKv)
+    return
+  }
+  for (const grant of await oauth.provider.listGrants())
+    await oauth.provider.revokeGrant(grant.id, grant.userId)
+}

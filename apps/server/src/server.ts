@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -57,6 +57,16 @@ const isAlive = (pid: number) => {
   }
 }
 
+/**
+ * Where this machine's own clients reach a server bound to `host`: never an address it does not
+ * hold, or whoever does would be sent the token.
+ */
+export const clientHost = (host: string) => {
+  if (host === '0.0.0.0') return '127.0.0.1'
+  if (host === '::' || host === '::1' || host === '[::1]') return '[::1]'
+  return host.includes(':') && !host.startsWith('[') ? `[${host}]` : host
+}
+
 export const readLock = async (dataDir: string): Promise<ServerLock | null> => {
   try {
     const lock = JSON.parse(await readFile(lockPath(dataDir), 'utf8')) as ServerLock
@@ -77,6 +87,8 @@ export const startServer = async (options: ServerOptions = {}) => {
     options.port ?? Number(process.env['KAMMACRON_PORT'] ?? process.env['PORT'] ?? DEFAULT_PORT)
 
   await mkdir(dataDir, { recursive: true, mode: 0o700 })
+  // one made wider (an older compiled binary, by hand) is closed: PGlite's files rely on it
+  await chmod(dataDir, 0o700)
   // a process that was just told to stop may still be closing the database: give it a moment
   let held = await readLock(dataDir)
   for (let waited = 0; held && waited < 15_000; waited += 250) {
@@ -91,25 +103,22 @@ export const startServer = async (options: ServerOptions = {}) => {
   // DATABASE_URL: Postgres; otherwise PGlite in the data dir
   const url = options.databaseUrl ?? process.env['DATABASE_URL']
   const database = url ? await openPostgres(url) : await openDatabase(join(dataDir, 'db'))
-  // filled once listening: `isLoopback` asks the Bun server for the peer address
-  const listening: {
-    server?: { requestIP: (r: Request) => { address: string } | null }
-    port?: number
-  } = {}
+  const listening: { port?: number } = {} // filled once listening
   const ctx = await buildContext({
     database,
     dataDir,
     worker: options.worker,
     webDir: await findWebDir(options.webDir),
-    serverUrl: () => `http://127.0.0.1:${String(listening.port ?? port)}`,
-    isLoopback: (request) => {
-      const ip = listening.server?.requestIP(request)?.address
-      return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
-    },
+    serverUrl: () => `http://${clientHost(host)}:${String(listening.port ?? port)}`,
+    bindHost: new URL(`http://${clientHost(host)}`).hostname,
   })
 
-  const app = buildApp(ctx).listen({ hostname: host, port })
-  if (app.server) listening.server = app.server
+  // the largest honest request is a 10 MB image as base64; anyone can send a body
+  const app = buildApp(ctx).listen({
+    hostname: host,
+    port,
+    maxRequestBodySize: 20 * 1024 * 1024,
+  })
   const actualPort = app.server?.port ?? port
   listening.port = actualPort
   await ctx.scheduler?.start()
@@ -123,7 +132,7 @@ export const startServer = async (options: ServerOptions = {}) => {
 
   return {
     ctx,
-    url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${String(actualPort)}`,
+    url: `http://${clientHost(host)}:${String(actualPort)}`,
     /**
      * In order, each step guarded so one failing cannot keep the rest (and the lock) from going:
      * runs stop, then HTTP with its open live streams, then the hub, then the database.

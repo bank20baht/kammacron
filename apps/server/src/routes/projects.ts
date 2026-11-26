@@ -5,6 +5,7 @@ import type { AppContext } from '../context'
 import { idParams, oneOf } from './params'
 import { createProject, getProject, listProjects, updateProject } from '../services/projects'
 import { childEnv } from '../worker/env'
+import { approveMcpServers } from '../worker/mcp-approvals'
 import { gitIn, localGit } from '../worker/git'
 
 const Id = idParams()
@@ -69,46 +70,81 @@ const ProjectFields = {
   playbooks: t.Optional(Playbooks),
 }
 
-export const projectRoutes = (ctx: AppContext) =>
-  new Elysia()
-    .use(liveMacro(ctx.live))
-    .get('/projects', ({ query }) => listProjects(ctx.db, { archived: query.archived ?? false }), {
-      query: t.Object({
-        archived: t.Optional(t.BooleanString({ description: 'true: archived projects instead' })),
-      }),
-      live: liveRoute(ctx.live, { topics: () => ['projects'], key: 'id' }),
-      detail: { operationId: 'list_projects', summary: 'The projects cards belong to', mcp: true },
-    })
-    .get('/projects/:id', ({ params }) => getProject(ctx.db, Number(params.id)), {
-      params: Id,
-      detail: { operationId: 'get_project', summary: 'One project' },
-    })
-    .get(
-      '/projects/:id/git',
-      async ({ params }) => {
-        const project = await getProject(ctx.db, Number(params.id))
-        const none = { repo: false, branch: null, dirty: false, ahead: null, behind: null }
-        const local = project.repo_path
-          ? await localGit(gitIn(project.repo_path, await childEnv(ctx.worker)))
-          : none
-        return local
-      },
-      {
-        params: Id,
-        detail: {
-          operationId: 'project_git',
-          summary:
-            "The project directory's branch, uncommitted changes, and how far it is from origin",
+export const projectRoutes = (ctx: AppContext) => {
+  /** Saving the MCP server choice approves what those names mean now. */
+  const approved = async <T extends Parameters<typeof approveMcpServers>[1]>(
+    saved: Promise<T>,
+    chose: boolean,
+  ) => {
+    const project = await saved
+    if (chose) await approveMcpServers(ctx.worker.dataDir, project)
+    return project
+  }
+
+  return (
+    new Elysia()
+      .use(liveMacro(ctx.live))
+      .get(
+        '/projects',
+        ({ query }) => listProjects(ctx.db, { archived: query.archived ?? false }),
+        {
+          query: t.Object({
+            archived: t.Optional(
+              t.BooleanString({ description: 'true: archived projects instead' }),
+            ),
+          }),
+          live: liveRoute(ctx.live, { topics: () => ['projects'], key: 'id' }),
+          detail: {
+            operationId: 'list_projects',
+            summary: 'The projects cards belong to',
+            mcp: true,
+          },
         },
-      },
-    )
-    // Project settings steer the worker (its tools, its prompt): never tools.
-    .post('/projects', ({ body }) => createProject(ctx.db, body), {
-      body: t.Object({ slug: t.String(), ...ProjectFields }),
-      detail: { operationId: 'create_project', summary: 'Create a project' },
-    })
-    .patch('/projects/:id', ({ params, body }) => updateProject(ctx.db, Number(params.id), body), {
-      params: Id,
-      body: t.Partial(t.Object({ slug: t.String(), archived: t.Boolean(), ...ProjectFields })),
-      detail: { operationId: 'update_project', summary: 'Change a project' },
-    })
+      )
+      .get('/projects/:id', ({ params }) => getProject(ctx.db, Number(params.id)), {
+        params: Id,
+        detail: { operationId: 'get_project', summary: 'One project' },
+      })
+      .get(
+        '/projects/:id/git',
+        async ({ params }) => {
+          const project = await getProject(ctx.db, Number(params.id))
+          const none = { repo: false, branch: null, dirty: false, ahead: null, behind: null }
+          const local = project.repo_path
+            ? await localGit(gitIn(project.repo_path, await childEnv(ctx.worker)))
+            : none
+          return local
+        },
+        {
+          params: Id,
+          detail: {
+            operationId: 'project_git',
+            summary:
+              "The project directory's branch, uncommitted changes, and how far it is from origin",
+          },
+        },
+      )
+      // Project settings steer the worker (its tools, its prompt): never tools.
+      .post(
+        '/projects',
+        ({ body }) => approved(createProject(ctx.db, body), body.enabled_mcp_servers !== undefined),
+        {
+          body: t.Object({ slug: t.String(), ...ProjectFields }),
+          detail: { operationId: 'create_project', summary: 'Create a project' },
+        },
+      )
+      .patch(
+        '/projects/:id',
+        ({ params, body }) =>
+          approved(
+            updateProject(ctx.db, Number(params.id), body),
+            body.enabled_mcp_servers !== undefined,
+          ),
+        {
+          params: Id,
+          body: t.Partial(t.Object({ slug: t.String(), archived: t.Boolean(), ...ProjectFields })),
+          detail: { operationId: 'update_project', summary: 'Change a project' },
+        },
+      )
+  )
+}

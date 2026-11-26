@@ -17,8 +17,6 @@ export type AppContext = {
   webDir: string | null
   /** Where attachments are kept (`<data>/files`). */
   filesDir: string
-  /** Did this request reach the server from this machine? (Not knowable in `app.handle` tests.) */
-  isLoopback: (request: Request) => boolean
   worker: WorkerEnv
   /** OAuth for /mcp, when `settings.public_url` is set (read at start). */
   oauth: OAuth | null

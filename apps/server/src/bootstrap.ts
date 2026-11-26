@@ -2,7 +2,7 @@ import { join } from 'node:path'
 
 import type { AppContext } from './context'
 import type { Database } from './db'
-import { isAuthenticated, type AuthState } from './auth'
+import { isOwner, type AuthState, type RunScope } from './auth'
 import { createLiveHub } from './live'
 import { createOAuth } from './oauth'
 import { secretsPath } from './secrets'
@@ -14,7 +14,8 @@ import { createScheduler } from './worker/scheduler'
 export type ContextOptions = {
   database: Database
   dataDir: string
-  isLoopback: (request: Request) => boolean
+  /** The bound address, when it is not a local name. */
+  bindHost?: string | undefined
   /** Where the worker's MCP client reaches this server, known once it listens. */
   serverUrl: () => string
   claudeBin?: string | undefined
@@ -32,14 +33,18 @@ export const buildContext = async (options: ContextOptions): Promise<AppContext>
   const path = secretsPath(dataDir)
   const secrets = await ensureSecrets(database.db, path)
   const settings = await getSettings(database.db)
+  const runTokens = new Map<string, RunScope>()
   const auth: AuthState = {
     apiToken: secrets.api_token,
     sessionSecret: secrets.session_secret,
     allowedHosts: settings.allowed_hosts,
+    bindHost: options.bindHost,
+    runOf: (token) => runTokens.get(token),
+    loginCodes: new Map(),
   }
   const publicUrl = options.publicUrl ?? process.env['KAMMACRON_PUBLIC_URL'] ?? settings.public_url
   const oauth = publicUrl
-    ? createOAuth(database.db, publicUrl, (request) => isAuthenticated(request, auth))
+    ? createOAuth(database.db, publicUrl, (request) => isOwner(request, auth))
     : null
   if (oauth) {
     auth.publicHost = new URL(oauth.issuer).hostname
@@ -54,6 +59,7 @@ export const buildContext = async (options: ContextOptions): Promise<AppContext>
     claudeBin: options.claudeBin ?? process.env['KAMMACRON_CLAUDE_BIN'] ?? 'claude',
     notify: options.notify ?? notifier(database.db),
     handles: new Map(),
+    runTokens,
   }
   return {
     db: database.db,
@@ -63,7 +69,6 @@ export const buildContext = async (options: ContextOptions): Promise<AppContext>
     secretsPath: path,
     filesDir: join(dataDir, 'files'),
     webDir: options.webDir ?? null,
-    isLoopback: options.isLoopback,
     worker,
     scheduler: options.worker === false ? null : createScheduler(worker),
     oauth,

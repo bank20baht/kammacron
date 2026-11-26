@@ -16,3 +16,6 @@ docs/screenshots/
 
 # Astro's generated types (apps/docs)
 .astro
+
+# temporaries of `bun build --compile`
+*.bun-build

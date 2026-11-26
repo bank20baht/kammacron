@@ -13,6 +13,7 @@ import {
   type PlaybookStep,
   type RunStep,
 } from '../db/schema'
+import { newToken } from '../secrets'
 import { addAlert } from '../services/alerts'
 import { attachmentPath, cardAttachments } from '../services/attachments'
 import { addComment, claimCard, getCard, moveCard, type Card } from '../services/cards'
@@ -30,20 +31,26 @@ import {
 import { getSettings, updateSettings } from '../services/settings'
 import { spawnClaude, type ClaudeResult } from './claude'
 import { childEnv, type RunHandle, type WorkerEnv } from './env'
-import { taskPrompt, workerRules } from './prompt'
+import { approvedServers, type McpServer } from './mcp-approvals'
+import { indented, taskPrompt, workerRules } from './prompt'
 import { spawnShell } from './shell'
 
 /**
  * The tools of a Claude step. Exact for everything but git, where the project's own instructions
  * decide the workflow (branches, worktrees, pushes); what could lose work stays refused.
  */
-export const toolLists = (project: Project, step: ClaudeStep, mcpServers: readonly string[]) => {
+export const toolLists = (
+  project: Project,
+  step: ClaudeStep,
+  mcpServers: readonly string[],
+  dataDir?: string,
+) => {
   const allowed = [
-    'Read',
-    'Edit',
-    'Write',
-    'Glob',
-    'Grep',
+    // Reading the directory (and attachments) needs no rule; writing is for the directory only
+    // (`Edit` rules cover Write). Grep and Glob exist only when named, and bare they search anywhere.
+    'Edit(./**)',
+    'Glob(./**)',
+    'Grep(./**)',
     'mcp__kammacron',
     ...mcpServers.map((name) => `mcp__${name}`),
     ...[
@@ -97,38 +104,77 @@ export const toolLists = (project: Project, step: ClaudeStep, mcpServers: readon
     'Bash(git config:*)',
     'Bash(git remote:*)',
     'Bash(git -c:*)',
+    // the same, with the flag later in the line
+    'Bash(git push * --force*)',
+    'Bash(git push * -f*)',
+    'Bash(git push * --delete*)',
+    'Bash(git push * --mirror*)',
+    'Bash(git push * +*)',
+    'Bash(git * --no-verify*)',
+    'Bash(git commit * -n*)',
+    // git options that run any program
+    'Bash(git rebase * --exec*)',
+    'Bash(git rebase --exec*)',
+    'Bash(git rebase * -x*)',
+    'Bash(git rebase -x*)',
+    // short flags written together, and the long one abbreviated
+    'Bash(git rebase -fx*)',
+    'Bash(git rebase -ix*)',
+    'Bash(git rebase -qx*)',
+    'Bash(git rebase -vx*)',
+    'Bash(git rebase * --ex*)',
+    'Bash(git rebase --ex*)',
+    'Bash(git * --upload-pack*)',
+    'Bash(git * --receive-pack*)',
+    // what decides what a later run may do
+    'Edit(./.claude/**)',
+    'Edit(./.claude-worker/**)',
+    'Edit(./.mcp.json)',
+    'Edit(./.git/**)',
+    // the install's own secrets and database (`//` is an absolute path in a permission rule)
+    ...(dataDir
+      ? ['secrets.json', 'server.json', 'db/**', 'mcp/**', 'mcp-approved/**'].flatMap((name) => {
+          const path = `//${join(dataDir, name).replace(/^\/+/, '')}`
+          return [`Read(${path})`, `Edit(${path})`]
+        })
+      : []),
   ]
   return { allowed, denied }
 }
 
-type McpServer = Record<string, unknown>
+const mcpConfigPath = (env: WorkerEnv, project: Project) =>
+  join(env.dataDir, 'mcp', `${project.slug}.json`)
 
-/** kammacron (with this run's id) and the project's own servers that Settings turned on. */
-const writeMcpConfig = async (env: WorkerEnv, project: Project, dir: string, runId: number) => {
+/** kammacron (with this run's own token) and the project's servers that Settings turned on. */
+const writeMcpConfig = async (env: WorkerEnv, project: Project, dir: string, token: string) => {
+  const own = await approvedServers(env.dataDir, project, dir)
+  if (own.changed.length > 0)
+    await addAlert(env.db, {
+      level: 'warning',
+      project_id: project.id,
+      message: `${project.name}: .mcp.json changed what ${own.changed.join(', ')} runs; left out until you save the project's MCP servers again`,
+    })
   const servers: Record<string, McpServer> = {
     kammacron: {
       type: 'http',
       url: `${env.serverUrl()}/mcp`,
-      headers: { Authorization: `Bearer ${env.apiToken()}`, 'X-Kammacron-Run': String(runId) },
+      headers: { Authorization: `Bearer ${token}` },
     },
+    ...own.servers,
   }
-  const own: Record<string, McpServer> = await readFile(join(dir, '.mcp.json'), 'utf8')
-    .then(
-      (text) => (JSON.parse(text) as { mcpServers?: Record<string, McpServer> }).mcpServers ?? {},
-    )
-    .catch(() => ({}))
-  const enabled: string[] = []
-  for (const name of project.enabled_mcp_servers) {
-    const server = own[name]
-    if (name === 'kammacron' || !server) continue
-    servers[name] = server
-    enabled.push(name)
-  }
-  const path = join(env.dataDir, 'mcp', `${project.slug}.json`)
+  const path = mcpConfigPath(env, project)
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   await writeFile(path, JSON.stringify({ mcpServers: servers }, null, 2), { mode: 0o600 })
-  return { path, servers: enabled }
+  return { path, servers: Object.keys(own.servers) }
 }
+
+/** The token of a run that is going (never the owner's). */
+const runTokenOf = (env: WorkerEnv, runId: number) =>
+  [...env.runTokens].find(([, scope]) => scope.runId === runId)?.[0] ?? ''
+
+/** Every string a run's output must not carry. */
+const secretsOf = (env: WorkerEnv, runId: number) =>
+  [env.apiToken(), env.claudeToken() ?? '', runTokenOf(env, runId)].filter(Boolean)
 
 type Attachment = { filename: string; path: string }
 
@@ -157,7 +203,8 @@ const prepareRunDir = async (env: WorkerEnv, runId: number, cardId: number) => {
       '',
       full.body.trim(),
       ...full.comments.map(
-        (c) => `\n## ${c.author} (${new Date(c.created_at).toISOString()})\n\n${c.body.trim()}`,
+        (c) =>
+          `\n## ${c.author} (${new Date(c.created_at).toISOString()})\n\n    ${indented(c.body)}`,
       ),
       '',
     ].join('\n'),
@@ -295,11 +342,27 @@ const track = async <T>(ctx: Context, handle: { stop: () => void; result: Promis
   return { result, stoppedByUser: entry.stoppedByUser }
 }
 
+/** Where a project writes its instructions for Claude, in the order they are given. */
+const RULE_FILES = ['CLAUDE.md', '.claude/CLAUDE.md', '.claude-worker/prompt.md']
+
+/**
+ * The project's instructions. Claude Code would read CLAUDE.md itself, but only together with the
+ * directory's settings, which a run does not load; so kammacron hands the files over.
+ */
+const projectRules = async (dir: string) => {
+  const found: string[] = []
+  for (const name of RULE_FILES) {
+    const text = await readFile(join(dir, name), 'utf8').catch(() => '')
+    if (text.trim()) found.push(`### ${name}\n${text.trim()}`)
+  }
+  return found.length > 0 ? found.join('\n\n') : null
+}
+
 const claudeArgs = async (ctx: Context, step: ClaudeStep, index: number) => {
   const { env, project, card, dir, run } = ctx
-  const rules = await readFile(join(dir, '.claude-worker', 'prompt.md'), 'utf8').catch(() => null)
-  const mcp = await writeMcpConfig(env, project, dir, run.id)
-  const tools = toolLists(project, step, mcp.servers)
+  const rules = await projectRules(dir)
+  const mcp = await writeMcpConfig(env, project, dir, runTokenOf(env, run.id))
+  const tools = toolLists(project, step, mcp.servers, env.dataDir)
   const model = step.model ?? project.model
   return [
     '-p',
@@ -315,6 +378,9 @@ const claudeArgs = async (ctx: Context, step: ClaudeStep, index: number) => {
     '--mcp-config',
     mcp.path,
     '--strict-mcp-config',
+    // nothing from the directory's .claude/: its hooks and apiKeyHelper would run commands here
+    '--setting-sources',
+    'user',
     ...(ctx.runDir.attachments.length > 0
       ? [`--add-dir=${join(ctx.runDir.dir, 'attachments')}`]
       : []),
@@ -363,7 +429,7 @@ const claudeStep = async (ctx: Context, step: ClaudeStep, index: number): Promis
     cwd: ctx.dir,
     env: ctx.childEnvironment,
     prompt,
-    secrets: [env.apiToken(), env.claudeToken() ?? ''].filter(Boolean),
+    secrets: secretsOf(env, ctx.run.id),
     timeoutMs: ctx.staleMinutes * 60_000,
     onLine: (line) => appendFile(ctx.logFile, `${line}\n`),
     onEvent: async (event) => {
@@ -399,7 +465,7 @@ const runStep = async (ctx: Context, step: RunStep): Promise<StepEnd> => {
       KAMMACRON_PROJECT_DIR: ctx.dir,
     },
     timeoutMs: (step.timeout_minutes ?? 15) * 60_000,
-    secrets: [ctx.env.apiToken(), ctx.env.claudeToken() ?? ''].filter(Boolean),
+    secrets: secretsOf(ctx.env, ctx.run.id),
     onChunk: (text) =>
       appendFile(ctx.logFile, `${JSON.stringify({ type: 'step', name: step.name, text })}\n`),
   })
@@ -515,6 +581,8 @@ export const runCard = async (
   const chosen = playbookOf(project, card)
   if (!chosen) return { run: await noPlaybook(env, project, card, run) }
   const runDir = await prepareRunDir(env, run.id, card.id)
+  const token = newToken()
+  env.runTokens.set(token, { runId: run.id, cardId: card.id })
   try {
     return await play({
       env,
@@ -530,6 +598,8 @@ export const runCard = async (
       seq: { value: 0 },
     })
   } finally {
+    env.runTokens.delete(token)
+    await rm(mcpConfigPath(env, project), { force: true })
     await rm(runDir.dir, { recursive: true, force: true })
   }
 }

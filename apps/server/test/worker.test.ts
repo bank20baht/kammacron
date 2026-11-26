@@ -27,6 +27,7 @@ const git = async (cwd: string, ...args: string[]) => {
   const r = await exec(['git', ...args], {
     cwd,
     env: {
+      ...process.env,
       GIT_AUTHOR_NAME: 't',
       GIT_AUTHOR_EMAIL: 't@x',
       GIT_COMMITTER_NAME: 't',

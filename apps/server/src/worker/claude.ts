@@ -1,4 +1,5 @@
 import type { RunEventType } from '../db/schema'
+import { redact } from './redact'
 
 /** One line of `claude -p --output-format stream-json`, as far as the worker reads it. */
 type StreamLine = {
@@ -163,11 +164,7 @@ export type ClaudeSpawn = {
 
 export type ClaudeHandle = { result: Promise<ClaudeResult>; stop: () => void; pid: number }
 
-export const redact = (text: string, secrets: readonly string[]) =>
-  secrets.reduce(
-    (acc, secret) => (secret.length >= 8 ? acc.split(secret).join('[redacted]') : acc),
-    text,
-  )
+export { redact }
 
 /** Spawns `claude -p` with the prompt on stdin and reads its stream-json, line by line. */
 export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {

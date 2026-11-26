@@ -97,7 +97,7 @@ project's instructions' business. The board shows the directory's git branch, re
 
 ## Reaching it from elsewhere
 
-It binds `127.0.0.1`. Put a tunnel in front, add its host under Settings → allowed hosts, and the
+It binds `127.0.0.1`. `kammacron open` signs your browser in; being on the machine is not enough. Put a tunnel in front, add its host under Settings → allowed hosts, and the
 browser asks for the API token once. Set **Public URL** to the tunnel's `https://` address and
 restart: `/mcp` then speaks OAuth, so claude.ai and Claude Desktop can connect (dynamic
 registration; the consent page needs your session).

@@ -65,6 +65,9 @@ ${input.projectRules ? `\n## Project rules (${project.name})\n${input.projectRul
   }`
 }
 
+/** Further lines of someone's text, indented: none of them can pass for a line of ours. */
+export const indented = (text: string) => text.trim().replace(/\r\n|\r|\n/g, '\n    ')
+
 type CommentLike = { author: string; body: string; created_at: Date | string }
 type RunLike = {
   id: number
@@ -101,13 +104,13 @@ export const taskPrompt = (input: {
   if (input.comments.length > 0) {
     parts.push('', "## Comments (oldest first; the newest by `user` is the owner's latest word)")
     for (const c of input.comments)
-      parts.push(`- [${when(c.created_at)}] ${c.author}: ${c.body.trim()}`)
+      parts.push(`- [${when(c.created_at)}] ${c.author}: ${indented(c.body)}`)
   }
   if (input.previousRuns.length > 0) {
     parts.push('', '## Earlier runs on this card')
     for (const r of input.previousRuns)
       parts.push(
-        `- run ${String(r.id)} (${when(r.started_at)}), ${r.status}: ${(r.summary ?? r.error ?? '').trim().slice(0, 600) || '(no summary)'}`,
+        `- run ${String(r.id)} (${when(r.started_at)}), ${r.status}: ${indented((r.summary ?? r.error ?? '').trim().slice(0, 600)) || '(no summary)'}`,
       )
   }
   if (input.stepPrompt?.trim()) parts.push('', '## For this step', input.stepPrompt.trim())

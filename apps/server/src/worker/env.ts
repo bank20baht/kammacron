@@ -1,3 +1,4 @@
+import type { RunScope } from '../auth'
 import type { Db } from '../db'
 import { getSettings } from '../services/settings'
 
@@ -7,6 +8,8 @@ export type RunHandle = { stop: () => void; stoppedByUser: boolean }
 export type WorkerEnv = {
   db: Db
   dataDir: string
+  /** Tokens of the runs going now: each reaches the MCP tools, for its own card. */
+  runTokens: Map<string, RunScope>
   /** Where the worker's MCP client reaches this server. */
   serverUrl: () => string
   apiToken: () => string

@@ -56,6 +56,8 @@ kammacron install-service     # launchd (macOS) or systemd --user (Linux), with 
 kammacron open
 ```
 
+It installs as an app (a PWA) for the Dock or the taskbar: the install icon in Chrome or Edge's address bar, or Safari's _File → Add to Dock_.
+
 Or one file with nothing to install: `bun run compile` builds `dist/bin/kammacron-<os>-<arch>`.
 
 ## First steps

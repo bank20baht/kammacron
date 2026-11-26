@@ -24,4 +24,18 @@ export default defineConfig([
     ],
   }),
   ...bahtui({ files: WEB, tokenFiles: ['apps/web/src/styles.css'] }),
+  // the web app's service worker: plain JS served as is, with a worker's globals
+  {
+    files: ['apps/web/public/sw.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: {
+        self: 'readonly',
+        caches: 'readonly',
+        fetch: 'readonly',
+        Response: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
 ])

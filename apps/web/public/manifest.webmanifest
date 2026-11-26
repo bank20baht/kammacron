@@ -1,0 +1,26 @@
+{
+  "name": "kammacron",
+  "short_name": "kammacron",
+  "description": "A Kanban board and cron jobs that run Claude or Codex, on your own machine.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ebebe8",
+  "theme_color": "#ebebe8",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Board", "url": "/board" },
+    { "name": "Cron jobs", "url": "/cron" },
+    { "name": "Runs", "url": "/runs" }
+  ]
+}

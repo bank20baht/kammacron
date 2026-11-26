@@ -14,6 +14,7 @@ export const board = {
   nextCheckDue: '· Next check: due',
   branch: 'Branch: {branch}',
   detached: 'No branch (detached HEAD)',
+  moreTags: '+{count}',
   ahead: '{count} ahead of origin',
   behind: '{count} behind origin',
   dirty: 'Uncommitted changes',

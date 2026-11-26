@@ -31,6 +31,14 @@
 }
 .title {
   font-size: var(--baht-text-md);
+  /* a long word or URL breaks instead of running out of the tile; a long title stops at three
+     lines (the card's modal has it whole, and the tile's tooltip) */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 .reason,
 .muted {
@@ -40,4 +48,11 @@
 .reason {
   flex: 1;
   min-width: 8rem;
+  /* the worker's reason has no limit: three lines on the tile, all of it in the card */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }

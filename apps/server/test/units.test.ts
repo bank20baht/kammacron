@@ -8,7 +8,7 @@ import { linkedIds, sniffImage } from '../src/services/attachments'
 import { staticRoutes } from '../src/static'
 import type { Project } from '../src/services/projects'
 import { classify, eventsOf, redact } from '../src/worker/claude'
-import { checkDir, exec } from '../src/worker/git'
+import { checkDir, exec, gitIn, localGit } from '../src/worker/git'
 import { toolLists } from '../src/worker/runner'
 
 const project = (patch: Partial<Project> = {}) =>
@@ -158,7 +158,9 @@ describe('checkDir', () => {
       const plain = await checkDir(dir)
       expect(plain.ok).toBe(true)
       expect(plain.checks.find((c) => c.name === 'git')?.detail).toContain('not a git repository')
+      expect((await localGit(gitIn(dir, {}))).repo).toBe(false)
       await exec(['git', 'init', '-q', '-b', 'main', dir], { cwd: dir })
+      expect(await localGit(gitIn(dir, {}))).toMatchObject({ repo: true, branch: 'main' })
       await Bun.write(join(dir, 'CLAUDE.md'), '# rules\n')
       const repo = await checkDir(dir)
       expect(repo.checks.find((c) => c.name === 'git')?.detail).toContain('on main')

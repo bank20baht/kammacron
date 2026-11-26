@@ -464,9 +464,15 @@ describe('the scheduler', () => {
 
 describe('the board', () => {
   test('GET /projects/:id/git: the branch, uncommitted changes, ahead and behind', async () => {
-    type LocalGit = { branch: string; dirty: boolean; ahead: number; behind: number }
+    type LocalGit = {
+      repo: boolean
+      branch: string
+      dirty: boolean
+      ahead: number
+      behind: number
+    }
     const clean = await t.json<LocalGit>('GET', `/api/projects/${String(projectId)}/git`)
-    expect(clean).toEqual({ branch: 'main', dirty: false, ahead: 0, behind: 0 })
+    expect(clean).toEqual({ repo: true, branch: 'main', dirty: false, ahead: 0, behind: 0 })
     await Bun.write(join(repo, 'new.txt'), 'x\n')
     const dirty = await t.json<LocalGit>('GET', `/api/projects/${String(projectId)}/git`)
     expect(dirty.dirty).toBe(true)

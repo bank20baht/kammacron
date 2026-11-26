@@ -32,21 +32,24 @@
         }}</a>
       </div>
       @if (gitState.value(); as g) {
-        <div class="meta">
-          <baht-badge
-            tone="info"
-            [label]="g.branch ? t('board.branch', { branch: g.branch }) : t('board.detached')"
-          ></baht-badge>
-          @if (g.ahead) {
-            <span class="muted">{{ t('board.ahead', { count: g.ahead }) }}</span>
-          }
-          @if (g.behind) {
-            <span class="muted">{{ t('board.behind', { count: g.behind }) }}</span>
-          }
-          @if (g.dirty) {
-            <baht-badge tone="neutral" [label]="t('board.dirty')"></baht-badge>
-          }
-        </div>
+        <!-- a directory that is not a git repository has no branch to show: the playbook decides -->
+        @if (g.repo) {
+          <div class="meta">
+            <baht-badge
+              tone="info"
+              [label]="g.branch ? t('board.branch', { branch: g.branch }) : t('board.detached')"
+            ></baht-badge>
+            @if (g.ahead) {
+              <span class="muted">{{ t('board.ahead', { count: g.ahead }) }}</span>
+            }
+            @if (g.behind) {
+              <span class="muted">{{ t('board.behind', { count: g.behind }) }}</span>
+            }
+            @if (g.dirty) {
+              <baht-badge tone="neutral" [label]="t('board.dirty')"></baht-badge>
+            }
+          </div>
+        }
       }
       @if (p.paused_reason) {
         <baht-alert
@@ -120,7 +123,7 @@
                 ></baht-badge>
               }
             </div>
-            <div class="title">{{ card.title }}</div>
+            <div class="title" [attr.title]="card.title">{{ card.title }}</div>
             <div class="badges">
               @if (card.status === 'doing' && card.claimed_by_run) {
                 <baht-badge tone="info" busy [label]="t('board.claudeWorking')"></baht-badge>
@@ -130,15 +133,22 @@
               } @else if (card.tags.includes(claude)) {
                 <baht-badge tone="neutral" [label]="t('card.claude')"></baht-badge>
               }
-              @for (tag of card.tags; track tag) {
-                @if (tag !== claude) {
-                  <baht-badge tone="mono" [label]="tag"></baht-badge>
-                }
+              @for (tag of shownTags()(card.tags); track tag) {
+                <baht-badge tone="mono" [label]="tag"></baht-badge>
+              }
+              @if (hiddenTags()(card.tags); as hidden) {
+                <baht-badge
+                  tone="outline"
+                  [label]="t('board.moreTags', { count: hidden })"
+                  [attr.title]="otherTags()(card.tags).join(', ')"
+                ></baht-badge>
               }
             </div>
             @if (card.status === 'review') {
               <div class="review-row">
-                <span class="reason">{{ card.review_reason }}</span>
+                <span class="reason" [attr.title]="card.review_reason">{{
+                  card.review_reason
+                }}</span>
                 <baht-button
                   size="sm"
                   variant="primary"

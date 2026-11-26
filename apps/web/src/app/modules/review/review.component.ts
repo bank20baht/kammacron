@@ -20,13 +20,13 @@ import { CardDialogComponent } from '../board/card-dialog.component'
   styles: `
     .split {
       display: grid;
-      grid-template-columns: minmax(16rem, 22rem) 1fr;
+      grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
       gap: var(--baht-space-4);
       align-items: start;
     }
     @media (width < 900px) {
       .split {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
     }
     .queue {
@@ -68,6 +68,20 @@ import { CardDialogComponent } from '../board/card-dialog.component'
       border-color: var(--baht-color-accent);
       background: var(--baht-color-bg-sunken);
     }
+    .item {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    /* the queue is for choosing: three lines of the title and of the reason, the whole of both
+       in the card beside it */
+    .title,
+    .reason {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      overflow: hidden;
+    }
     .title {
       font-weight: var(--baht-font-weight-label);
     }
@@ -106,7 +120,7 @@ import { CardDialogComponent } from '../board/card-dialog.component'
                   <span class="muted"
                     >{{ projectName()(card.project_id) }} · {{ ago(card.updated_at) }}</span
                   >
-                  <span class="muted">{{ card.review_reason ?? t('card.noReason') }}</span>
+                  <span class="muted reason">{{ card.review_reason ?? t('card.noReason') }}</span>
                 </div>
               }
             </div>

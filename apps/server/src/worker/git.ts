@@ -70,9 +70,11 @@ export const checkDir = async (
   checks.push({
     name: 'git',
     ok: true,
-    detail: local.branch
-      ? `on ${local.branch}${local.dirty ? ', with uncommitted changes' : ''}`
-      : 'not a git repository, or a detached HEAD (fine: the playbook decides)',
+    detail: !local.repo
+      ? 'not a git repository (fine: the playbook decides)'
+      : local.branch
+        ? `on ${local.branch}${local.dirty ? ', with uncommitted changes' : ''}`
+        : 'a detached HEAD (fine: the playbook decides)',
   })
   const rules = ['CLAUDE.md', '.claude-worker/prompt.md']
   const found: string[] = []
@@ -87,6 +89,8 @@ export const checkDir = async (
 
 /** The project's directory as git sees it now, from local refs only (no fetch): for the board. */
 export type LocalGit = {
+  /** Whether the directory is in a git repository at all; a playbook may not need one. */
+  repo: boolean
   /** The checked-out branch; null on a detached HEAD or outside a repo. */
   branch: string | null
   /** Uncommitted changes, untracked files included (ignored ones not). */
@@ -98,14 +102,14 @@ export type LocalGit = {
 
 export const localGit = async (repo: Git): Promise<LocalGit> => {
   const head = await repo.run('branch', '--show-current')
-  if (head.code !== 0) return { branch: null, dirty: false, ahead: null, behind: null }
+  if (head.code !== 0) return { repo: false, branch: null, dirty: false, ahead: null, behind: null }
   const branch = head.stdout.trim() || null
   const status = await repo.run('status', '--porcelain')
   const dirty = status.code === 0 && status.stdout.trim() !== ''
-  if (!branch) return { branch, dirty, ahead: null, behind: null }
+  if (!branch) return { repo: true, branch, dirty, ahead: null, behind: null }
   const counts = await repo.run('rev-list', '--left-right', '--count', `HEAD...origin/${branch}`)
   const [ahead, behind] = counts.stdout.trim().split(/\s+/).map(Number)
   return counts.code === 0 && ahead !== undefined && behind !== undefined
-    ? { branch, dirty, ahead, behind }
-    : { branch, dirty, ahead: null, behind: null }
+    ? { repo: true, branch, dirty, ahead, behind }
+    : { repo: true, branch, dirty, ahead: null, behind: null }
 }

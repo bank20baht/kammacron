@@ -87,7 +87,7 @@ export const projectRoutes = (ctx: AppContext) =>
       '/projects/:id/git',
       async ({ params }) => {
         const project = await getProject(ctx.db, Number(params.id))
-        const none = { branch: null, dirty: false, ahead: null, behind: null }
+        const none = { repo: false, branch: null, dirty: false, ahead: null, behind: null }
         const local = project.repo_path
           ? await localGit(gitIn(project.repo_path, await childEnv(ctx.worker)))
           : none

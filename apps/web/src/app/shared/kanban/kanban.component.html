@@ -13,7 +13,8 @@
         <span>{{ column.label }}</span>
         <baht-badge tone="outline" [label]="'' + (lanes()[column.key]?.length ?? 0)"></baht-badge>
       </header>
-      @for (item of lanes()[column.key] ?? []; track item.id) {
+      @let lane = lanes()[column.key] ?? [];
+      @for (item of lane.slice(0, limit(column.key)); track item.id) {
         <article
           class="tile"
           draggable="true"
@@ -35,6 +36,11 @@
         </article>
       } @empty {
         <p class="empty">{{ emptyText() ?? t('kanban.empty') }}</p>
+      }
+      @if (lane.length > limit(column.key)) {
+        <baht-button size="sm" variant="ghost" (click)="showMore(column.key)">{{
+          t('kanban.more', { count: Math.min(lane.length - limit(column.key), 50) })
+        }}</baht-button>
       }
       @if (footer(); as f) {
         <ng-container *ngTemplateOutlet="f.template; context: { $implicit: column }" />

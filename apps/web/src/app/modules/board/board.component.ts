@@ -32,6 +32,8 @@ import { CardDialogComponent } from './card-dialog.component'
 
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
 const CLAUDE = 'claude'
+/** Tags a tile shows before the rest become "+N" (the card itself shows them all). */
+const TILE_TAGS = 4
 const ACCENT: Record<CardStatus, string> = {
   todo: 'var(--baht-color-border-strong)',
   doing: 'var(--baht-color-primary)',
@@ -86,6 +88,15 @@ export class BoardComponent {
   )
   protected readonly ago = ago
   protected readonly claude = CLAUDE
+  protected readonly otherTags = computed(
+    () => (tags: readonly string[]) => tags.filter((tag) => tag !== CLAUDE),
+  )
+  protected readonly shownTags = computed(
+    () => (tags: readonly string[]) => this.otherTags()(tags).slice(0, TILE_TAGS),
+  )
+  protected readonly hiddenTags = computed(
+    () => (tags: readonly string[]) => Math.max(0, this.otherTags()(tags).length - TILE_TAGS),
+  )
   protected readonly openCard = computed(() => {
     const id = Number(this.card())
     return Number.isInteger(id) && id > 0 ? id : null

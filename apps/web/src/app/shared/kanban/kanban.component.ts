@@ -15,6 +15,9 @@ import { BAHT_UI } from '@20baht/angular'
 
 import { I18n } from '../../core/i18n/i18n.service'
 
+/** Tiles a column draws before "Show N more": a column of 1,000 cards stays a page, not 88,000px. */
+const PAGE = 50
+
 /** One column of the board; `accent` colours its top edge (a CSS colour, a token). */
 export type KanbanColumn = { key: string; label: string; accent?: string }
 
@@ -68,6 +71,13 @@ export class KanbanComponent {
   protected readonly tile = contentChild(KanbanTileDirective)
   protected readonly footer = contentChild(KanbanFooterDirective)
   private dragged: number | null = null
+  /** How many tiles each column shows; a column not listed shows `PAGE`. */
+  private readonly shown = signal<Record<string, number>>({})
+  protected readonly Math = Math
+  protected readonly limit = (column: string) => this.shown()[column] ?? PAGE
+  protected showMore(column: string): void {
+    this.shown.update((s) => ({ ...s, [column]: this.limit(column) + PAGE }))
+  }
   /** The tile being dragged and the column under it, so both can show it while the drag lasts. */
   protected readonly dragging = signal<number | null>(null)
   protected readonly over = signal<string | null>(null)

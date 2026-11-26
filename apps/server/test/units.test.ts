@@ -5,6 +5,7 @@ import { join } from 'node:path'
 
 import { launchdPlist, systemdUnit } from '../src/service'
 import { linkedIds, sniffImage } from '../src/services/attachments'
+import { staticRoutes } from '../src/static'
 import type { Project } from '../src/services/projects'
 import { classify, eventsOf, redact } from '../src/worker/claude'
 import { checkDir, exec } from '../src/worker/git'
@@ -162,6 +163,23 @@ describe('checkDir', () => {
       const repo = await checkDir(dir)
       expect(repo.checks.find((c) => c.name === 'git')?.detail).toContain('on main')
       expect(repo.checks.find((c) => c.name === 'project instructions')?.detail).toBe('CLAUDE.md')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('static', () => {
+  test('a rebuilt, longer index.html is served whole while the server runs', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kc-web-'))
+    try {
+      await Bun.write(join(dir, 'index.html'), '<p>old</p>')
+      const app = staticRoutes(dir)
+      const get = async () => (await app.handle(new Request('http://x/board'))).text()
+      expect(await get()).toBe('<p>old</p>')
+      const longer = `<p>${'new '.repeat(50)}</p>`
+      await Bun.write(join(dir, 'index.html'), longer)
+      expect(await get()).toBe(longer)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

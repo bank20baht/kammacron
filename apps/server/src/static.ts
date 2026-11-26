@@ -12,7 +12,7 @@ export const staticRoutes = (webDir: string | null) => {
   const app = new Elysia({ name: 'kammacron-static' })
   if (!webDir) return app
   const root = resolve(webDir)
-  const index = Bun.file(join(root, 'index.html'))
+  const indexPath = join(root, 'index.html')
   return app.get(
     '/*',
     async ({ request }) => {
@@ -31,8 +31,11 @@ export const staticRoutes = (webDir: string | null) => {
             },
           })
       }
+      // a fresh handle each time: one kept from startup keeps the old size, and a rebuilt,
+      // longer index.html would be served cut short (a blank page)
+      const index = Bun.file(indexPath)
       if (!(await index.exists())) return new Response('web app not built', { status: 404 })
-      return new Response(index, {
+      return new Response(await index.arrayBuffer(), {
         headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
       })
     },

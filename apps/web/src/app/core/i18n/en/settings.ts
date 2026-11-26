@@ -11,7 +11,7 @@ export const settings = {
   },
   projects: {
     heading: 'Projects',
-    description: 'Each with a linked repo is worked by Claude',
+    description: 'Each with a directory is worked through its playbook',
     empty: 'No project yet',
     add: 'Add project',
     columns: { name: 'Name', slug: 'Slug', worker: 'Worker', checked: 'Last checked' },

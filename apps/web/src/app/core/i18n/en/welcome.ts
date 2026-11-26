@@ -1,13 +1,13 @@
 /** The first-start page: the setup steps, the tools, the Claude token, a project. */
 export const welcome = {
   heading: 'Welcome to kammacron',
-  description: 'Connect Claude and a repository to start.',
+  description: 'Connect Claude and a project directory to start.',
   progress: 'Setup progress',
   allSet: 'All set',
   left: { one: '{count} left', other: '{count} left' },
   ready: 'Ready.',
   step: { done: 'done', missing: 'missing', toDo: 'to do' },
-  steps: { tools: 'Tools', token: 'Claude token', repo: 'A project with its repo' },
+  steps: { tools: 'Tools', token: 'Claude token', repo: 'A project and its directory' },
   tools: { heading: 'Tools', subtitle: 'On the PATH the worker uses', notFound: 'not found' },
   token: {
     heading: 'Claude token',
@@ -21,7 +21,7 @@ export const welcome = {
   },
   project: {
     heading: 'Project',
-    subtitle: 'Settings → Projects: add one, set its repo path, turn the worker on',
+    subtitle: 'Settings → Projects: add one, set its directory, turn the worker on',
     linked: 'linked',
     noneYet: 'none yet',
     edit: 'Edit',

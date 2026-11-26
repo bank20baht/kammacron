@@ -202,7 +202,13 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
                   <baht-code variant="block" [code]="s.command"></baht-code>
                 }
                 @if (s.output) {
-                  <baht-code variant="block" [code]="s.output"></baht-code>
+                  <!-- the output's end matters most: 20 lines, kept at the end while it grows -->
+                  <baht-code
+                    variant="block"
+                    [code]="s.output"
+                    [maxLines]="20"
+                    [follow]="true"
+                  ></baht-code>
                 }
               </div>
             } @empty {

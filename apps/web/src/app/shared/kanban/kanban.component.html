@@ -5,7 +5,8 @@
       [attr.data-column]="column.key"
       [style.--app-kanban-accent]="column.accent ?? null"
       [attr.aria-label]="column.label"
-      (dragover)="$event.preventDefault()"
+      [class.over]="over() === column.key"
+      (dragover)="dragOver($event, column.key)"
       (drop)="drop($event, column.key, null)"
     >
       <header>
@@ -20,7 +21,9 @@
           [attr.data-item]="item.id"
           [attr.aria-keyshortcuts]="'Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown'"
           [class.selected]="selected() === item.id"
+          [class.dragging]="dragging() === item.id"
           (dragstart)="dragStart($event, item.id)"
+          (dragend)="dragEnd()"
           (dragover)="$event.preventDefault()"
           (drop)="drop($event, column.key, item.id)"
           (click)="opened.emit(item.id)"

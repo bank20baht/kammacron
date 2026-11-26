@@ -7,6 +7,7 @@ import {
   inject,
   input,
   output,
+  signal,
   TemplateRef,
 } from '@angular/core'
 import { NgTemplateOutlet } from '@angular/common'
@@ -67,9 +68,13 @@ export class KanbanComponent {
   protected readonly tile = contentChild(KanbanTileDirective)
   protected readonly footer = contentChild(KanbanFooterDirective)
   private dragged: number | null = null
+  /** The tile being dragged and the column under it, so both can show it while the drag lasts. */
+  protected readonly dragging = signal<number | null>(null)
+  protected readonly over = signal<string | null>(null)
 
   protected dragStart(event: DragEvent, id: number): void {
     this.dragged = id
+    this.dragging.set(id)
     event.dataTransfer?.setData('text/plain', String(id))
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
   }
@@ -78,9 +83,20 @@ export class KanbanComponent {
     event.preventDefault()
     event.stopPropagation()
     const id = this.dragged ?? Number(event.dataTransfer?.getData('text/plain'))
-    this.dragged = null
+    this.dragEnd()
     if (!Number.isInteger(id) || id <= 0 || id === before) return
     this.move.emit({ id, to, before })
+  }
+
+  protected dragOver(event: DragEvent, column: string): void {
+    event.preventDefault()
+    this.over.set(column)
+  }
+
+  protected dragEnd(): void {
+    this.dragged = null
+    this.dragging.set(null)
+    this.over.set(null)
   }
 
   /** Alt+arrows move the focused tile; focus follows it once the host redraws. */

@@ -43,10 +43,26 @@ import { CardDialogComponent } from '../board/card-dialog.component'
       border-radius: var(--baht-radius-md);
       background: var(--baht-color-surface);
       cursor: pointer;
+      transition:
+        border-color 150ms ease,
+        background-color 150ms ease,
+        transform 160ms var(--app-ease-out);
     }
-    .item:hover,
     .item:focus-visible {
       border-color: var(--baht-color-border-strong);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .item:hover {
+        border-color: var(--baht-color-border-strong);
+      }
+    }
+    .item:active {
+      transform: scale(0.98);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .item:active {
+        transform: none;
+      }
     }
     .item.selected {
       border-color: var(--baht-color-accent);

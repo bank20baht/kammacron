@@ -47,6 +47,8 @@ html[data-baht-theme='dark'] {
 /* The shell: a header band on the surface colour, with a hairline under it; the current link
    tinted with the primary, links with rounded corners (konmek's frame). */
 html {
+  /* a strong ease-out for the app's own small interactions (press, state changes) */
+  --app-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --baht-shell-header-bg: var(--baht-color-surface);
   --baht-shell-header-ink: var(--baht-color-text);
   --baht-table-head-bg: var(--baht-color-surface);

@@ -1,4 +1,22 @@
 /* @20baht/ui's tokens.css comes first (angular.json); this file only sets the page up. */
+
+/*
+ * The navigator folded away (the header's toggle): the page takes the whole width. Only where the
+ * shell shows it as a column; below 900px it is a strip above the page already.
+ */
+@media (min-width: 901px) {
+  baht-app-shell.nav-hidden .baht-shell-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  baht-app-shell.nav-hidden .baht-shell-side {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  baht-app-shell .nav-toggle {
+    display: none;
+  }
+}
 html,
 body {
   margin: 0;

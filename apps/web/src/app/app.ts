@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
@@ -11,6 +11,16 @@ import { LiveService } from './services/live.service'
 import { SessionService } from './services/session.service'
 import { StatusBarComponent } from './shared/status-bar.component'
 
+const NAV_KEY = 'kammacron.nav-hidden'
+
+const readNavHidden = (): boolean => {
+  try {
+    return localStorage.getItem(NAV_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 /** The frame every page sits in: brand, the navigator, the page. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,7 +32,20 @@ import { StatusBarComponent } from './shared/status-bar.component'
 export class App {
   private readonly router = inject(Router)
   protected readonly session = inject(SessionService)
-  private readonly t = inject(I18n).t
+  protected readonly t = inject(I18n).t
+
+  /** The navigator folded away, for a wider page (the board's four columns); kept per browser. */
+  protected readonly navHidden = signal(readNavHidden())
+
+  protected toggleNav(): void {
+    const hidden = !this.navHidden()
+    this.navHidden.set(hidden)
+    try {
+      localStorage.setItem(NAV_KEY, hidden ? '1' : '0')
+    } catch {
+      // storage refused (private mode): it holds for this visit only
+    }
+  }
 
   private readonly url = toSignal(
     this.router.events.pipe(

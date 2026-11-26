@@ -1,5 +1,6 @@
 @if (items().length > 0) {
 <baht-app-shell
+  [class.nav-hidden]="navHidden()"
   brand="kammacron"
   brand-href="/board"
   label="kammacron"
@@ -16,6 +17,16 @@
     decoding="async"
   />
   <div data-slot="actions" class="actions">
+    <baht-button
+      class="nav-toggle"
+      variant="ghost"
+      size="sm"
+      icon="columns"
+      icon-only
+      [label]="navHidden() ? t('nav.show') : t('nav.hide')"
+      [attr.aria-pressed]="navHidden()"
+      (click)="toggleNav()"
+    ></baht-button>
     <app-status-bar></app-status-bar>
     <baht-theme-toggle default="system"></baht-theme-toggle>
   </div>

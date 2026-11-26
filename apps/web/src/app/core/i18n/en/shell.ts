@@ -7,6 +7,8 @@ export const nav = {
   stats: 'Stats',
   settings: 'Settings',
   projects: 'Projects',
+  hide: 'Hide the navigator',
+  show: 'Show the navigator',
 } as const
 
 /** The browser tab: `{page} · kammacron`. */

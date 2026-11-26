@@ -374,7 +374,7 @@ def factory(stats):
                   inner=f'<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:{INK}">'
                         f'<div style="font-size:84px;font-weight:800;line-height:1">{stats["fixed"]} Done</div>'
                         f'<div class="label" style="margin-top:16px;padding:6px 18px 10px;border-radius:6px;font-size:27px;font-weight:800">{extra}</div></div>')
-    facts = [(f'AI เปิดการ์ดบัค {stats["cards"]} ใบ', CORAL), (f'แก้ + commit {stats["fixed"] + stats["review"]} ใบ', GREEN),
+    facts = [(f'AI เปิดการ์ดบัค {stats["cards"]} ใบ', CORAL), (f'แก้ + commit {stats.get("commits", stats["fixed"])} ใบ', GREEN),
              (f'{stats["runs"]} รอบ ใน {stats["minutes"]:g} นาที', BLUE), (f'${stats["cost"]:.3f} (haiku)', YELLOW),
              ('ไม่มีใครกดอะไรเลย', PINK)]
     row = ''.join(f'<div class="pop" style="animation-delay:{1.0 + k * 0.14:.2f}s;white-space:nowrap">{tag(t, c, 34, c in (BLUE, PURPLE, CORAL))}</div>'

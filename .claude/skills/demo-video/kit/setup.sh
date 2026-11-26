@@ -30,8 +30,9 @@ cp "$KIT/tapes/git.tape" "$WORK/tapes/git.tape"
 rm -rf "$WORK/shop" && mkdir "$WORK/shop"
 cp "$KIT/shop/index.html" "$KIT/shop/menu.html" "$KIT/shop/app.js" "$WORK/shop/"
 cp "$KIT/shop/CLAUDE.md.in" "$WORK/shop/CLAUDE.md"
-(cd "$WORK/shop" && git init -q -b main && git add . &&
-  git -c user.name=demo -c user.email=demo@example.com commit -qm "first version")
+# its own git identity, so the agents' commits (and anything they print) never carry yours
+(cd "$WORK/shop" && git init -q -b main && git config user.name demo &&
+  git config user.email demo@example.com && git add . && git commit -qm "first version")
 
 echo "work dir: $WORK"
 echo "next: build the web app (bun run --filter web build), then $WORK/make.sh, then python3 $WORK/scripts/compose.py"

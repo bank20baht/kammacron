@@ -60,6 +60,15 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
 
 - A contact sheet (`ffmpeg -vf "fps=1/6,scale=640:-1,tile=3x5"`), and look at it: captions off
   the page, Done column visible, the URL bar right, counts moving, nothing cut off.
+- **No personal data on screen.** The Runs window shows the agents' commands as they type them,
+  and an agent once wrote the owner's name and email into a `git -c user.name=… commit`. OCR the
+  recordings (`tesseract`, two frames a second of `clips/*_right.webm` and `*_left.webm`) for the
+  owner's name, email and `user.email`; blur the event list over any hit
+  (`boxblur` on `crop=iw:ih-50:0:50` with `enable='between(t,a,b)'`), keep the original as
+  `*.orig.webm`, OCR again, then compose. The shop repo has its own identity (`demo`), set by
+  `setup.sh`, so its commits never carry the owner's.
+- The factory card's "แก้ + commit N" counts the shop's real commits (`stats.json` `commits`),
+  not Done plus Review: a card in Review may hold an edit that was never committed.
 - `ffmpeg -af ebur128` says about −20 LUFS. You cannot hear it: say so, and that the chords
   were checked (each bar's strongest pitch classes match C–G–Am–F).
 - **Saving**: `docs/screenshots/` is the owner's folder (git-ignored). Look before you write:

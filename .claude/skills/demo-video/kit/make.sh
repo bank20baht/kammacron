@@ -46,6 +46,7 @@ json.dump({
   'fixed': sum(c['status'] == 'done' for c in pilot),
   'review': sum(c['status'] == 'review' for c in pilot),
   'turns': sum(r['num_turns'] or 0 for r in runs), 'cost': sum(r['cost_usd'] or 0 for r in runs),
+  'commits': int(__import__('subprocess').check_output(['git', '-C', 'shop', 'rev-list', '--count', 'HEAD'])) - 1,
   'minutes': round((last - first).total_seconds() / 60, 1),
   'starts': sorted(t(r['started_at']).astimezone().strftime('%H:%M:%S') for r in runs),
   'titles': [c['title'] for c in cards]}, open('clips/stats.json', 'w'), indent=1, ensure_ascii=False)

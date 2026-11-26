@@ -25,7 +25,7 @@ export const board = {
   needsReview: { one: '{count} card needs review', other: '{count} cards need review' },
   openReview: 'Open review',
   noProject: 'No project yet',
-  noProjectHint: 'Three steps: the tools, a Claude token, a project directory.',
+  noProjectHint: 'Add a project and give it a directory.',
   getStarted: 'Get started',
   cards: 'Cards',
   priority: 'P{priority}',

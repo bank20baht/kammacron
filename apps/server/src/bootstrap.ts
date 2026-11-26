@@ -55,11 +55,11 @@ export const buildContext = async (options: ContextOptions): Promise<AppContext>
     dataDir,
     serverUrl: options.serverUrl,
     apiToken: () => auth.apiToken,
-    claudeToken: () => process.env['CLAUDE_CODE_OAUTH_TOKEN'] ?? secrets.claude_oauth_token,
     claudeBin: options.claudeBin ?? process.env['KAMMACRON_CLAUDE_BIN'] ?? 'claude',
     notify: options.notify ?? notifier(database.db),
     handles: new Map(),
     runTokens,
+    claude: { hold: null, told: false },
   }
   return {
     db: database.db,

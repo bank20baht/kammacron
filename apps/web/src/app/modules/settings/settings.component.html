@@ -37,30 +37,16 @@
         </baht-card>
       </div>
 
-      <div data-tab="claude" class="stack">
+      <div data-tab="mcp" class="stack">
         <baht-card
-          [heading]="t('settings.claude.heading')"
-          [subtitle]="t('settings.claude.subtitle')"
-        >
-          <baht-form #ct="bahtForm" [form]="forms().claudeToken"></baht-form>
-          <div class="row">
-            <baht-button variant="primary" [disabled]="busy()" (click)="saveToken(ct.element)">{{
-              t('settings.claude.keep')
-            }}</baht-button>
-            <baht-button variant="secondary" [loading]="busy()" (click)="testClaude()">{{
-              t('settings.claude.test')
-            }}</baht-button>
-          </div>
-        </baht-card>
-        <baht-card
-          [heading]="t('settings.claude.connect')"
-          [subtitle]="t('settings.claude.connectSubtitle')"
+          [heading]="t('settings.mcp.connect')"
+          [subtitle]="t('settings.mcp.connectSubtitle')"
         >
           <baht-code variant="block" [code]="mcpCommand()"></baht-code>
           <div class="row">
             <baht-copy-button [text]="mcpCommand()" [label]="t('common.copy')"></baht-copy-button>
             <baht-button variant="ghost" [disabled]="busy()" (click)="rotate()">{{
-              t('settings.claude.rotate')
+              t('settings.mcp.rotate')
             }}</baht-button>
           </div>
         </baht-card>
@@ -129,33 +115,6 @@
 
     <baht-card class="status">
       @if (settings.value(); as s) {
-        <div class="state">
-          <baht-badge
-            [tone]="s.claude_token.source ? 'success' : 'danger'"
-            [label]="
-              s.claude_token.source
-                ? t('settings.status.tokenSet')
-                : t('settings.status.tokenNotSet')
-            "
-          ></baht-badge>
-          <p class="muted">
-            @if (s.claude_token.source) {
-              {{
-                t(
-                  s.claude_token.source === 'env'
-                    ? 'settings.status.fromEnv'
-                    : 'settings.status.fromSettings',
-                  { last4: s.claude_token.last4 ?? '' }
-                )
-              }}
-            } @else {
-              {{ t('settings.status.localLogin') }}
-            }
-          </p>
-          <baht-button size="sm" variant="ghost" icon="arrow-right" (click)="tab.set('claude')">{{
-            t('settings.status.configure')
-          }}</baht-button>
-        </div>
         <div class="state">
           <baht-badge
             [tone]="s.paused ? 'danger' : 'success'"

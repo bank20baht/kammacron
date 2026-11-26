@@ -18,7 +18,7 @@ import { IllustrationComponent } from '../../shared/illustration/illustration.co
 import { I18n, type AppLocale, type Translate } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
-import { accessForm, claudeTokenForm, newProjectForm, workerForm } from '../../shared/forms'
+import { accessForm, newProjectForm, workerForm } from '../../shared/forms'
 
 const projectColumns = (t: Translate): ColumnMap => ({
   name: t('settings.projects.columns.name'),
@@ -33,7 +33,7 @@ const projectColumns = (t: Translate): ColumnMap => ({
   checked: t('settings.projects.columns.checked'),
 })
 
-const TABS = ['projects', 'claude', 'worker', 'access', 'machine'] as const
+const TABS = ['projects', 'mcp', 'worker', 'access', 'machine'] as const
 
 /** The language of this browser's pages: one option per locale the app speaks. */
 const languageForm = (t: Translate, locales: readonly AppLocale[]) =>
@@ -53,7 +53,7 @@ const languageForm = (t: Translate, locales: readonly AppLocale[]) =>
 
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 
-/** The install: Claude's token, MCP, pause, hosts, notifications, the tools found; and the projects. */
+/** The install: MCP, pause, hosts, notifications, the tools found; and the projects. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [IllustrationComponent, BAHT_UI],
@@ -98,7 +98,6 @@ export class SettingsComponent {
     })),
   )
   protected readonly forms = computed(() => ({
-    claudeToken: claudeTokenForm(this.t),
     worker: workerForm(this.t),
     access: accessForm(this.t),
     newProject: newProjectForm(this.t),
@@ -152,32 +151,6 @@ export class SettingsComponent {
       () => firstValueFrom(this.api.settings.patch(patch)),
       this.t('settings.messages.saved'),
     )
-  }
-
-  protected saveToken(form: BahtForm): Promise<void> {
-    const token = text(form.getData()['token'])
-    return this.act(
-      async () => {
-        await firstValueFrom(this.api.settings['claude-token'].put({ token }))
-        form.reset()
-      },
-      token ? this.t('settings.messages.tokenKept') : this.t('settings.messages.tokenCleared'),
-    )
-  }
-
-  protected async testClaude(): Promise<void> {
-    this.busy.set(true)
-    try {
-      const r = await firstValueFrom(this.api.settings['claude-test'].post())
-      this.message.set({
-        tone: r.ok ? 'success' : 'danger',
-        text: r.ok ? this.t('settings.messages.claudeAnswered', { message: r.message }) : r.message,
-      })
-    } catch (error) {
-      this.message.set({ tone: 'danger', text: describeError(error) })
-    } finally {
-      this.busy.set(false)
-    }
   }
 
   protected saveWorker(form: BahtForm): Promise<void> {

@@ -1,13 +1,13 @@
 ---
-title: Your backlog, on the clock
-description: A Kanban board, an MCP server and an unattended Claude Code worker in one process on your own machine.
+title: Your chores, on the clock
+description: An easy scheduler with a board, on your own machine. Run any command on an interval, and Claude Code if you want it.
 template: splash
 hero:
   title: kammacron
   # html, not file: Starlight sizes a file to a 400x400 square, which crops the 3:2 logo's sides
   image:
-    html: '<img src="/brand/app-icon.webp?v=transparent-2" width="768" height="512" alt="kammacron: You plan. Claude works. You decide." fetchpriority="high" />'
-  tagline: Your backlog, on the clock. Write a card, hand it to Claude, and only look at what needs a decision.
+    html: '<img src="/brand/app-icon.webp?v=transparent-2" width="768" height="512" alt="kammacron" fetchpriority="high" />'
+  tagline: An easy scheduler on your own machine. Run commands on an interval, and only look when one fails or needs a decision.
   actions:
     - text: Get started
       link: /start/install/
@@ -30,32 +30,27 @@ bunx kammacron start          # http://127.0.0.1:7420
 ![The board of one project: To do, Doing, Review and Done](../../assets/board.png)
 
 <CardGrid>
-  <Card title="A board Claude reads" icon="list-format">
-    Four columns, live. Cards tagged `claude` are picked up on each project's interval and run
-    through the project's playbook: Claude does the card, your commands do the rest.
+  <Card title="Any command, on an interval" icon="seti:shell">
+    Ping a server, run tests, back up a database. A failure opens a card and notifies you; while it
+    is open, later failures are added to it.
   </Card>
-  <Card title="A playbook per project" icon="seti:shell">
-    Steps in order, in the project's directory: a Claude step, then tests, `ssh` to a server, a
-    deploy, a migration. A step that fails stops the rest and sends the card to Review.
-  </Card>
-  <Card title="No --dangerously-skip-permissions" icon="approve-check">
-    Claude gets a tool allowlist: no force push, no `--no-verify`, nothing that loses work. Git and
-    shipping follow your project's own instructions; kammacron does not meddle.
+  <Card title="A playbook per project" icon="list-format">
+    Steps in order, in the project's directory: tests, `ssh` to a server, a deploy, a migration. A
+    step that fails stops the rest and sends the card to Review.
   </Card>
   <Card title="You decide" icon="comment-alt">
-    A card Claude hands over, or whose step failed, waits in Review with its reason and output.
-    Approve it, send it back with a note for the next run, or take it yourself.
+    What failed or was handed over waits with its reason and output. Approve it, send it back with a
+    note, or take it yourself.
   </Card>
-  <Card title="Your subscription, your machine" icon="laptop">
-    `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`. One process, PGlite by default, and Claude
-    is only called when there is a card to work.
+  <Card title="Claude, if you want it" icon="puzzle">
+    A playbook step can be `claude -p`, using the Claude Code you already signed in to. It gets a
+    tool allowlist, never `--dangerously-skip-permissions`.
   </Card>
   <Card title="Every run, on the record" icon="document">
-    Each step and how it ended, Claude's live event stream, turns and cost, and every command the
-    allowlist refused. Week-by-week stats, and a calendar of what runs when.
+    Each step and how it ended, its output, and a calendar of what runs when.
   </Card>
-  <Card title="Claude Code drives the board" icon="puzzle">
-    The board is an MCP server: Claude Code, Claude Desktop and claude.ai can list, create, move and
-    comment on cards.
+  <Card title="Your machine" icon="laptop">
+    One process, PGlite by default or Postgres. A CLI and a background service. A board over MCP for
+    agents that want it.
   </Card>
 </CardGrid>

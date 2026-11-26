@@ -32,10 +32,6 @@ export const forms = {
     commentHelp: 'The worker reads it next run',
   },
   login: { name: 'Login', token: 'API token' },
-  claudeToken: {
-    name: 'Claude token',
-    help: 'From `claude setup-token`. Kept in secrets.json (600), never in the database. Empty clears it.',
-  },
   worker: {
     name: 'Worker',
     staleMinutes: 'A run may take (minutes)',
@@ -59,7 +55,7 @@ export const forms = {
   project: {
     name: 'Project',
     projectName: 'Name',
-    workerEnabled: 'Claude works this project',
+    workerEnabled: 'Run this project on its schedule',
     repoPath: 'Directory',
     repoPathHelp:
       'Where runs happen, as it is: kammacron does not branch, reset or push it. Empty: a board without a worker',
@@ -99,7 +95,9 @@ export const forms = {
     scheduleName: 'Name',
     namePlaceholder: 'nightly tests',
     command: 'Command',
-    commandHelp: 'A failure opens a card',
+    commandHelp: 'A failure opens a card and notifies you',
+    cardTags: 'Tags of that card',
+    cardTagsHelp: 'Empty: the card is yours. “claude”: the worker runs the playbook on it',
     runs: 'Runs',
     runsCommand: 'A command',
     runsPlaybook: 'Playbook {name}',

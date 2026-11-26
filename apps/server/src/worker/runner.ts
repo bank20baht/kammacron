@@ -8,7 +8,6 @@ import {
   DEFAULT_PLAYBOOK_NAME,
   DEFAULT_PLAYBOOKS,
   PLAYBOOK_TAG,
-  projects,
   type ClaudeStep,
   type PlaybookStep,
   type RunStep,
@@ -28,9 +27,9 @@ import {
   updateRun,
   type Run,
 } from '../services/runs'
-import { getSettings, updateSettings } from '../services/settings'
+import { getSettings } from '../services/settings'
 import { spawnClaude, type ClaudeResult } from './claude'
-import { childEnv, type RunHandle, type WorkerEnv } from './env'
+import { childEnv, holdClaude, passedSecrets, type RunHandle, type WorkerEnv } from './env'
 import { approvedServers, type McpServer } from './mcp-approvals'
 import { indented, taskPrompt, workerRules } from './prompt'
 import { spawnShell } from './shell'
@@ -174,7 +173,7 @@ const runTokenOf = (env: WorkerEnv, runId: number) =>
 
 /** Every string a run's output must not carry. */
 const secretsOf = (env: WorkerEnv, runId: number) =>
-  [env.apiToken(), env.claudeToken() ?? '', runTokenOf(env, runId)].filter(Boolean)
+  [env.apiToken(), ...passedSecrets(), runTokenOf(env, runId)].filter(Boolean)
 
 type Attachment = { filename: string; path: string }
 
@@ -294,25 +293,25 @@ const settleInterrupted = async (
 ): Promise<Run | null> => {
   const { env, project, card, run } = ctx
   if (result.errorKind === 'auth') {
-    await updateSettings(env.db, { paused: true })
+    holdClaude(env, 'Claude is not signed in')
     await returnCard(env, card.id, false, '')
-    const message =
-      'Claude refused the token: the worker is paused. Set a new CLAUDE_CODE_OAUTH_TOKEN in Settings (claude setup-token), then resume.'
-    await addAlert(env.db, { level: 'error', run_id: run.id, message })
-    await env.notify('kammacron paused', message)
+    if (!env.claude.told) {
+      env.claude.told = true
+      const message =
+        'Claude is not signed in (or its sign-in expired): cards that need it wait, everything else runs. On this machine, as the user kammacron runs as, run `claude` and sign in; then Run now, or wait for the hourly retry.'
+      await addAlert(env.db, { level: 'error', run_id: run.id, message })
+      await env.notify('kammacron: Claude is not signed in', message)
+    }
     return updateRun(env.db, run.id, { status: 'failed', ended_at: new Date() })
   }
   if (result.errorKind === 'rate_limit') {
+    holdClaude(env, 'Claude usage limit reached')
     await returnCard(env, card.id, false, '')
-    await env.db
-      .update(projects)
-      .set({ next_run_at: new Date(Date.now() + 60 * 60_000) })
-      .where(eq(projects.id, project.id))
     await addAlert(env.db, {
       level: 'info',
       project_id: project.id,
       run_id: run.id,
-      message: `${project.name}: usage limit reached; next try in an hour`,
+      message: `${project.name}: Claude usage limit reached; cards that need it try again in an hour`,
     })
     return updateRun(env.db, run.id, { status: 'failed', ended_at: new Date() })
   }
@@ -441,6 +440,7 @@ const claudeStep = async (ctx: Context, step: ClaudeStep, index: number): Promis
   ctx.run = await recordClaude(ctx, result)
   const interrupted = await settleInterrupted(ctx, result, stoppedByUser)
   if (interrupted) return { interrupted, errorKind: result.errorKind }
+  if (!result.errorKind) env.claude.told = false
   if (result.errorKind === 'max_turns') return { failed: `Claude hit max_turns before finishing` }
   if (result.errorKind)
     return { failed: `Claude ended with an error: ${result.error ?? result.errorKind}` }
@@ -603,6 +603,10 @@ export const runCard = async (
     await rm(runDir.dir, { recursive: true, force: true })
   }
 }
+
+/** Whether the card's playbook has a Claude step. */
+export const needsClaude = (project: Project, card: Card) =>
+  playbookOf(project, card)?.steps.some((step) => step.kind === 'claude') ?? false
 
 /** The card's `playbook:<name>` tag names the playbook; without one, `default`. */
 const playbookOf = (project: Project, card: Card) => {

@@ -150,23 +150,55 @@ describe('the default playbook: one Claude step', () => {
     expect(must(r).status).toBe('failed')
   })
 
-  test('a bad token pauses everything and gives the card back untouched', async () => {
+  test('not signed in: the card goes back untouched, nothing else is paused', async () => {
     const card = await newCard()
     const { run: r } = await run('auth', card.id)
     expect(must(r).error_kind).toBe('auth')
     expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
     expect((await getCard(t.ctx.db, card.id)).stale_count).toBe(0)
     const [row] = await t.ctx.db.select().from(settings)
-    expect(must(row).paused).toBe(true)
+    expect(must(row).paused).toBe(false)
     expect((await listAlerts(t.ctx.db)).map((a) => a.level)).toEqual(['error'])
   })
 
-  test('a usage limit postpones the project an hour without counting against the card', async () => {
+  test('while Claude cannot run, command cards still do, and the person is told once', async () => {
+    await playbook([{ kind: 'claude', name: 'Claude' }], {
+      shell: [{ kind: 'run', name: 'Shell', command: 'true' }],
+    })
+    const told: string[] = []
+    t.ctx.worker.notify = (title) => {
+      told.push(title)
+      return Promise.resolve()
+    }
+    const forClaude = await newCard('for claude', ['claude'])
+    const forShell = await newCard('for shell', ['playbook:shell'])
+    process.env['FAKE_SCENARIO'] = 'auth'
+    const scheduler = createScheduler(t.ctx.worker)
+    scheduler.runNow(projectId)
+    await scheduler.idle()
+    expect((await getCard(t.ctx.db, forShell.id)).status).toBe('done')
+    expect((await getCard(t.ctx.db, forClaude.id)).status).toBe('todo')
+
+    // the next round on its own leaves the Claude card where it is
+    await t.ctx.db.update(projects).set({ next_run_at: null })
+    await scheduler.tick()
+    await scheduler.idle()
+    expect((await getCard(t.ctx.db, forClaude.id)).last_run?.id).toBe(1)
+    expect((await getProject(t.ctx.db, projectId)).last_check_result).toContain(
+      'Claude is not signed in',
+    )
+
+    // Run now tries again, without telling the person again
+    scheduler.runNow(projectId)
+    await scheduler.idle()
+    expect(told).toEqual(['kammacron: Claude is not signed in'])
+  })
+
+  test('a usage limit holds Claude for an hour without counting against the card', async () => {
     const card = await newCard()
     await run('rate', card.id)
     expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
-    const project = await getProject(t.ctx.db, projectId)
-    expect(must(project.next_run_at).getTime()).toBeGreaterThan(Date.now() + 55 * 60_000)
+    expect(must(t.ctx.worker.claude.hold).until).toBeGreaterThan(Date.now() + 55 * 60_000)
   })
 
   test('stop: the process is killed and the card returns to todo, counted', async () => {
@@ -477,5 +509,29 @@ describe('the board', () => {
     await Bun.write(join(repo, 'new.txt'), 'x\n')
     const dirty = await t.json<LocalGit>('GET', `/api/projects/${String(projectId)}/git`)
     expect(dirty.dirty).toBe(true)
+  })
+})
+
+describe('a schedule that runs a command', () => {
+  test('a failure opens a card for a person and notifies once; nothing agent-specific runs', async () => {
+    const told: string[] = []
+    t.ctx.worker.notify = (title) => {
+      told.push(title)
+      return Promise.resolve()
+    }
+    await t.json('POST', `/api/projects/${String(projectId)}/schedules`, {
+      name: 'health',
+      command: 'false',
+      interval_minutes: 5,
+    })
+    const scheduler = createScheduler(t.ctx.worker)
+    for (let round = 0; round < 2; round++) {
+      await t.ctx.db.update(schedules).set({ next_run_at: null })
+      scheduler.runNow(projectId)
+      await scheduler.idle()
+    }
+    const open = await t.json<Card[]>('GET', '/api/cards')
+    expect(open.map((c) => [c.title, c.tags, c.status])).toEqual([['health fails', [], 'todo']])
+    expect(told).toEqual(['health fails'])
   })
 })

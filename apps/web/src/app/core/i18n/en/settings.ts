@@ -1,10 +1,10 @@
 /** The settings page: the install's tabs, the status side card, and the language. */
 export const settings = {
   heading: 'Settings',
-  description: 'One person, one machine: the worker, its token and its projects.',
+  description: 'One person, one machine: the worker and its projects.',
   tabs: {
     projects: 'Projects',
-    claude: 'Claude connection',
+    mcp: 'MCP',
     worker: 'Worker',
     access: 'Access & notifications',
     machine: 'This machine',
@@ -20,13 +20,9 @@ export const settings = {
     boardOnly: 'board only',
     notYet: 'not yet',
   },
-  claude: {
-    heading: 'Claude token',
-    subtitle: 'The token every run uses: subscription quota, not the API',
-    keep: 'Keep',
-    test: 'Test',
+  mcp: {
     connect: 'Connect Claude Code',
-    connectSubtitle: 'Adds this board as an MCP server',
+    connectSubtitle: 'Optional: adds this board as an MCP server',
     rotate: 'Rotate token',
   },
   worker: {
@@ -45,12 +41,6 @@ export const settings = {
   language: { heading: 'Language', form: 'Language', label: 'Language' },
   languages: { en: 'English' },
   status: {
-    tokenSet: 'Claude token set',
-    tokenNotSet: 'Claude token not set',
-    fromEnv: 'From the environment ({last4}).',
-    fromSettings: 'From Settings ({last4}).',
-    localLogin: 'Runs use the local Claude login, which a service may not have.',
-    configure: 'Configure connection',
     workerPaused: 'Worker paused',
     workerOn: 'Worker on',
     pausedHint: 'No new runs start until you resume.',
@@ -58,9 +48,6 @@ export const settings = {
   },
   messages: {
     saved: 'Saved',
-    tokenKept: 'Token kept',
-    tokenCleared: 'Token cleared',
-    claudeAnswered: 'Claude answered: {message}',
     rotated:
       'New token: update every `claude mcp add` that used the old one, and reconnect OAuth clients',
   },

@@ -6,7 +6,7 @@ description: What lives in ~/.kammacron.
 | Path           | What it holds                                                     |
 | -------------- | ----------------------------------------------------------------- |
 | `db/`          | The PGlite database (unless `DATABASE_URL` points at Postgres)    |
-| `secrets.json` | The API token, the session secret and the Claude token; mode 600  |
+| `secrets.json` | The API token and the session secret; mode 600                    |
 | `files/`       | Images attached to cards                                          |
 | `logs/`        | The server log, and one `.jsonl` per run (`logs/runs/<id>.jsonl`) |
 | `mcp/`         | The MCP config each run is given                                  |

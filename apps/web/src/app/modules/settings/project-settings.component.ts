@@ -196,7 +196,7 @@ export class ProjectSettingsComponent {
           name: text(d['name']) ?? '',
           ...(text(d['runs']) && text(d['runs']) !== COMMAND
             ? { playbook: text(d['runs']) }
-            : { command: text(d['command']) }),
+            : { command: text(d['command']), card_tags: list(d['card_tags']) }),
           interval_minutes: count(d['interval_minutes'], 1440),
         }),
       )

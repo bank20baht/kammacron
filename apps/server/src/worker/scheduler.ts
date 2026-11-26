@@ -14,9 +14,9 @@ import { getProject, type Project } from '../services/projects'
 import { markInterruptedRuns, pruneRunEvents } from '../services/runs'
 import { getSettings } from '../services/settings'
 import { redact } from './redact'
-import { childEnv, type WorkerEnv } from './env'
+import { childEnv, claudeHeld, passedSecrets, type WorkerEnv } from './env'
 import { exec } from './git'
-import { runCard } from './runner'
+import { needsClaude, runCard } from './runner'
 
 const TICK_MS = 30_000
 
@@ -79,9 +79,17 @@ export const createScheduler = (env: WorkerEnv) => {
 
   const nextRunAt = (project: Project) => new Date(Date.now() + project.interval_minutes * 60_000)
 
+  /** The next card to run; while Claude is held, the next one that does without it. */
+  const nextCard = async (project: Project) => {
+    const held = claudeHeld(env)
+    const pickable = await pickableCards(env.db, project.id, held ? 10_000 : 1)
+    const card = held ? pickable.find((c) => !needsClaude(project, c)) : pickable[0]
+    return { card, waiting: card === undefined && pickable.length > 0 ? held : null }
+  }
+
   /**
-   * Up to max cards, one at a time: how many ran, and why the round stopped short of a card it
-   * had (the directory is gone); null when it must end without rescheduling.
+   * Up to max cards, one at a time: how many ran, why the round stopped short of a card it had
+   * (the directory is gone), and why cards were left waiting.
    */
   const runCards = async (project: Project) => {
     let done = 0
@@ -89,22 +97,21 @@ export const createScheduler = (env: WorkerEnv) => {
       if (stopping || (await getSettings(env.db)).paused) break
       const fresh = await getProject(env.db, project.id)
       if (!runnable(fresh)) break
-      const [card] = await pickableCards(env.db, project.id, 1)
-      if (!card) break
+      const { card, waiting } = await nextCard(fresh)
+      if (!card) return { done, skipped: null, waiting }
       const outcome = await runCard(env, fresh, card.id)
-      const kind = outcome.errorKind
-      if (kind === 'auth' || kind === 'rate_limit') return null
       // Stop put the card back in todo: going on would pick it up again at once
-      if (kind === 'stopped') return { done: done + 1, skipped: null }
+      if (outcome.errorKind === 'stopped') return { done: done + 1, skipped: null, waiting: null }
       if (outcome.skipped && outcome.skipped !== 'claimed by someone else')
-        return { done, skipped: outcome.skipped }
+        return { done, skipped: outcome.skipped, waiting: null }
     }
-    return { done, skipped: null }
+    return { done, skipped: null, waiting: null }
   }
 
   /** What the round says of itself on the board and in the calendar. */
-  const checkResult = (done: number, skipped: string | null) => {
+  const checkResult = (done: number, skipped: string | null, waiting: string | null) => {
     const ran = done === 0 ? 'no cards' : `ran ${String(done)} card${done === 1 ? '' : 's'}`
+    if (waiting) return `${ran}; cards wait: ${waiting}`
     if (!skipped) return ran
     return done === 0 ? `skipped: ${skipped}` : `${ran}, then skipped: ${skipped}`
   }
@@ -117,8 +124,7 @@ export const createScheduler = (env: WorkerEnv) => {
     await sweepStale(project.id)
     await runSchedules(project)
     const outcome = await runCards(project)
-    if (outcome === null) return
-    const result = checkResult(outcome.done, outcome.skipped)
+    const result = checkResult(outcome.done, outcome.skipped, outcome.waiting)
     // said once, not every round it stays so
     if (outcome.skipped && result !== project.last_check_result)
       await addAlert(env.db, {
@@ -204,7 +210,7 @@ export const createScheduler = (env: WorkerEnv) => {
       .set({ last_exit_code: r.code })
       .where(eq(schedules.id, schedule.id))
     if (r.code === 0) return schedule.last_card_id
-    const secrets = [env.apiToken(), env.claudeToken() ?? ''].filter(Boolean)
+    const secrets = [env.apiToken(), ...passedSecrets()]
     const output = redact(`${r.stdout}\n${r.stderr}`, secrets).trim().slice(-3000)
     const failed = `\`${schedule.command ?? ''}\` failed with exit ${String(r.code)}.`
     // Output is whatever a test, a package or a remote host printed. It goes in a comment, which
@@ -222,11 +228,18 @@ export const createScheduler = (env: WorkerEnv) => {
       {
         project_id: project.id,
         title: `${schedule.name} fails`,
-        body: `Autonomy: claude - opened by the schedule "${schedule.name}"; make it pass again.\n\n${failed} What it printed is in the comments.`,
+        body: `Opened by the schedule "${schedule.name}": make it pass again.\n\n${failed} What it printed is in the comments.`,
         tags: schedule.card_tags,
       },
     ])
-    if (created) await addComment(env.db, created.id, { author: 'claude-worker', body: printed })
+    if (created) {
+      await addComment(env.db, created.id, { author: 'claude-worker', body: printed })
+      // once, when it starts failing; and without the output, which may hold anything
+      await env.notify(
+        `${schedule.name} fails`,
+        `${project.name}: card #${String(created.id)}, exit ${String(r.code)}`,
+      )
+    }
     return created?.id ?? null
   }
 
@@ -323,6 +336,7 @@ export const createScheduler = (env: WorkerEnv) => {
     },
     /** "Run now": a round for this project whatever its next_run_at says (still not when paused). */
     runNow: (projectId: number) => {
+      env.claude.hold = null // the person asks: try Claude again too
       enqueue(projectId)
     },
     /** Stop: SIGTERM, then SIGKILL after 10 s; the card goes back to todo. */

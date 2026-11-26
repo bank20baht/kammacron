@@ -149,21 +149,6 @@ export const loginForm = (t: Translate) =>
     ],
   })
 
-export const claudeTokenForm = (t: Translate) =>
-  defineForm({
-    form_id: 'claude-token',
-    form_name: t('forms.claudeToken.name'),
-    fields: [
-      {
-        order: 1,
-        type: 'password',
-        key: 'token',
-        label: 'CLAUDE_CODE_OAUTH_TOKEN',
-        help: t('forms.claudeToken.help'),
-      },
-    ],
-  })
-
 export const workerForm = (t: Translate) =>
   defineForm({
     form_id: 'worker',
@@ -404,8 +389,15 @@ export const scheduleForm = (t: Translate, playbooks: readonly string[]) =>
         type: 'text',
         key: 'command',
         label: t('forms.schedule.command'),
-        placeholder: 'bun run test',
+        placeholder: 'curl -fsS --max-time 10 https://example.com/health',
         help: t('forms.schedule.commandHelp'),
+      },
+      {
+        order: 5,
+        type: 'tags',
+        key: 'card_tags',
+        label: t('forms.schedule.cardTags'),
+        help: t('forms.schedule.cardTagsHelp'),
       },
     ],
   })

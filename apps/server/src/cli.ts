@@ -11,7 +11,7 @@ import { clientHost, DEFAULT_PORT, readLock, resolveDataDir, startServer } from 
 import { installService, uninstallService } from './service'
 import { exec } from './worker/git'
 
-const HELP = `kammacron: Kanban + MCP + a Claude worker, on this machine
+const HELP = `kammacron: a scheduler with a board, on this machine
 
 Usage: kammacron <command> [options]
 

@@ -10,7 +10,7 @@ export default defineConfig({
     starlight({
       title: 'kammacron',
       description:
-        'A Kanban board, an MCP server and an unattended Claude Code worker in one process on your own machine.',
+        'An easy scheduler with a board, on your own machine. Run any command on an interval, and Claude Code if you want it.',
       logo: { src: './src/assets/app-mark.webp', replacesTitle: false },
       favicon: '/favicon.ico?v=buffalo-1',
       social: [

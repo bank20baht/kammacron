@@ -1,26 +1,35 @@
 ---
 title: First steps
-description: A Claude token, a project with its repo, and the first card.
+description: A project, a scheduled command, and, if you want it, Claude.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components'
 
-![The welcome page: tools found, Claude token, project](../../../assets/welcome.png)
-
 <Steps>
 
-1. **Claude token.** Run `claude setup-token` in a terminal and paste what it prints into **Settings → Claude connection** (or set `CLAUDE_CODE_OAUTH_TOKEN`). **Test** runs one short `claude -p`. The token is kept in `secrets.json` (mode 600), never in the database.
+1. **Project.** **Settings → Projects → Add project**, give it a slug and a name, set its **directory** (any folder, say `~/ops`) and turn **Run this project on its schedule** on.
 
-2. **Project.** **Settings → Projects → Add project**, give it a slug and a name, then set its **directory** and turn **Claude works this project** on. **Check the directory** says what it found there. Its **Playbook** is one Claude step until you add more.
+2. **Schedule.** In the project, **Schedules**: a name, a command and how often (5 minutes at least).
 
-3. **First card.** On the board, **New card**: a title, what you want in the body, owner **Claude**. Claude cards carry the `claude` tag, and the worker takes them on the project's next round. **Run now** starts a round straight away.
+   ```sh
+   curl -fsS --max-time 10 https://example.com/health
+   ```
+
+   While it passes, nothing happens. When it fails you get one card and one notification (desktop, or the webhook in **Settings**); later failures are added to the card until it is done. **Run now** starts a round straight away.
+
+3. **More than one command.** The project's **Playbook** runs several in order, and a schedule can run a playbook instead of a command. See [playbooks](/guides/playbook/).
 
 </Steps>
 
+## With Claude
+
+Run `claude` once on this machine, as the user kammacron runs as, and sign in. kammacron asks for no token and keeps none.
+
+Then a card tagged `claude` (owner **Claude** on **New card**) is worked by the project's playbook, which in a new project is one Claude step. To have a failing schedule's card fixed that way, put `claude` in the schedule's **Tags of that card**.
+
 <Aside>
-  Project rules for the worker can live in the repository at `.claude-worker/prompt.md`, and in
-  **Extra rules** in the project's settings. Claude Code also reads the repository's own
-  `CLAUDE.md`.
+  Project instructions can live in the directory (`CLAUDE.md`, `.claude-worker/prompt.md`) and in
+  **Extra rules** in the project's settings.
 </Aside>
 
 To add cards from Claude Code instead, see [Claude Code and MCP](/guides/mcp/).

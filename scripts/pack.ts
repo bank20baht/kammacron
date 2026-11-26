@@ -45,7 +45,8 @@ const version = process.env['KAMMACRON_VERSION'] ?? rootPkg.version ?? '0.1.0'
 const pkg = {
   name: 'kammacron',
   version,
-  description: 'Kanban + MCP + an unattended Claude Code worker, on your own machine',
+  description:
+    'An easy scheduler with a board, on your own machine; runs any command, and Claude Code if you want it',
   type: 'module',
   bin: { kammacron: 'cli.js' },
   files: ['cli.js', 'drizzle', 'web', 'README.md'],

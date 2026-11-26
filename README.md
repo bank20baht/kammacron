@@ -1,18 +1,15 @@
 # kammacron
 
-A Kanban board, an MCP server and an unattended worker in one process on your own machine: a
-small Ansible for your backlog. Each project points at a directory and has a **playbook**: steps in
-order, such as a Claude step (`claude -p` on the card), then your commands (tests, `ssh` to a
-server, a deploy, a migration). Cards tagged `claude` are run through it on a schedule. You only
-see the cards that need a decision.
+An easy scheduler on your own machine, with a board that shows what needs you: a small Ansible.
+Point a project at a directory, give it commands to run on an interval (ping a server, run tests,
+back up, deploy), and look only when something fails or waits for a decision.
 
-- **Runs without `--dangerously-skip-permissions`.** Claude steps get a tool allowlist (no force
-  push, no `--no-verify`, nothing that loses work). Git and shipping follow the project's own
-  instructions (`CLAUDE.md`): kammacron points at the directory and does not meddle.
-- **Uses your subscription.** `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, and a pre-check
-  that calls Claude only when there is a card to work.
-- **Cards triaged before Claude works.** `claude` / `human`, `waits_on`, splitting a person's task
-  into small Claude cards, and review only for what a person should decide.
+- **Any command.** A schedule is `sh -c` in the project's directory. A failure opens a card and
+  notifies you (desktop or webhook).
+- **Playbooks.** Steps in order, run for a card; one fails and the rest stop. A step is a command,
+  or an AI agent: Claude Code today.
+- **No agent required.** Schedules and command playbooks need nothing but a shell. A Claude step
+  uses the `claude` you have installed and signed in to; kammacron keeps no login of its own.
 
 ## What it does
 
@@ -25,10 +22,10 @@ see the cards that need a decision.
 | **Runs**      | Every run with its steps, Claude's live event stream, turns and cost; stop one that is going.                                                                                                                                                       |
 | **Calendar**  | What runs on its own and when: each project's worker round, its schedules and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                        |
 | **Stats**     | Week by week: runs done, sent to review, failed, and what they cost.                                                                                                                                                                                |
-| **Schedules** | Per project, on an interval: a shell command (when it fails it opens a card for Claude, or comments on the open one), or a playbook (a card each time, run in the same round).                                                                      |
+| **Schedules** | Per project, on an interval: a shell command (when it fails it opens a card and notifies you; tag the card `claude` to have it fixed), or a playbook (a card each time, run in the same round).                                                     |
 | **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                          |
 | **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a project paused, a round skipped.                                                                                                                                      |
-| **Settings**  | The Claude token (with a test run), the worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), each project's directory, playbook and limits, and the language.                                                         |
+| **Settings**  | The worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), MCP, each project's directory, playbook and limits, and the language.                                                                                        |
 | **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                          |
 
 Documentation: **[kammacron.pages.dev](https://kammacron.pages.dev)** (the Starlight site in `apps/docs`: `bun run --filter docs dev`, and `bun run --filter docs deploy` to publish it). The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
@@ -36,7 +33,7 @@ lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
 
 ## Install
 
-Needs [Bun](https://bun.sh) 1.3+, git, and [Claude Code](https://claude.com/claude-code).
+Needs [Bun](https://bun.sh) 1.3+. Install whatever your commands use; for Claude steps, [Claude Code](https://claude.com/claude-code), signed in.
 
 ```sh
 bunx kammacron start          # try it: http://127.0.0.1:7420
@@ -52,18 +49,27 @@ Or one file with nothing to install: `bun run compile` builds `dist/bin/kammacro
 
 ## First steps
 
-1. **Token**: `claude setup-token`, then Settings → Claude → Keep (or set `CLAUDE_CODE_OAUTH_TOKEN`).
-   **Test** runs one short `claude -p`.
-2. **Project**: Settings → Projects → add one, set its directory, turn the worker on. Its
-   **Playbook** is one Claude step; add commands around it as you need.
-3. **Cards**: on the board, or from Claude Code itself:
+1. **Project**: Settings → Projects → add one, set its directory (any folder, say `~/ops`), turn
+   **Run this project on its schedule** on.
+2. **Schedule**: in the project, Schedules → add a command and an interval (5 minutes at least):
+
+   ```sh
+   curl -fsS --max-time 10 https://example.com/health
+   ```
+
+   While it passes, nothing happens. When it fails you get one card and one notification, and later
+   failures are added to that card.
+
+3. **Optional, Claude**: run `claude` once on this machine and sign in. Then a card tagged `claude`
+   is worked by the project's playbook (one Claude step in a new project). Cards can also come from
+   Claude Code over MCP:
 
    ```sh
    kammacron token   # prints: claude mcp add --transport http kammacron http://127.0.0.1:7420/mcp --header "Authorization: Bearer …"
    ```
 
-Project rules for Claude live in the directory: `CLAUDE.md`, and `.claude-worker/prompt.md` (the
-same file the `~/claude-worker/run.sh` setup used), plus **Extra rules** in the project's settings.
+Project instructions for Claude live in the directory: `CLAUDE.md`, and `.claude-worker/prompt.md`,
+plus **Extra rules** in the project's settings.
 
 ## How a card is worked
 
@@ -104,7 +110,7 @@ registration; the consent page needs your session).
 
 ## Data
 
-`~/.kammacron/`: `db/` (PGlite), `secrets.json` (API token, session secret, Claude token; mode 600),
+`~/.kammacron/`: `db/` (PGlite), `secrets.json` (API token, session secret; mode 600),
 `files/` (images), `logs/` (server and one `.jsonl` per run), `mcp/`, `runs/` (a run's card file and images, while it goes). Set
 `DATABASE_URL` to use Postgres instead of PGlite.
 

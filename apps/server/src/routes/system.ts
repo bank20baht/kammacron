@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 
 import { identityProof, isOwner, newLoginCode, sessionCookie, useLoginCode } from '../auth'
 import type { AppContext } from '../context'
-import { maskSecret, sameSecret } from '../secrets'
+import { sameSecret } from '../secrets'
 import { disconnectOAuth } from '../services/oauth-storage'
 import { getSettings, rotateToken, updateSettings } from '../services/settings'
 
@@ -61,7 +61,6 @@ export const systemRoutes = (ctx: AppContext) =>
       '/settings',
       async () => {
         const row = await getSettings(ctx.db)
-        const envToken = process.env['CLAUDE_CODE_OAUTH_TOKEN']
         return {
           paused: row.paused,
           stale_minutes: row.stale_minutes,
@@ -73,14 +72,6 @@ export const systemRoutes = (ctx: AppContext) =>
           desktop_notifications: row.desktop_notifications,
           public_url: row.public_url,
           oauth: ctx.oauth !== null,
-          claude_token: {
-            source: envToken
-              ? ('env' as const)
-              : ctx.secrets.claude_oauth_token
-                ? ('settings' as const)
-                : null,
-            last4: maskSecret(envToken ?? ctx.secrets.claude_oauth_token),
-          },
         }
       },
       { detail: { operationId: 'get_settings', summary: 'Settings of the install' } },

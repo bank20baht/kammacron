@@ -11,8 +11,6 @@ export type Secrets = {
   api_token: string
   /** The value of the web session cookie. */
   session_secret: string
-  /** `CLAUDE_CODE_OAUTH_TOKEN`, when entered in Settings rather than given by the environment. */
-  claude_oauth_token?: string | undefined
 }
 
 export const newToken = () => randomBytes(32).toString('base64url')
@@ -42,6 +40,3 @@ export const writeSecrets = async (path: string, secrets: Secrets) => {
   await chmod(tmp, 0o600)
   await rename(tmp, path)
 }
-
-/** Shows the last four characters only. */
-export const maskSecret = (value: string | undefined) => (value ? `…${value.slice(-4)}` : null)

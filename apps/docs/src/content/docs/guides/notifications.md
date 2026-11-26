@@ -3,7 +3,7 @@ title: Alerts and notifications
 description: What kammacron tells you, and where.
 ---
 
-kammacron raises an alert, in the app's bell, when something needs a person: a card needs review, a run was reverted, a project paused, a round was skipped, the token was refused, a setup command failed.
+kammacron raises an alert, in the app's bell, when something needs a person: a schedule's command starts failing, Claude is not signed in, a card needs review, a run was reverted, a project paused, a round was skipped, the token was refused, a setup command failed.
 
 The ones worth interrupting you for are also sent:
 

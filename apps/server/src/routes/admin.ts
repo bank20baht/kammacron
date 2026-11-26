@@ -5,7 +5,6 @@ import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
 import { runs } from '../db/schema'
-import { writeSecrets } from '../secrets'
 import { getSettings } from '../services/settings'
 import { childEnv } from '../worker/env'
 import { exec } from '../worker/git'
@@ -19,7 +18,7 @@ const locate = async (name: string, env: Record<string, string>) => {
   return { name, path, version: (version.stdout || version.stderr).trim().split('\n')[0] ?? null }
 }
 
-/** Settings' system box, the Claude token and the weekly numbers. None are tools. */
+/** Settings' system box and the weekly numbers. None are tools. */
 export const adminRoutes = (ctx: AppContext) =>
   new Elysia()
     .get(
@@ -38,59 +37,6 @@ export const adminRoutes = (ctx: AppContext) =>
         }
       },
       { detail: { operationId: 'get_system', summary: 'The tools the worker finds, and where' } },
-    )
-    .put(
-      '/settings/claude-token',
-      async ({ body }) => {
-        ctx.secrets.claude_oauth_token = body.token.trim() || undefined
-        await writeSecrets(ctx.secretsPath, ctx.secrets)
-        return { ok: true as const }
-      },
-      {
-        body: t.Object({
-          token: t.String({ description: 'From `claude setup-token`; empty clears it' }),
-        }),
-        detail: {
-          operationId: 'set_claude_token',
-          summary: 'Keep CLAUDE_CODE_OAUTH_TOKEN in secrets.json',
-        },
-      },
-    )
-    .post(
-      '/settings/claude-test',
-      async () => {
-        const env = await childEnv(ctx.worker)
-        const r = await exec(
-          [
-            ctx.worker.claudeBin,
-            '-p',
-            '--model',
-            'haiku',
-            '--max-turns',
-            '1',
-            '--output-format',
-            'json',
-            '--strict-mcp-config',
-          ],
-          { cwd: homedir(), env, input: 'Reply with the single word: ok', timeoutMs: 120_000 },
-        )
-        let result: { is_error?: boolean; result?: string; api_error_status?: number | null } = {}
-        try {
-          result = JSON.parse(r.stdout) as typeof result
-        } catch {
-          // not JSON: the binary is missing, or it crashed before answering
-        }
-        const ok = r.code === 0 && result.is_error !== true
-        return {
-          ok,
-          message: ok
-            ? (result.result ?? 'ok').trim()
-            : (result.result ?? r.stderr.trim()) || `exit ${String(r.code)}`,
-        }
-      },
-      {
-        detail: { operationId: 'test_claude', summary: 'One short claude -p, to check the token' },
-      },
     )
     .get(
       '/stats',

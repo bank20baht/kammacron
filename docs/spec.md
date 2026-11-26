@@ -1,5 +1,7 @@
 # Spec: kammacron — Kanban + MCP + Claude worker แบบ self-hosted
 
+> **ทิศทางเปลี่ยน (2026-11-26):** kammacron คือ scheduler ที่ใช้ง่ายและไม่ผูกกับ agent ตัวใด Claude เป็นเพียงชนิดหนึ่งของ step และ kammacron ไม่เก็บ token ของ Claude อีกแล้ว (ใช้ login ของเครื่อง) ส่วนของเอกสารนี้ที่พูดถึง `CLAUDE_CODE_OAUTH_TOKEN` หรือ `claude setup-token` เป็นของเดิม
+
 Nov 25, 2026 · @bank20baht
 
 > **อัปเดต 25 พ.ย. 2026:** เป้าหมายเปลี่ยนเป็น "Ansible ฉบับเรียบง่าย": โปรเจกต์มี playbook (step ของ Claude และคำสั่ง shell) และ kammacron เลิกจัดการ git (worktree, gate, verify, การตรวจ ref, Approve ที่ rebase) ส่วนที่เกี่ยวกับ git ข้างล่างจึงเป็นประวัติ ดูรายละเอียดที่ [`playbook.md`](playbook.md)

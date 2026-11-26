@@ -312,7 +312,8 @@ export const runRoutes = (ctx: AppContext) =>
         checkSchedule(await getProject(ctx.db, Number(params.id)), body)
         const [row] = await ctx.db
           .insert(schedules)
-          .values({ ...body, project_id: Number(params.id) })
+          // a failure's card is for a person unless the schedule says who else takes it
+          .values({ ...body, card_tags: body.card_tags ?? [], project_id: Number(params.id) })
           .returning()
         return row
       },

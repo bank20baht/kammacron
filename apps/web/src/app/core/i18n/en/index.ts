@@ -19,6 +19,7 @@ import { welcome } from './welcome'
  * have (`ShapeOf<typeof en>`); a key is `section.name`, e.g. `board.newCard`.
  */
 export const en = {
+  identity: { worker: 'The digital workshop', philosophy: 'You plan. Claude works. You decide.' },
   common,
   nav,
   titles,

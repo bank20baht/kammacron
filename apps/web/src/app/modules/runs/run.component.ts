@@ -6,6 +6,8 @@ import type { AccordionItem, Crumb, TabItem, TimelineItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { runIllustration } from '../../shared/illustration/illustration.registry'
+import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { cost, duration, stamp } from '../../shared/format'
@@ -25,7 +27,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
 /** One run: what went wrong first, then the facts, Claude's summary and every event (live). */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, RouterLink],
+  imports: [IllustrationComponent, BAHT_UI, RouterLink],
   selector: 'web-run',
   styles: `
     .row {
@@ -103,6 +105,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
       @if (run().data; as r) {
         <baht-breadcrumbs [items]="crumbs()" (bahtNavigate)="go('/runs')"></baht-breadcrumbs>
         <baht-page-header [heading]="t('run.heading', { id: r.id })">
+          <app-illustration data-slot="art" [art]="runIllustration(r.status)" />
           @if (r.status === 'running') {
             <baht-button variant="danger" [loading]="busy()" (click)="stop()">{{
               t('run.stop')
@@ -242,6 +245,7 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
   `,
 })
 export class RunComponent {
+  protected readonly runIllustration = runIllustration
   private readonly live = inject(LiveService).live
   private readonly api = inject(Api).client.api
   private readonly router = inject(Router)

@@ -11,6 +11,7 @@ import {
   type ColumnMap,
 } from '@20baht/ui'
 
+import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { dateLocale, I18n, type Translate } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import {
@@ -84,7 +85,7 @@ const validDay = (key: string | undefined): key is string =>
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [IllustrationComponent, BAHT_UI],
   selector: 'web-calendar',
   styles: `
     .tools {
@@ -100,10 +101,9 @@ const validDay = (key: string | undefined): key is string =>
   `,
   template: `
     <div class="app-page">
-      <baht-page-header
-        [heading]="t('calendar.heading')"
-        [description]="t('calendar.description')"
-      ></baht-page-header>
+      <baht-page-header [heading]="t('calendar.heading')" [description]="t('calendar.description')">
+        <app-illustration data-slot="art" art="calendar" />
+      </baht-page-header>
       <div class="tools">
         <span class="muted">{{ t('calendar.show') }}</span>
         <baht-filter

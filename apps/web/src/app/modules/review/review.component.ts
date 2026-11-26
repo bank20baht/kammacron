@@ -3,6 +3,7 @@ import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 
+import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
@@ -14,7 +15,7 @@ import { CardDialogComponent } from '../board/card-dialog.component'
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, CardDialogComponent],
+  imports: [IllustrationComponent, BAHT_UI, CardDialogComponent],
   selector: 'web-review',
   styles: `
     .split {
@@ -64,13 +65,14 @@ import { CardDialogComponent } from '../board/card-dialog.component'
       <baht-page-header
         [heading]="t('review.heading')"
         [description]="t('review.count', { count: count() })"
-      ></baht-page-header>
+      >
+        <app-illustration data-slot="art" art="mirror" />
+      </baht-page-header>
       @if (cards().data; as all) {
         @if (all.length === 0) {
-          <baht-empty-state
-            [message]="t('review.empty')"
-            [hint]="t('review.emptyHint')"
-          ></baht-empty-state>
+          <baht-empty-state [message]="t('review.empty')" [hint]="t('review.emptyHint')">
+            <app-illustration data-slot="art" art="cloud" />
+          </baht-empty-state>
         } @else {
           <div class="split">
             <div class="queue" role="listbox" [attr.aria-label]="t('review.queue')">

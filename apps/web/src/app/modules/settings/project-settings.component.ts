@@ -14,6 +14,7 @@ import type { BahtForm, Crumb, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
@@ -37,7 +38,7 @@ const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
 /** One project's settings, its playbook, the directory check, Run now, and its schedules. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, PlaybookEditorComponent],
+  imports: [IllustrationComponent, BAHT_UI, PlaybookEditorComponent],
   selector: 'web-project-settings',
   styles: `
     .row {

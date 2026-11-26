@@ -4,6 +4,8 @@ import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import type { ColumnMap } from '@20baht/ui'
 
+import { workerIllustration } from '../../shared/illustration/illustration.registry'
+import { IllustratedCardComponent } from '../../shared/illustration/illustrated-card.component'
 import { I18n, type Translate } from '../../core/i18n/i18n.service'
 import { status } from '../../core/i18n/en/status'
 import { LiveService } from '../../services/live.service'
@@ -60,7 +62,7 @@ type Query = {
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [BAHT_UI, IllustratedCardComponent],
   styles: `
     .tools {
       display: flex;
@@ -83,6 +85,25 @@ type Query = {
         [heading]="t('runs.heading')"
         [description]="t('runs.description')"
       ></baht-page-header>
+      @if (worker().data; as worker) {
+        <app-illustrated-card [art]="workerIllustration(worker)">
+          <baht-section-header
+            [heading]="t('identity.worker')"
+            [description]="t('identity.philosophy')"
+          />
+          <baht-badge
+            [tone]="worker.paused ? 'warning' : worker.running.length > 0 ? 'info' : 'neutral'"
+            [busy]="!worker.paused && worker.running.length > 0"
+            [label]="
+              worker.paused
+                ? t('statusBar.paused')
+                : worker.running.length > 0
+                  ? t('board.claudeWorking')
+                  : t('statusBar.idle')
+            "
+          />
+        </app-illustrated-card>
+      }
       <div class="tools">
         <baht-search
           [placeholder]="t('runs.searchPlaceholder')"
@@ -125,6 +146,7 @@ type Query = {
   `,
 })
 export class RunsComponent {
+  protected readonly workerIllustration = workerIllustration
   private readonly live = inject(LiveService).live
   private readonly router = inject(Router)
   protected readonly t = inject(I18n).t
@@ -144,6 +166,8 @@ export class RunsComponent {
   protected readonly projectOptions = computed(() =>
     (this.projects().data ?? []).map((p) => ({ key: String(p.id), label: p.name })),
   )
+
+  protected readonly worker = liveSignal(() => this.live.subscribe('GET', '/api/status'))
 
   protected readonly runs = liveSignal(() =>
     this.live.subscribe('POST', '/api/runs/search', { body: this.query() }),

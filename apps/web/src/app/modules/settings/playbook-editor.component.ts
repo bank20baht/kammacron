@@ -116,104 +116,101 @@ const toStep = (row: Row): PlaybookStep => {
       [heading]="t('project.playbook.heading')"
       [subtitle]="t('project.playbook.subtitle')"
     >
-      <!-- one element of ours: baht-card moves its children, and Angular's anchors with them -->
-      <div>
-        <baht-tabs
-          [tabs]="tabs()"
-          [value]="String(currentKey())"
-          (bahtChange)="pick($any($event).value)"
-        ></baht-tabs>
-        <div class="row">
-          @if (book(); as b) {
-            @if (b.name === 'default') {
-              <span class="muted">{{ t('project.playbook.defaultHelp') }}</span>
-            } @else {
-              <span class="muted">{{
-                t('project.playbook.tagHelp', { tag: 'playbook:' + b.name })
-              }}</span>
-              <span class="grow"></span>
-              <baht-button size="sm" variant="ghost" icon="trash" (click)="removeBook()">{{
-                t('project.playbook.removeBook')
-              }}</baht-button>
-            }
+      <baht-tabs
+        [tabs]="tabs()"
+        [value]="String(currentKey())"
+        (bahtChange)="pick($any($event).value)"
+      ></baht-tabs>
+      <div class="row">
+        @if (book(); as b) {
+          @if (b.name === 'default') {
+            <span class="muted">{{ t('project.playbook.defaultHelp') }}</span>
+          } @else {
+            <span class="muted">{{
+              t('project.playbook.tagHelp', { tag: 'playbook:' + b.name })
+            }}</span>
+            <span class="grow"></span>
+            <baht-button size="sm" variant="ghost" icon="trash" (click)="removeBook()">{{
+              t('project.playbook.removeBook')
+            }}</baht-button>
           }
-        </div>
-        @for (row of rows(); track row.key; let i = $index, first = $first, last = $last) {
-          <div class="step">
-            <div class="head">
-              <baht-badge
-                [tone]="row.kind === 'claude' ? 'info' : 'neutral'"
-                [label]="
-                  t('project.playbook.step', { n: i + 1 }) +
-                  ' · ' +
-                  (row.kind === 'claude' ? t('project.playbook.claude') : t('project.playbook.run'))
-                "
-              ></baht-badge>
-              <span class="grow"></span>
-              <baht-button
-                size="sm"
-                variant="ghost"
-                icon="chevron-up"
-                icon-only
-                [label]="t('project.playbook.up')"
-                [disabled]="first"
-                (click)="move(i, -1)"
-              ></baht-button>
-              <baht-button
-                size="sm"
-                variant="ghost"
-                icon="chevron-down"
-                icon-only
-                [label]="t('project.playbook.down')"
-                [disabled]="last"
-                (click)="move(i, 1)"
-              ></baht-button>
-              <baht-button
-                size="sm"
-                variant="ghost"
-                icon="trash"
-                icon-only
-                [label]="t('project.playbook.remove')"
-                (click)="remove(i)"
-              ></baht-button>
-            </div>
-            <baht-form
-              [form]="row.kind === 'claude' ? claudeForm() : runForm()"
-              [value]="row.data"
-              (bahtChange)="change(row.key, $any($event).data)"
-            ></baht-form>
-          </div>
-        } @empty {
-          <p class="muted">{{ t('project.playbook.empty') }}</p>
-        }
-        <div class="row">
-          <span class="muted">{{ t('project.playbook.add') }}</span>
-          <baht-button size="sm" variant="secondary" icon="plus" (click)="addClaude()">{{
-            t('project.playbook.addClaude')
-          }}</baht-button>
-          <baht-button size="sm" variant="secondary" icon="plus" (click)="addRun()">{{
-            t('project.playbook.addRun')
-          }}</baht-button>
-          <baht-button size="sm" variant="secondary" icon="plus" (click)="addSsh()">{{
-            t('project.playbook.addSsh')
-          }}</baht-button>
-        </div>
-        <p class="muted">{{ t('project.playbook.env') }}</p>
-        <div class="row">
-          <baht-form #nf="bahtForm" class="grow" [form]="nameForm()" [value]="{}"></baht-form>
-          <baht-button size="sm" variant="secondary" icon="plus" (click)="addBook(nf.element)">{{
-            t('project.playbook.addBook')
-          }}</baht-button>
-        </div>
-        @if (error(); as e) {
-          <baht-alert
-            tone="danger"
-            [message]="e"
-            dismissible
-            (bahtDismiss)="error.set(null)"
-          ></baht-alert>
         }
       </div>
+      @for (row of rows(); track row.key; let i = $index, first = $first, last = $last) {
+        <div class="step">
+          <div class="head">
+            <baht-badge
+              [tone]="row.kind === 'claude' ? 'info' : 'neutral'"
+              [label]="
+                t('project.playbook.step', { n: i + 1 }) +
+                ' · ' +
+                (row.kind === 'claude' ? t('project.playbook.claude') : t('project.playbook.run'))
+              "
+            ></baht-badge>
+            <span class="grow"></span>
+            <baht-button
+              size="sm"
+              variant="ghost"
+              icon="chevron-up"
+              icon-only
+              [label]="t('project.playbook.up')"
+              [disabled]="first"
+              (click)="move(i, -1)"
+            ></baht-button>
+            <baht-button
+              size="sm"
+              variant="ghost"
+              icon="chevron-down"
+              icon-only
+              [label]="t('project.playbook.down')"
+              [disabled]="last"
+              (click)="move(i, 1)"
+            ></baht-button>
+            <baht-button
+              size="sm"
+              variant="ghost"
+              icon="trash"
+              icon-only
+              [label]="t('project.playbook.remove')"
+              (click)="remove(i)"
+            ></baht-button>
+          </div>
+          <baht-form
+            [form]="row.kind === 'claude' ? claudeForm() : runForm()"
+            [value]="row.data"
+            (bahtChange)="change(row.key, $any($event).data)"
+          ></baht-form>
+        </div>
+      } @empty {
+        <p class="muted">{{ t('project.playbook.empty') }}</p>
+      }
+      <div class="row">
+        <span class="muted">{{ t('project.playbook.add') }}</span>
+        <baht-button size="sm" variant="secondary" icon="plus" (click)="addClaude()">{{
+          t('project.playbook.addClaude')
+        }}</baht-button>
+        <baht-button size="sm" variant="secondary" icon="plus" (click)="addRun()">{{
+          t('project.playbook.addRun')
+        }}</baht-button>
+        <baht-button size="sm" variant="secondary" icon="plus" (click)="addSsh()">{{
+          t('project.playbook.addSsh')
+        }}</baht-button>
+      </div>
+      <p class="muted">{{ t('project.playbook.env') }}</p>
+      <div class="row">
+        <baht-form #nf="bahtForm" class="grow" [form]="nameForm()" [value]="{}"></baht-form>
+        <baht-button size="sm" variant="secondary" icon="plus" (click)="addBook(nf.element)">{{
+          t('project.playbook.addBook')
+        }}</baht-button>
+      </div>
+      @if (error(); as e) {
+        <baht-alert
+          tone="danger"
+          [message]="e"
+          dismissible
+          (bahtDismiss)="error.set(null)"
+        ></baht-alert>
+      }
     </baht-card>
     <baht-save-bar
       [open]="dirty()"

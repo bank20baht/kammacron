@@ -14,6 +14,7 @@ import { defineForm } from '@20baht/ui/engine'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { I18n, type AppLocale, type Translate } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
@@ -55,7 +56,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 /** The install: Claude's token, MCP, pause, hosts, notifications, the tools found; and the projects. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [IllustrationComponent, BAHT_UI],
   selector: 'web-settings',
   styleUrl: './settings.component.css',
   templateUrl: './settings.component.html',

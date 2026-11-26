@@ -1,8 +1,7 @@
 <div class="app-page">
-  <baht-page-header
-    [heading]="t('settings.heading')"
-    [description]="t('settings.description')"
-  ></baht-page-header>
+  <baht-page-header [heading]="t('settings.heading')" [description]="t('settings.description')">
+    <app-illustration data-slot="art" art="toolbox" />
+  </baht-page-header>
   @if (message(); as m) {
     <baht-alert
       [tone]="m.tone"

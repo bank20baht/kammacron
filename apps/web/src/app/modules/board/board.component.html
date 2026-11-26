@@ -2,6 +2,7 @@
   <div class="app-page board-page">
     @if (project(); as p) {
       <baht-page-header [heading]="t('board.headingProject', { name: p.name })">
+        <app-illustration data-slot="art" [art]="p.paused_reason ? 'mug' : 'cloud'" />
         <baht-button variant="secondary" icon="play" [disabled]="!p.repo_path" (click)="runNow()">{{
           t('board.runNow')
         }}</baht-button>
@@ -91,6 +92,7 @@
 
     @if ((projects().data ?? []).length === 0 && projects().data) {
       <baht-empty-state [message]="t('board.noProject')" [hint]="t('board.noProjectHint')">
+        <app-illustration data-slot="art" art="cloud" />
         <baht-button variant="primary" (click)="go('/welcome')">{{
           t('board.getStarted')
         }}</baht-button>

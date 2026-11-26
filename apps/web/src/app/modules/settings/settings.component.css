@@ -1,12 +1,12 @@
 .split {
   display: grid;
-  grid-template-columns: 1fr minmax(15rem, 19rem);
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
   gap: var(--baht-space-4);
   align-items: start;
 }
 @media (width < 1000px) {
   .split {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .stack {

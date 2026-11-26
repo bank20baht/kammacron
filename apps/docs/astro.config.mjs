@@ -11,8 +11,8 @@ export default defineConfig({
       title: 'kammacron',
       description:
         'A Kanban board, an MCP server and an unattended Claude Code worker in one process on your own machine.',
-      logo: { src: './src/assets/mark.svg', replacesTitle: false },
-      favicon: '/favicon.svg',
+      logo: { src: './src/assets/app-mark.webp', replacesTitle: false },
+      favicon: '/favicon.ico?v=buffalo-1',
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/bank20baht/kammacron' },
       ],

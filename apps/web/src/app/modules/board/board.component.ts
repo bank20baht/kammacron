@@ -15,6 +15,7 @@ import type { BahtForm, FormDefinition, NavItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
@@ -43,6 +44,7 @@ const isStatus = (value: string): value is CardStatus => COLUMNS.some((c) => c =
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    IllustrationComponent,
     BAHT_UI,
     CardDialogComponent,
     RouterLink,

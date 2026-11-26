@@ -7,6 +7,14 @@
   [value]="current()"
   (baht-nav)="navigate($event)"
 >
+  <img
+    data-slot="brand-art"
+    src="/brand/app-mark.webp?v=transparent-2"
+    width="256"
+    height="256"
+    alt=""
+    decoding="async"
+  />
   <div data-slot="actions" class="actions">
     <app-status-bar></app-status-bar>
     <baht-theme-toggle default="system"></baht-theme-toggle>

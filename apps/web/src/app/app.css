@@ -3,6 +3,10 @@
   min-width: 0;
 }
 
+baht-app-shell {
+  --baht-shell-brand-art-size: 40px;
+}
+
 /* status, alerts and the theme toggle on one line in the header */
 .actions {
   display: flex;

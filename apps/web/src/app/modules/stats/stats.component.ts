@@ -11,6 +11,7 @@ import type { ChartSeries, ColumnMap } from '@20baht/ui'
 import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
+import { IllustratedCardComponent } from '../../shared/illustration/illustrated-card.component'
 import { currentLocale, I18n, type Translate } from '../../core/i18n/i18n.service'
 import { cost } from '../../shared/format'
 
@@ -25,18 +26,22 @@ const columnsOf = (t: Translate): ColumnMap => ({
 /** What the worker did, week by week: done, handed back, failed, and what it cost. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [IllustratedCardComponent, BAHT_UI],
   selector: 'web-stats',
   styles: `
     .stats {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
       gap: var(--baht-space-4);
     }
     .charts {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
       gap: var(--baht-space-4);
+    }
+    .ranges {
+      max-width: 100%;
+      overflow-x: auto;
     }
     .muted {
       margin: 0;
@@ -46,7 +51,11 @@ const columnsOf = (t: Translate): ColumnMap => ({
   `,
   template: `
     <div class="app-page">
-      <baht-page-header [heading]="t('stats.heading')" [description]="t('stats.description')">
+      <baht-page-header
+        [heading]="t('stats.heading')"
+        [description]="t('stats.description')"
+      ></baht-page-header>
+      <div class="ranges">
         <baht-tabs
           variant="pill"
           [label]="t('stats.weeksLabel')"
@@ -54,16 +63,16 @@ const columnsOf = (t: Translate): ColumnMap => ({
           [value]="String(weeks())"
           (bahtChange)="weeks.set(Number($any($event).value))"
         ></baht-tabs>
-      </baht-page-header>
+      </div>
       @if (stats.value(); as s) {
         <div class="stats">
-          <baht-card
+          <app-illustrated-card [metric]="true" art="gear"
             ><baht-stat [label]="t('stats.runs')" [value]="s.total.runs"></baht-stat
-          ></baht-card>
-          <baht-card
+          ></app-illustrated-card>
+          <app-illustrated-card [metric]="true" art="rice"
             ><baht-stat [label]="t('stats.shippedByClaude')" [value]="s.total.done"></baht-stat
-          ></baht-card>
-          <baht-card>
+          ></app-illustrated-card>
+          <app-illustrated-card [metric]="true" art="mirror">
             <baht-stat
               [label]="t('stats.sentToReview')"
               [value]="s.total.review_rate"
@@ -73,8 +82,8 @@ const columnsOf = (t: Translate): ColumnMap => ({
             <p class="muted">
               {{ t('stats.reviewOf', { review: s.total.review, runs: s.total.runs }) }}
             </p>
-          </baht-card>
-          <baht-card>
+          </app-illustrated-card>
+          <app-illustrated-card [metric]="true" art="banknote">
             <baht-stat
               [label]="t('stats.cost')"
               [value]="s.total.cost"
@@ -84,7 +93,7 @@ const columnsOf = (t: Translate): ColumnMap => ({
             <p class="muted">
               {{ t('stats.costNote') }}
             </p>
-          </baht-card>
+          </app-illustrated-card>
         </div>
         @if (s.total.runs <= 1) {
           <baht-alert tone="info" [message]="t('stats.noTrend')"></baht-alert>

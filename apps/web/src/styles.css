@@ -9,25 +9,30 @@ body {
 }
 
 /*
- * The colours, with the library's own tokens only (so every element follows): konmek's light
- * cloud palette, and a dark one with a blue cast and three clear layers (page, column or panel,
+ * Thai-cloud palette, following konmek's white surfaces and cobalt ink through library tokens,
+ * and a dark one with a blue cast and three clear layers (page, column or panel,
  * card) instead of three near-blacks.
  */
 html:not([data-baht-theme='dark']) {
   --baht-primary: #2449c4;
-  --baht-accent: #c45c35;
+  --baht-accent: #ff7417;
+  --baht-accent-content: #142b49;
   --baht-base-100: #ffffff; /* surfaces: cards, tiles, panels */
-  --baht-base-200: #ffffff; /* the page */
+  --baht-base-200: #ffffff; /* white paper, like konmek */
   --baht-base-300: #f2f5fb; /* sunken: board columns, selected rows */
   --baht-row-alt: #f8fafd;
   --baht-color-border: #d7e2f4;
   --baht-color-border-strong: #b5c8e5;
   --baht-color-divider: #e6edf8;
-  --baht-color-text: #15203b;
+  --baht-color-text: #142b49;
   --baht-color-text-muted: #5b6980;
 }
 
 html[data-baht-theme='dark'] {
+  --baht-primary: #8db8ff;
+  --baht-primary-content: #142b49;
+  --baht-accent: #ff944f;
+  --baht-accent-content: #142b49;
   --baht-base-200: #0d1017; /* the page */
   --baht-base-300: #141922; /* sunken: board columns */
   --baht-base-100: #1b212d; /* surfaces: cards, tiles, panels */
@@ -44,6 +49,8 @@ html[data-baht-theme='dark'] {
 html {
   --baht-shell-header-bg: var(--baht-color-surface);
   --baht-shell-header-ink: var(--baht-color-text);
+  --baht-table-head-bg: var(--baht-color-surface);
+  --baht-table-head-ink: var(--baht-color-text-muted);
 }
 .baht-shell .baht-shell-header {
   border-bottom: var(--baht-border-default);
@@ -71,4 +78,20 @@ html {
   box-sizing: border-box;
   max-width: 1200px;
   padding: var(--baht-space-5);
+}
+
+/* Public PageHeader art sizing API; compact on technical pages, roomier for onboarding. */
+baht-page-header {
+  --baht-page-header-art-size: 5rem;
+}
+baht-page-header[size='lg'] {
+  --baht-page-header-art-size: 26rem;
+}
+@media (width < 600px) {
+  baht-page-header {
+    --baht-page-header-art-size: 4rem;
+  }
+  baht-page-header[size='lg'] {
+    --baht-page-header-art-size: 12rem;
+  }
 }

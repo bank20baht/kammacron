@@ -49,13 +49,30 @@ import { claudeTokenForm } from '../../shared/forms'
       color: var(--baht-color-text-muted);
       font-size: var(--baht-text-sm);
     }
+    .app-logo {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
   `,
   template: `
     <div class="app-page">
       <baht-page-header
+        size="lg"
+        [eyebrow]="t('identity.philosophy')"
         [heading]="t('welcome.heading')"
         [description]="t('welcome.description')"
-      ></baht-page-header>
+      >
+        <img
+          data-slot="art"
+          class="app-logo"
+          src="/brand/app-icon.webp?v=transparent-2"
+          width="768"
+          height="512"
+          alt=""
+          decoding="async"
+        />
+      </baht-page-header>
       <div class="split">
         <baht-card
           [heading]="t('welcome.progress')"

@@ -85,3 +85,10 @@
     transform: none;
   }
 }
+
+/* The hero's logo (raw html, so Starlight does not crop it square): its whole 3:2 width. */
+.hero-html img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

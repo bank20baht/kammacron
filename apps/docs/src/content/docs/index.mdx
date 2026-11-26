@@ -4,8 +4,9 @@ description: A Kanban board, an MCP server and an unattended Claude Code worker 
 template: splash
 hero:
   title: kammacron
+  # html, not file: Starlight sizes a file to a 400x400 square, which crops the 3:2 logo's sides
   image:
-    file: ../../assets/app-icon.webp
+    html: '<img src="/brand/app-icon.webp?v=transparent-2" width="768" height="512" alt="kammacron: You plan. Claude works. You decide." fetchpriority="high" />'
   tagline: Your backlog, on the clock. Write a card, hand it to Claude, and only look at what needs a decision.
   actions:
     - text: Get started

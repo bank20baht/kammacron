@@ -13,7 +13,7 @@ A schedule runs on an interval, inside the project's round, in the project's dir
 
 ## The calendar
 
-![The calendar: worker rounds and schedules ahead, runs behind](../../../assets/calendar.png)
+![The calendar's month: worker rounds, schedules and housekeeping ahead (dashed), runs behind (solid)](../../../assets/calendar.png)
 
 **Calendar** shows what runs on its own, and when:
 

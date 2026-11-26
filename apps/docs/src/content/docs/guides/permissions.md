@@ -19,8 +19,6 @@ What can lose work, whatever the project allows: force pushes (`--force`, `-f`, 
 
 ## Commands blocked by the allowlist
 
-![Commands the worker tried and was refused](../../../assets/run.png)
-
 Each run lists the commands Claude tried and was refused. Allow only what the project needs: **Open project permissions** goes straight to the list.
 
 ## What kammacron does not do

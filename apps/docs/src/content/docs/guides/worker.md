@@ -12,7 +12,7 @@ Every project with its worker on is checked on its **interval** (30 minutes by d
 
 Then it sets the project's next round.
 
-![A run: duration, turns, cost, and the commands the allowlist refused](../../../assets/run.png)
+![A run whose Migrate step failed: its steps, the command and the end of its output](../../../assets/run.png)
 
 ## Modes
 

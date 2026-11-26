@@ -215,7 +215,7 @@ export const createScheduler = (env: WorkerEnv) => {
     const failed = `\`${schedule.command ?? ''}\` failed with exit ${String(r.code)}.`
     // Output is whatever a test, a package or a remote host printed. It goes in a comment, which
     // the worker reads as data, never in the body, which it reads as the task.
-    const printed = `\`\`\`\n${output}\n\`\`\``
+    const printed = output || '(no output)' // comments are plain text: no fences
     const open = await openCard(schedule.last_card_id)
     if (open) {
       await addComment(env.db, open.id, {

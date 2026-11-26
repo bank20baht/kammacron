@@ -6,6 +6,7 @@ type StreamLine = {
   type?: string
   subtype?: string
   session_id?: string
+  model?: string
   error?: string
   message?: { content?: unknown }
   result?: string
@@ -78,7 +79,9 @@ export const eventsOf = (line: StreamLine): RunEvent[] => {
         {
           type: 'system',
           summary: clip(line.subtype ?? 'system', SUMMARY_MAX),
-          data: capped(line),
+          // `init` lists the person's plugins, skills, MCP servers and home paths, and run events
+          // are read over MCP: keep only what says which run this was
+          data: { subtype: line.subtype, session_id: line.session_id, model: line.model },
         },
       ]
     case 'assistant':

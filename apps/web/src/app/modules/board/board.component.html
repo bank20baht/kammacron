@@ -188,14 +188,16 @@
   </baht-modal>
 </div>
 
-<baht-form-modal
-  [heading]="t('board.newCard')"
-  [submitLabel]="t('board.createCard')"
-  [open]="creating()"
-  [form]="newForm()"
-  [value]="newValue()"
-  [registry]="registry"
-  [error]="createError()"
-  (bahtSubmit)="create($any($event).data)"
-  (bahtClose)="creating.set(false)"
-></baht-form-modal>
+@for (n of [formNumber()]; track n) {
+  <baht-form-modal
+    [heading]="t('board.newCard')"
+    [submitLabel]="t('board.createCard')"
+    [open]="creating()"
+    [form]="newForm()"
+    [value]="newValue()"
+    [registry]="registry"
+    [error]="createError()"
+    (bahtSubmit)="create($any($event).data)"
+    (bahtClose)="creating.set(false)"
+  ></baht-form-modal>
+}

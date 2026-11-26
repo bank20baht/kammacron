@@ -8,8 +8,9 @@ const WEB = ['apps/web/src/**', 'packages/kit/src/**']
 // Every rule is an error. Add app overrides below, each with a reason:
 //   // eslint-disable-next-line <rule> -- <why>
 export default defineConfig([
-  // Astro's generated types (apps/docs); agent skills installed as they are published (.claude)
-  globalIgnores(['**/.astro/', '.claude/']),
+  // Astro's generated types (apps/docs); agent skills installed as they are published (.claude);
+  // local screenshots and video scripts, which git does not track (docs/screenshots)
+  globalIgnores(['**/.astro/', '.claude/', 'docs/screenshots/']),
   ...base,
   ...angular({
     files: WEB,

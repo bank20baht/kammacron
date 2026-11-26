@@ -161,6 +161,8 @@ export class BoardComponent {
 
   // a new card
   protected readonly creating = signal(false)
+  /** A form keeps what was typed into it, so each new card gets a form of its own. */
+  protected readonly formNumber = signal(0)
   protected readonly error = signal<string | null>(null)
   protected readonly createError = signal('')
   protected readonly busy = signal(false)
@@ -202,6 +204,7 @@ export class BoardComponent {
 
   protected startNew(): void {
     const project = this.project() ?? this.projects().data?.[0]
+    this.formNumber.update((n) => n + 1)
     this.newValue.set({
       project_id: project ? String(project.id) : null,
       owner: 'claude',

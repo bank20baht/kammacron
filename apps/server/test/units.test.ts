@@ -72,6 +72,25 @@ describe('stream-json', () => {
     ])
   })
 
+  test("an init line keeps nothing of the person's setup", () => {
+    const line = {
+      type: 'system',
+      subtype: 'init',
+      session_id: 's1',
+      model: 'haiku',
+      plugins: [{ path: '/Users/someone/.claude/plugins/x' }],
+      skills: ['private-skill'],
+      cwd: '/Users/someone/work',
+    }
+    expect(eventsOf(line)).toEqual([
+      {
+        type: 'system',
+        summary: 'init',
+        data: { subtype: 'init', session_id: 's1', model: 'haiku' },
+      },
+    ])
+  })
+
   test('data past 8 KB is cut, and summaries stay short', () => {
     const [event] = eventsOf({
       type: 'assistant',

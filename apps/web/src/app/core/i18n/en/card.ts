@@ -28,6 +28,7 @@ export const card = {
   commentPlaceholder: 'Add a comment. Claude reads every comment on its next run.',
   noComments: 'No comments yet',
   authorRun: 'Claude (run {run})',
+  authorSchedule: 'kammacron (schedule)',
   authorMcp: 'Claude (MCP)',
   authorYou: 'You',
   notLoaded: 'This card did not load',

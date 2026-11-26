@@ -94,7 +94,10 @@ export class CardDialogComponent {
       id: c.id,
       author:
         c.author === 'claude-worker'
-          ? this.t('card.authorRun', { run: c.run_id ?? '' })
+          ? // no run: a schedule wrote it, and no agent was involved
+            c.run_id === null
+            ? this.t('card.authorSchedule')
+            : this.t('card.authorRun', { run: c.run_id })
           : c.author === 'mcp'
             ? this.t('card.authorMcp')
             : this.t('card.authorYou'),

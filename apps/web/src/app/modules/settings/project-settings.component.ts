@@ -6,6 +6,7 @@ import {
   input,
   resource,
   signal,
+  untracked,
 } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
@@ -18,7 +19,15 @@ import { IllustrationComponent } from '../../shared/illustration/illustration.co
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
-import { COMMAND, projectForm, scheduleForm } from '../../shared/forms'
+import { projectForm, scheduleForm } from '../../shared/forms'
+import {
+  cronOf,
+  runsWhat,
+  SCHEDULE_KINDS,
+  TIMINGS,
+  type ScheduleKind,
+  type Timing,
+} from '../../shared/schedule'
 import { PlaybookEditorComponent } from './playbook-editor.component'
 
 type Check = {
@@ -58,6 +67,9 @@ const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
     .muted {
       color: var(--baht-color-text-muted);
     }
+    .grow {
+      flex: 1;
+    }
   `,
   templateUrl: './project-settings.component.html',
 })
@@ -92,13 +104,49 @@ export class ProjectSettingsComponent {
   protected readonly busy = signal(false)
   protected readonly ago = ago
   protected readonly projectForm = computed(() => projectForm(this.t))
-  protected readonly scheduleForm = computed(() =>
-    scheduleForm(
-      this.t,
-      (this.project.value()?.playbooks ?? []).map((p) => p.name),
-    ),
+  /** What the new cron job runs, and how its time is picked: the tabs above its form. */
+  protected readonly scheduleKind = signal<ScheduleKind>('claude')
+  protected readonly timing = signal<Timing>('hourly')
+  protected readonly kindTabs = computed<TabItem[]>(() =>
+    SCHEDULE_KINDS.map((key) => ({ key, label: this.t(`project.schedules.kind.${key}`) })),
   )
-  protected readonly scheduleValue = { interval_minutes: 1440, runs: COMMAND }
+  protected readonly timingTabs = computed<TabItem[]>(() =>
+    TIMINGS.map((key) => ({ key, label: this.t(`project.schedules.timing.${key}`) })),
+  )
+  protected readonly playbookNames = computed(() =>
+    (this.project.value()?.playbooks ?? []).map((p) => p.name),
+  )
+  protected readonly scheduleForm = computed(() =>
+    scheduleForm(this.t, this.scheduleKind(), this.timing(), this.playbookNames()),
+  )
+  /** What the form holds now: it keeps what was typed when the tabs change the fields. */
+  private readonly scheduleData = signal<Record<string, unknown>>({
+    interval_minutes: 60,
+    minute: 0,
+    time: '09:00',
+    weekday: '1',
+    use_board: true,
+  })
+  /** Given to the form again only when the tabs change its fields, never on each keystroke. */
+  protected readonly scheduleValue = computed(() => {
+    this.scheduleKind()
+    this.timing()
+    return untracked(() => this.scheduleData())
+  })
+  /** The expression the timing makes, as it will be saved. */
+  protected readonly cronPreview = computed(() => {
+    const timing = this.timing()
+    const data = this.scheduleData()
+    if (timing === 'interval')
+      return this.t('project.schedules.previewInterval', {
+        minutes: count(data['interval_minutes'], 60),
+      })
+    const cron = cronOf(timing, data)
+    return cron
+      ? this.t('project.schedules.preview', { cron })
+      : this.t('project.schedules.previewMissing')
+  })
+  protected readonly runsWhat = runsWhat
 
   protected readonly value = computed(() => {
     const p = this.project.value()
@@ -187,21 +235,57 @@ export class ProjectSettingsComponent {
     }, this.t('project.messages.resumed'))
   }
 
+  protected pickKind(kind: string): void {
+    if ((SCHEDULE_KINDS as readonly string[]).includes(kind))
+      this.scheduleKind.set(kind as ScheduleKind)
+  }
+
+  protected pickTiming(timing: string): void {
+    if ((TIMINGS as readonly string[]).includes(timing)) this.timing.set(timing as Timing)
+  }
+
+  protected scheduleChanged(data: Record<string, unknown>): void {
+    this.scheduleData.update((now) => ({ ...now, ...data }))
+  }
+
+  /** What the new cron job runs, as the API takes it. */
+  private runsBody(d: Record<string, unknown>) {
+    const kind = this.scheduleKind()
+    if (kind === 'claude' || kind === 'codex')
+      return {
+        agent: kind,
+        prompt: text(d['prompt']),
+        use_board: d['use_board'] === true,
+        model: text(d['model']),
+      }
+    if (kind === 'playbook') return { playbook: text(d['playbook']) }
+    return { command: text(d['command']), card_tags: list(d['card_tags']) }
+  }
+
   protected addSchedule(form: BahtForm): Promise<void> {
     if (!form.validate().valid) return Promise.resolve()
     const d = form.getData()
+    const timing = this.timing()
+    const cron = cronOf(timing, d)
+    if (timing !== 'interval' && !cron) {
+      this.message.set({ tone: 'danger', text: this.t('project.schedules.previewMissing') })
+      return Promise.resolve()
+    }
     return this.act(async () => {
       await firstValueFrom(
         this.api.projects({ id: this.id() }).schedules.post({
           name: text(d['name']) ?? '',
-          ...(text(d['runs']) && text(d['runs']) !== COMMAND
-            ? { playbook: text(d['runs']) }
-            : { command: text(d['command']), card_tags: list(d['card_tags']) }),
-          interval_minutes: count(d['interval_minutes'], 1440),
+          ...this.runsBody(d),
+          ...(cron ? { cron } : { interval_minutes: count(d['interval_minutes'], 60) }),
         }),
       )
       form.reset()
     }, this.t('project.messages.scheduleAdded'))
+  }
+
+  /** When a listed schedule runs, in a few words. */
+  protected whenOf(s: { cron: string | null; interval_minutes: number }): string {
+    return s.cron ?? this.t('project.schedules.every', { minutes: s.interval_minutes })
   }
 
   protected toggleSchedule(id: number, enabled: boolean): Promise<void> {

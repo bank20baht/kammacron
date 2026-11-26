@@ -155,7 +155,12 @@ switch (command) {
     }
     const status = (await api('GET', '/api/status')) as {
       paused: boolean
-      running: { run_id: number; card_id: number; card_title: string }[]
+      running: {
+        run_id: number
+        card_id: number | null
+        card_title: string | null
+        schedule_name: string | null
+      }[]
       review: number
       paused_projects: { name: string; reason: string }[]
     }
@@ -164,7 +169,9 @@ switch (command) {
     )
     console.log(`worker: ${status.paused ? 'PAUSED' : 'on'}`)
     for (const r of status.running)
-      console.log(`  run ${String(r.run_id)}: #${String(r.card_id)} ${r.card_title}`)
+      console.log(
+        `  run ${String(r.run_id)}: ${r.card_id === null ? `schedule ${r.schedule_name ?? ''}` : `#${String(r.card_id)} ${r.card_title ?? ''}`}`,
+      )
     for (const p of status.paused_projects) console.log(`  project ${p.name} paused: ${p.reason}`)
     console.log(`review: ${String(status.review)} card${status.review === 1 ? '' : 's'}`)
     break

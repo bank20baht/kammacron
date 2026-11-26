@@ -1,12 +1,13 @@
 import { join } from 'node:path'
 
-import { and, eq, isNull, lte, or } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, lte, or } from 'drizzle-orm'
 
 import { cards, PLAYBOOK_TAG, projects, runs, schedules } from '../db/schema'
 
 type Schedule = typeof schedules.$inferSelect
 import { addAlert } from '../services/alerts'
 import { HOUSEKEEPING_MINUTES } from '../services/calendar'
+import { nextScheduleRun } from '../services/cron'
 import { purgeOrphans } from '../services/attachments'
 import { purgeOAuth } from '../services/oauth-storage'
 import { addComment, createCards, moveCard, pickableCards } from '../services/cards'
@@ -16,12 +17,13 @@ import { getSettings } from '../services/settings'
 import { redact } from './redact'
 import { childEnv, claudeHeld, passedSecrets, type WorkerEnv } from './env'
 import { exec } from './git'
+import { runAgentSchedule } from './agent'
 import { needsClaude, runCard } from './runner'
 
 const TICK_MS = 30_000
 
 export type SchedulerStatus = {
-  running: { run_id: number; project_id: number; card_id: number }[]
+  running: { run_id: number; project_id: number; card_id: number | null }[]
   queued: number[]
   last_tick: string | null
   /** When the daily housekeeping (old run events, orphan files, OAuth rows) last ran. */
@@ -116,7 +118,23 @@ export const createScheduler = (env: WorkerEnv) => {
     return done === 0 ? `skipped: ${skipped}` : `${ran}, then skipped: ${skipped}`
   }
 
-  /** One round of a project: stale sweep, pre-check without Claude, then up to max cards. */
+  /**
+   * Schedules run on their own time, whether the project's worker is on or not: they need only a
+   * directory, and the project neither archived nor paused.
+   */
+  const schedulable = (project: Project) =>
+    !project.paused_reason && !project.archived && project.repo_path !== null
+
+  /** Only the schedules that are due; and the cards a playbook schedule just opened. */
+  const scheduleRound = async (projectId: number) => {
+    const settings = await getSettings(env.db)
+    const project = await getProject(env.db, projectId)
+    if (settings.paused || !schedulable(project)) return
+    const opened = await runSchedules(project)
+    if (opened && runnable(project)) await runCards(project)
+  }
+
+  /** One round of a project: stale sweep, its due schedules, then up to max cards. */
   const round = async (projectId: number) => {
     const settings = await getSettings(env.db)
     const project = await getProject(env.db, projectId)
@@ -142,7 +160,10 @@ export const createScheduler = (env: WorkerEnv) => {
       .where(eq(projects.id, project.id))
   }
 
-  /** Schedules of a project that are due: a failing command opens (or comments on) a card. */
+  /**
+   * Schedules of a project that are due: a failing command opens (or comments on) a card, a
+   * playbook opens a card, an agent runs. Whether a playbook opened a card the round should run.
+   */
   const runSchedules = async (project: Project) => {
     const due = await env.db
       .select()
@@ -154,21 +175,42 @@ export const createScheduler = (env: WorkerEnv) => {
           or(isNull(schedules.next_run_at), lte(schedules.next_run_at, new Date())),
         ),
       )
-    if (due.length === 0 || !project.repo_path) return
+    let opened = false
+    if (due.length === 0 || !project.repo_path) return opened
     for (const schedule of due) {
-      if (stopping) return
-      const cardId = schedule.playbook
-        ? await playbookCard(project, schedule)
-        : await commandSchedule(project, schedule, project.repo_path)
+      if (stopping) return opened
+      const started = new Date()
+      // the next time first: a run that takes long does not make the next tick start it again
       await env.db
         .update(schedules)
-        .set({
-          last_run_at: new Date(),
-          last_card_id: cardId,
-          next_run_at: new Date(Date.now() + schedule.interval_minutes * 60_000),
-        })
+        .set({ last_run_at: started, next_run_at: nextScheduleRun(schedule, started) })
         .where(eq(schedules.id, schedule.id))
+      const done = await runSchedule(project, schedule, project.repo_path)
+      if (schedule.playbook && done.last_card_id !== null) opened = true
+      await env.db.update(schedules).set(done).where(eq(schedules.id, schedule.id))
     }
+    return opened
+  }
+
+  /** One schedule's time, by what it runs; what to write on its row after. */
+  const runSchedule = async (project: Project, schedule: Schedule, dir: string) => {
+    if (schedule.agent) {
+      const outcome = await runAgentSchedule(env, project, schedule)
+      return {
+        last_card_id: schedule.last_card_id,
+        last_run_id: outcome.run?.id ?? schedule.last_run_id,
+        last_result: outcome.result,
+      }
+    }
+    if (schedule.playbook) {
+      const cardId = await playbookCard(project, schedule)
+      return {
+        last_card_id: cardId,
+        last_result: cardId === null ? 'no card' : `card #${String(cardId)}`,
+      }
+    }
+    const cardId = await commandSchedule(project, schedule, dir)
+    return { last_card_id: cardId }
   }
 
   /** The card a schedule opened last, while it is still open. */
@@ -207,7 +249,7 @@ export const createScheduler = (env: WorkerEnv) => {
     })
     await env.db
       .update(schedules)
-      .set({ last_exit_code: r.code })
+      .set({ last_exit_code: r.code, last_result: `exit ${String(r.code)}` })
       .where(eq(schedules.id, schedule.id))
     if (r.code === 0) return schedule.last_card_id
     const secrets = [env.apiToken(), ...passedSecrets()]
@@ -251,7 +293,8 @@ export const createScheduler = (env: WorkerEnv) => {
         if (index < 0) return
         const [projectId] = queue.splice(index, 1)
         if (projectId === undefined) return
-        const job = round(projectId)
+        const full = fullRound.delete(projectId)
+        const job = (full ? round(projectId) : scheduleRound(projectId))
           .catch(async (error: unknown) => {
             const message = error instanceof Error ? error.message : String(error)
             await addAlert(env.db, {
@@ -269,8 +312,13 @@ export const createScheduler = (env: WorkerEnv) => {
     })()
   }
 
-  const enqueue = (projectId: number) => {
-    if (!queue.includes(projectId) && !active.has(projectId)) queue.push(projectId)
+  /** Projects queued for a whole round; the others in the queue run only their due schedules. */
+  const fullRound = new Set<number>()
+
+  const enqueue = (projectId: number, full = true) => {
+    if (active.has(projectId)) return
+    if (full) fullRound.add(projectId)
+    if (!queue.includes(projectId)) queue.push(projectId)
     pump()
   }
 
@@ -293,6 +341,21 @@ export const createScheduler = (env: WorkerEnv) => {
           ),
         )
       for (const p of due) enqueue(p.id)
+      // schedules come on their own time, not only with their project's round
+      const dueSchedules = await env.db
+        .selectDistinct({ id: schedules.project_id })
+        .from(schedules)
+        .innerJoin(projects, eq(projects.id, schedules.project_id))
+        .where(
+          and(
+            eq(schedules.enabled, true),
+            eq(projects.archived, false),
+            isNull(projects.paused_reason),
+            isNotNull(projects.repo_path),
+            or(isNull(schedules.next_run_at), lte(schedules.next_run_at, new Date())),
+          ),
+        )
+      for (const p of dueSchedules) enqueue(p.id, false)
     } finally {
       ticking = false
     }
@@ -314,6 +377,7 @@ export const createScheduler = (env: WorkerEnv) => {
     start: async () => {
       stopping = false
       for (const gone of await markInterruptedRuns(env.db)) {
+        if (gone.card_id === null) continue
         const [card] = await env.db.select().from(cards).where(eq(cards.id, gone.card_id))
         if (card?.status === 'doing' && card.claimed_by_run === gone.id)
           await moveCard(env.db, card.id, { status: 'todo' })
@@ -331,6 +395,7 @@ export const createScheduler = (env: WorkerEnv) => {
       if (timer) clearInterval(timer)
       if (housekeepingTimer) clearInterval(housekeepingTimer)
       queue.length = 0
+      fullRound.clear()
       for (const handle of env.handles.values()) handle.stop()
       await Promise.allSettled([...active.values()])
     },

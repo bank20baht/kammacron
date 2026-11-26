@@ -4,13 +4,14 @@ import { and, count, eq, sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
-import { cards, projects, RUN_STATUSES, runs, schedules } from '../db/schema'
+import { AGENTS, cards, projects, RUN_STATUSES, runs, schedules } from '../db/schema'
 import { listAlerts, markAlertsRead } from '../services/alerts'
 import { listCronJobs, runsBetween } from '../services/calendar'
 import { getCard, moveCard, updateCard } from '../services/cards'
 import { conflict, invalid, notFound } from '../services/errors'
 import { getProject, updateProject, type Project } from '../services/projects'
-import { getRunWithEvents, listRuns } from '../services/runs'
+import { nextCron } from '../services/cron'
+import { getRunWithEvents, listRuns, runLabels, withLabels } from '../services/runs'
 import { getSettings } from '../services/settings'
 import { approveCard } from '../worker/approve'
 import { checkDir } from '../worker/git'
@@ -19,23 +20,70 @@ import { idParams, oneOf } from './params'
 
 const Id = idParams()
 
-/** A schedule runs a command or a playbook of its project, never both, never neither. */
-const checkSchedule = (
-  project: Project,
-  s: { command?: string | null | undefined; playbook?: string | null | undefined },
-) => {
-  if (!s.command === !s.playbook)
-    throw invalid('BAD_SCHEDULE', 'a schedule runs either a command or a playbook')
+type ScheduleShape = {
+  command?: string | null | undefined
+  playbook?: string | null | undefined
+  agent?: string | null | undefined
+  prompt?: string | null | undefined
+  cron?: string | null | undefined
+}
+
+/**
+ * A schedule runs exactly one of a command, a playbook of its project or an agent (with a
+ * prompt); its cron expression, when it has one, must name a time that comes.
+ */
+const checkSchedule = (project: Project, s: ScheduleShape) => {
+  if ([s.command, s.playbook, s.agent].filter(Boolean).length !== 1)
+    throw invalid(
+      'BAD_SCHEDULE',
+      'a schedule runs exactly one of a command, a playbook or an agent',
+    )
   if (s.playbook && !project.playbooks.some((p) => p.name === s.playbook))
     throw invalid('BAD_SCHEDULE', `${project.name} has no playbook "${s.playbook}"`)
+  if (s.agent && !s.prompt?.trim())
+    throw invalid('BAD_SCHEDULE', 'an agent schedule needs a prompt')
+  if (s.cron && nextCron(s.cron) === null)
+    throw invalid('BAD_CRON', `"${s.cron}" never comes (no such day)`)
 }
+
+/** What a schedule may say of itself, on create and (each optional) on change. */
+const scheduleFields = {
+  name: t.String({ minLength: 1, maxLength: 120 }),
+  command: t.Nullable(t.String({ minLength: 1 })),
+  playbook: t.Nullable(
+    t.String({ minLength: 1, description: 'Run this playbook instead of a command' }),
+  ),
+  agent: t.Nullable(
+    oneOf(AGENTS, { description: 'Run this agent with `prompt`: claude or codex' }),
+  ),
+  prompt: t.Nullable(t.String({ maxLength: 20_000, description: "The agent's task" })),
+  use_board: t.Boolean({
+    description: "The agent's prompt comes with the open auto-pilot cards and how to take one",
+  }),
+  model: t.Nullable(t.String({ description: "The agent's model; empty: its default" })),
+  cron: t.Nullable(
+    t.String({
+      minLength: 1,
+      maxLength: 120,
+      description:
+        'minute hour day-of-month month day-of-week, local time; null: every interval_minutes',
+    }),
+  ),
+  interval_minutes: t.Integer({ minimum: 5, maximum: 7 * 24 * 60 }),
+  card_tags: t.Array(t.String()),
+  enabled: t.Boolean(),
+}
+
+/** A new or changed schedule runs next at its own next time. */
+const firstRun = (s: { cron?: string | null | undefined }) =>
+  s.cron ? { next_run_at: nextCron(s.cron) } : {}
 
 /** The Runs table's columns, as SQL text the query can search, filter and sort (@20baht/table-query). */
 const runsTable = tableQuery(sql, {
   key: sql`${runs.id}`,
   columns: {
     id: sql`${runs.id}::text`,
-    card: sql`'#' || ${runs.card_id}::text || ' ' || ${cards.title}`,
+    card: sql`coalesce('#' || ${runs.card_id}::text || ' ' || ${cards.title}, ${schedules.name}, '')`,
     status: sql`${runs.status}`,
     project: sql`${projects.id}::text`,
     started: sql`to_char(${runs.started_at}, 'YYYY-MM-DD HH24:MI')`,
@@ -44,7 +92,11 @@ const runsTable = tableQuery(sql, {
     turns: sql`coalesce(${runs.num_turns}::text, '')`,
     cost: sql`coalesce(${runs.cost_usd}::text, '')`,
   },
-  term: [sql`${cards.title}`, sql`coalesce(${runs.summary}, '')`, sql`coalesce(${runs.error}, '')`],
+  term: [
+    sql`coalesce(${cards.title}, ${schedules.name}, '')`,
+    sql`coalesce(${runs.summary}, '')`,
+    sql`coalesce(${runs.error}, '')`,
+  ],
   sortAs: {
     id: sql`${runs.id}`,
     started: sql`${runs.started_at}`,
@@ -79,9 +131,10 @@ export const runRoutes = (ctx: AppContext) =>
         const { limit, offset } = runsTable.page(parsed.query)
         const sorted = runsTable.orderBy(parsed.query)
         const rows = await ctx.db
-          .select({ run: runs, card_title: cards.title, project_name: projects.name })
+          .select({ run: runs, ...runLabels, project_name: projects.name })
           .from(runs)
-          .innerJoin(cards, eq(cards.id, runs.card_id))
+          .leftJoin(cards, eq(cards.id, runs.card_id))
+          .leftJoin(schedules, eq(schedules.id, runs.schedule_id))
           .innerJoin(projects, eq(projects.id, runs.project_id))
           .where(where)
           .orderBy(...(sorted.length ? sorted : [sql`${runs.id} desc`]))
@@ -90,11 +143,12 @@ export const runRoutes = (ctx: AppContext) =>
         const [total] = await ctx.db
           .select({ n: count() })
           .from(runs)
-          .innerJoin(cards, eq(cards.id, runs.card_id))
+          .leftJoin(cards, eq(cards.id, runs.card_id))
+          .leftJoin(schedules, eq(schedules.id, runs.schedule_id))
           .innerJoin(projects, eq(projects.id, runs.project_id))
           .where(where)
         return {
-          rows: rows.map((r) => ({ ...r.run, card_title: r.card_title })),
+          rows: rows.map(withLabels),
           total: total?.n ?? 0,
         }
       },
@@ -215,10 +269,11 @@ export const runRoutes = (ctx: AppContext) =>
             project_id: runs.project_id,
             status: runs.status,
             started_at: runs.started_at,
-            card_title: cards.title,
+            ...runLabels,
           })
           .from(runs)
-          .innerJoin(cards, eq(cards.id, runs.card_id))
+          .leftJoin(cards, eq(cards.id, runs.card_id))
+          .leftJoin(schedules, eq(schedules.id, runs.schedule_id))
           .where(eq(runs.status, 'running'))
         const paused = await ctx.db
           .select({ id: projects.id, name: projects.name, reason: projects.paused_reason })
@@ -272,7 +327,7 @@ export const runRoutes = (ctx: AppContext) =>
           })
         const loop = ctx.scheduler ? await ctx.scheduler.status() : null
         return {
-          jobs: await listCronJobs(ctx.db, loop),
+          jobs: await listCronJobs(ctx.db, loop, { from, to }),
           runs: await runsBetween(ctx.db, from, to),
         }
       },
@@ -302,7 +357,7 @@ export const runRoutes = (ctx: AppContext) =>
         live: liveRoute(ctx.live, { topics: () => ['schedules'], key: 'id' }),
         detail: {
           operationId: 'list_schedules',
-          summary: 'Commands on a schedule that open a card when they fail',
+          summary: 'The cron jobs of a project: commands, playbooks and agents on a timer',
         },
       },
     )
@@ -313,25 +368,25 @@ export const runRoutes = (ctx: AppContext) =>
         const [row] = await ctx.db
           .insert(schedules)
           // a failure's card is for a person unless the schedule says who else takes it
-          .values({ ...body, card_tags: body.card_tags ?? [], project_id: Number(params.id) })
+          .values({
+            ...body,
+            ...firstRun(body),
+            card_tags: body.card_tags ?? [],
+            project_id: Number(params.id),
+          })
           .returning()
         return row
       },
       {
         params: Id,
-        body: t.Object({
-          name: t.String({ minLength: 1, maxLength: 120 }),
-          command: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
-          playbook: t.Optional(
-            t.Nullable(
-              t.String({ minLength: 1, description: 'Run this playbook instead of a command' }),
-            ),
-          ),
-          interval_minutes: t.Optional(t.Integer({ minimum: 5, maximum: 7 * 24 * 60 })),
-          card_tags: t.Optional(t.Array(t.String())),
-          enabled: t.Optional(t.Boolean()),
-        }),
-        detail: { operationId: 'create_schedule', summary: 'Add a schedule' },
+        body: t.Composite([
+          t.Object({ name: scheduleFields.name }),
+          t.Partial(t.Omit(t.Object(scheduleFields), ['name'])),
+        ]),
+        detail: {
+          operationId: 'create_schedule',
+          summary: 'Add a cron job: a command, a playbook, or Claude or Codex with a prompt',
+        },
       },
     )
     .patch(
@@ -345,7 +400,7 @@ export const runRoutes = (ctx: AppContext) =>
         checkSchedule(await getProject(ctx.db, current.project_id), { ...current, ...body })
         const [row] = await ctx.db
           .update(schedules)
-          .set(body)
+          .set({ ...body, ...('cron' in body ? firstRun(body) : {}) })
           .where(eq(schedules.id, Number(params.id)))
           .returning()
         if (!row) throw notFound('schedule', params.id)
@@ -353,16 +408,7 @@ export const runRoutes = (ctx: AppContext) =>
       },
       {
         params: Id,
-        body: t.Partial(
-          t.Object({
-            name: t.String({ minLength: 1, maxLength: 120 }),
-            command: t.Nullable(t.String({ minLength: 1 })),
-            playbook: t.Nullable(t.String({ minLength: 1 })),
-            interval_minutes: t.Integer({ minimum: 5, maximum: 7 * 24 * 60 }),
-            card_tags: t.Array(t.String()),
-            enabled: t.Boolean(),
-          }),
-        ),
+        body: t.Partial(t.Object(scheduleFields)),
         detail: { operationId: 'update_schedule', summary: 'Change or turn off a schedule' },
       },
     )

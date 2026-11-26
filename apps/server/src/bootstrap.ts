@@ -19,6 +19,8 @@ export type ContextOptions = {
   /** Where the worker's MCP client reaches this server, known once it listens. */
   serverUrl: () => string
   claudeBin?: string | undefined
+  /** The `codex` executable; else KAMMACRON_CODEX_BIN, else `codex` on PATH. */
+  codexBin?: string | undefined
   /** false: no scheduler (tests drive runs themselves; `start --no-worker`). */
   worker?: boolean | undefined
   notify?: WorkerEnv['notify'] | undefined
@@ -56,6 +58,7 @@ export const buildContext = async (options: ContextOptions): Promise<AppContext>
     serverUrl: options.serverUrl,
     apiToken: () => auth.apiToken,
     claudeBin: options.claudeBin ?? process.env['KAMMACRON_CLAUDE_BIN'] ?? 'claude',
+    codexBin: options.codexBin ?? process.env['KAMMACRON_CODEX_BIN'] ?? 'codex',
     notify: options.notify ?? notifier(database.db),
     handles: new Map(),
     runTokens,

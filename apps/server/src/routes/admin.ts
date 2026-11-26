@@ -26,7 +26,9 @@ export const adminRoutes = (ctx: AppContext) =>
       async () => {
         const env = await childEnv(ctx.worker)
         const settings = await getSettings(ctx.db)
-        const tools = await Promise.all(['claude', 'git', 'bun'].map((name) => locate(name, env)))
+        const tools = await Promise.all(
+          ['claude', 'codex', 'git', 'bun'].map((name) => locate(name, env)),
+        )
         return {
           data_dir: ctx.worker.dataDir,
           path: env['PATH'] ?? '',

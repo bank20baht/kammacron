@@ -82,7 +82,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const newCard = async (title = 'fix it', tags = ['claude']) => {
+const newCard = async (title = 'fix it', tags = ['auto-pilot']) => {
   const [card] = await t.json<Card[]>('POST', '/api/cards/batch', {
     cards: [{ project_id: projectId, title, tags }],
   })
@@ -170,7 +170,7 @@ describe('the default playbook: one Claude step', () => {
       told.push(title)
       return Promise.resolve()
     }
-    const forClaude = await newCard('for claude', ['claude'])
+    const forClaude = await newCard('for claude', ['auto-pilot'])
     const forShell = await newCard('for shell', ['playbook:shell'])
     process.env['FAKE_SCENARIO'] = 'auth'
     const scheduler = createScheduler(t.ctx.worker)

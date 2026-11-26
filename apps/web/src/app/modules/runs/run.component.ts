@@ -121,9 +121,17 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
           @if (r.error_kind) {
             <baht-badge tone="danger" [label]="r.error_kind"></baht-badge>
           }
-          <a [routerLink]="['/review']" [queryParams]="{ card: r.card_id }">{{
-            t('run.card', { id: r.card_id })
-          }}</a>
+          @if (r.card_id !== null) {
+            <a [routerLink]="['/review']" [queryParams]="{ card: r.card_id }">{{
+              t('run.card', { id: r.card_id })
+            }}</a>
+          } @else if (r.schedule_id !== null) {
+            <a
+              [routerLink]="['/settings/projects', r.project_id]"
+              [queryParams]="{ section: 'schedules' }"
+              >{{ t('run.schedule', { agent: agentName(r.agent) }) }}</a
+            >
+          }
         </div>
         @if (error(); as message) {
           <baht-alert tone="danger" [message]="message"></baht-alert>
@@ -189,7 +197,11 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
                   ></baht-badge>
                   <strong>{{ s.name }}</strong>
                   <span class="muted">{{
-                    s.kind === 'claude' ? t('run.claudeStep') : t('run.runStep')
+                    s.kind === 'claude'
+                      ? t('run.claudeStep')
+                      : s.kind === 'codex'
+                        ? t('run.codexStep')
+                        : t('run.runStep')
                   }}</span>
                   @if (s.exit_code !== null) {
                     <span class="muted">{{ t('run.exit', { code: s.exit_code }) }}</span>
@@ -260,6 +272,9 @@ export class RunComponent {
     this.live.subscribe('GET', '/api/runs/:id', { params: { id: this.id() }, query: {} }),
   )
   protected readonly t = inject(I18n).t
+  protected agentName(agent: string): string {
+    return agent === 'codex' ? this.t('run.agent.codex') : this.t('run.agent.claude')
+  }
   protected readonly runStatusLabel = runStatusLabel
   protected readonly tone = RUN_TONE
   protected readonly cost = cost

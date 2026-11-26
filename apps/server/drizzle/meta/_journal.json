@@ -50,6 +50,13 @@
       "when": 1795624851331,
       "tag": "0006_playbooks",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795694986532,
+      "tag": "0007_agent_schedules",
+      "breakpoints": true
     }
   ]
 }

@@ -19,7 +19,7 @@ type StreamLine = {
   permission_denials?: unknown[]
 }
 
-type RunEvent = { type: RunEventType; summary: string; data: unknown }
+export type RunEvent = { type: RunEventType; summary: string; data: unknown }
 
 export type ClaudeResult = {
   exitCode: number
@@ -35,14 +35,14 @@ export type ClaudeResult = {
   error: string | null
 }
 
-const SUMMARY_MAX = 300
+export const SUMMARY_MAX = 300
 const DATA_MAX = 8 * 1024
 
-const clip = (text: string, max: number) =>
+export const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text
 
 /** A value as JSON, cut to 8 KB (then kept as a string, so it is still valid JSON). */
-const capped = (value: unknown) => {
+export const capped = (value: unknown) => {
   const json = JSON.stringify(value)
   return json.length <= DATA_MAX ? value : { truncated: true, json: json.slice(0, DATA_MAX) }
 }
@@ -150,8 +150,9 @@ export const classify = (
   return null
 }
 
-export type ClaudeSpawn = {
-  /** The `claude` executable (a path, or a name found on `PATH`). */
+/** What every agent's process takes: one JSON object a line on stdout, the prompt on stdin. */
+export type AgentSpawn = {
+  /** The executable (a path, or a name found on `PATH`). */
   bin: string
   args: string[]
   cwd: string
@@ -165,12 +166,29 @@ export type ClaudeSpawn = {
   timeoutMs: number
 }
 
-export type ClaudeHandle = { result: Promise<ClaudeResult>; stop: () => void; pid: number }
+export type ClaudeSpawn = AgentSpawn
+
+export type AgentHandle<T> = { result: Promise<T>; stop: () => void; pid: number }
+export type ClaudeHandle = AgentHandle<ClaudeResult>
 
 export { redact }
 
-/** Spawns `claude -p` with the prompt on stdin and reads its stream-json, line by line. */
-export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {
+/** How the process ended, for the agent's own reading of its lines. */
+type Ended = { exitCode: number; stderr: string; stopped: boolean }
+
+/**
+ * Spawns an agent with the prompt on stdin, hands each JSON line of its stdout to `onJson` (and
+ * the events `eventsOf` makes of it to `onEvent`), and stops it with SIGTERM, then SIGKILL after
+ * 10 s, when asked or at the timeout.
+ */
+export const spawnJsonLines = <L, T>(
+  options: AgentSpawn,
+  read: {
+    onJson: (line: L) => void
+    eventsOf: (line: L) => RunEvent[]
+    finish: (ended: Ended) => T
+  },
+): AgentHandle<T> => {
   const proc = Bun.spawn([options.bin, ...options.args], {
     cwd: options.cwd,
     env: options.env,
@@ -190,10 +208,7 @@ export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {
   }
   const timeout = setTimeout(stop, options.timeoutMs)
 
-  const result = (async (): Promise<ClaudeResult> => {
-    let last: StreamLine | null = null
-    let sessionId: string | null = null
-    const errors: string[] = []
+  const result = (async (): Promise<T> => {
     const decoder = new TextDecoder()
     let buffer = ''
     const handle = async (raw: string) => {
@@ -201,16 +216,14 @@ export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {
       if (!line) return
       const clean = redact(line, options.secrets)
       await options.onLine(clean)
-      let parsed: StreamLine
+      let parsed: L
       try {
-        parsed = JSON.parse(clean) as StreamLine
+        parsed = JSON.parse(clean) as L
       } catch {
         return
       }
-      if (parsed.session_id) sessionId = parsed.session_id
-      if (parsed.type === 'assistant' && parsed.error) errors.push(parsed.error)
-      if (parsed.type === 'result') last = parsed
-      for (const event of eventsOf(parsed)) await options.onEvent(event)
+      read.onJson(parsed)
+      for (const event of read.eventsOf(parsed)) await options.onEvent(event)
     }
     for await (const chunk of proc.stdout) {
       buffer += decoder.decode(chunk, { stream: true })
@@ -223,24 +236,42 @@ export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {
     const exitCode = await proc.exited
     clearTimeout(timeout)
     if (killTimer) clearTimeout(killTimer)
-    const r = last as StreamLine | null
-    const errorKind = classify({ result: r, errors }, exitCode, stopped)
-    return {
-      exitCode,
-      sessionId,
-      summary: r?.result ?? null,
-      numTurns: r?.num_turns ?? null,
-      costUsd: r?.total_cost_usd ?? null,
-      usage: r?.usage ?? null,
-      permissionDenials: r?.permission_denials ?? [],
-      isError: errorKind !== null,
-      errorKind,
-      error:
-        errorKind === null
-          ? null
-          : clip(r?.result ?? (stderr.trim() || `claude exited with ${String(exitCode)}`), 2000),
-    }
+    return read.finish({ exitCode, stderr, stopped })
   })()
 
   return { result, stop, pid: proc.pid }
+}
+
+/** Spawns `claude -p` with the prompt on stdin and reads its stream-json, line by line. */
+export const spawnClaude = (options: ClaudeSpawn): ClaudeHandle => {
+  let last: StreamLine | null = null
+  let sessionId: string | null = null
+  const errors: string[] = []
+  return spawnJsonLines<StreamLine, ClaudeResult>(options, {
+    onJson: (parsed) => {
+      if (parsed.session_id) sessionId = parsed.session_id
+      if (parsed.type === 'assistant' && parsed.error) errors.push(parsed.error)
+      if (parsed.type === 'result') last = parsed
+    },
+    eventsOf,
+    finish: ({ exitCode, stderr, stopped }) => {
+      const r: StreamLine | null = last
+      const errorKind = classify({ result: r, errors }, exitCode, stopped)
+      return {
+        exitCode,
+        sessionId,
+        summary: r?.result ?? null,
+        numTurns: r?.num_turns ?? null,
+        costUsd: r?.total_cost_usd ?? null,
+        usage: r?.usage ?? null,
+        permissionDenials: r?.permission_denials ?? [],
+        isError: errorKind !== null,
+        errorKind,
+        error:
+          errorKind === null
+            ? null
+            : clip(r?.result ?? (stderr.trim() || `claude exited with ${String(exitCode)}`), 2000),
+      }
+    },
+  })
 }

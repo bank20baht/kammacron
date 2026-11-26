@@ -34,6 +34,8 @@ export type WorkerEnv = {
   apiToken: () => string
   /** The `claude` executable. */
   claudeBin: string
+  /** The `codex` executable. */
+  codexBin: string
   notify: (title: string, message: string) => Promise<void>
   /** Runs in flight (the step going now), so Stop can reach them. */
   handles: Map<number, RunHandle>

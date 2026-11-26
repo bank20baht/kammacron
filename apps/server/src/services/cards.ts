@@ -19,6 +19,7 @@ import {
   cardWaitsOn,
   cards,
   comments,
+  AUTOPILOT_TAG,
   PLAYBOOK_TAG,
   projects,
   runs,
@@ -29,9 +30,6 @@ import { linkAttachments } from './attachments'
 import { invalid, notFound } from './errors'
 
 export type Card = typeof cards.$inferSelect
-
-/** The tag that hands a card to the worker. */
-const CLAUDE_TAG = 'claude'
 
 export type CardQuery = {
   project_id?: number | undefined
@@ -292,40 +290,59 @@ export const sendBack = (db: Executor, id: number, comment: string) =>
     return moveCard(tx, id, { status: 'todo' })
   })
 
-/**
- * What the worker may take, best first: tagged `claude`, not `human`, `todo`, not archived,
- * everything it waits on `done`, in a project with a repo and the worker on.
- */
-export const pickableCards = (db: Executor, projectId: number, limit = 1) => {
-  const blocker = db
+/** Some card this one waits on is not done yet. */
+const blocked = (db: Executor) =>
+  db
     .select({ one: sql`1` })
     .from(cardWaitsOn)
     .innerJoin(sql`${cards} as w`, sql`w.id = ${cardWaitsOn.waits_on_id}`)
     .where(and(eq(cardWaitsOn.card_id, cards.id), sql`w.status <> 'done'`))
-  return db
+
+/** A card open to agents now: `todo`, not archived, not a person's, nothing it waits on open. */
+const openToAgents = (db: Executor, projectId: number) =>
+  and(
+    eq(cards.project_id, projectId),
+    eq(cards.status, 'todo'),
+    eq(cards.archived, false),
+    eq(cards.human, false),
+    notExists(blocked(db)),
+  )
+
+const BEST_FIRST = [desc(cards.priority), asc(cards.created_at), asc(cards.id)]
+
+/**
+ * What the worker may take, best first: tagged `auto-pilot` (or naming a playbook), open to
+ * agents, in a project with a directory and the worker on.
+ */
+export const pickableCards = (db: Executor, projectId: number, limit = 1) =>
+  db
     .select({ card: cards })
     .from(cards)
     .innerJoin(projects, eq(projects.id, cards.project_id))
     .where(
       and(
-        eq(cards.project_id, projectId),
-        eq(cards.status, 'todo'),
-        eq(cards.archived, false),
-        eq(cards.human, false),
-        // tagged claude, or naming a playbook (which may have no Claude step at all)
+        openToAgents(db, projectId),
+        // tagged auto-pilot, or naming a playbook (which may have no agent step at all)
         or(
-          arrayContains(cards.tags, [CLAUDE_TAG]),
+          arrayContains(cards.tags, [AUTOPILOT_TAG]),
           sql`exists (select 1 from unnest(${cards.tags}) as tag where tag like ${`${PLAYBOOK_TAG}%`})`,
         ),
         eq(projects.worker_enabled, true),
         sql`${projects.repo_path} is not null`,
-        notExists(blocker),
       ),
     )
-    .orderBy(desc(cards.priority), asc(cards.created_at), asc(cards.id))
+    .orderBy(...BEST_FIRST)
     .limit(limit)
     .then((rows) => rows.map((r) => r.card))
-}
+
+/** The `auto-pilot` cards an agent schedule may take, best first, whether the worker is on or not. */
+export const autopilotCards = (db: Executor, projectId: number, limit = 20) =>
+  db
+    .select()
+    .from(cards)
+    .where(and(openToAgents(db, projectId), arrayContains(cards.tags, [AUTOPILOT_TAG])))
+    .orderBy(...BEST_FIRST)
+    .limit(limit)
 
 /** Takes a `todo` card for a run: one statement, so of two claimers exactly one wins. */
 export const claimCard = async (db: Executor, id: number, runId: number) => {

@@ -1,5 +1,5 @@
 import { t } from '../core/i18n/i18n.service'
-import { daysWith, every, occurrences } from './cron'
+import { daysWith, every, gapMinutes, occurrences } from './cron'
 
 const at = (s: string) => new Date(s)
 
@@ -41,5 +41,23 @@ describe('cron', () => {
       'daily',
       'every 3 days',
     ])
+  })
+
+  it('a cron job goes by the times the server listed, not its interval', () => {
+    const job = {
+      every_minutes: 1440,
+      next_at: '2026-11-25T12:00:00Z',
+      off: null,
+      times: ['2026-11-25T09:00:00Z', '2026-11-25T12:00:00Z', '2026-11-25T13:00:00Z'],
+    }
+    const times = occurrences(job, at('2026-11-25T00:00:00Z'), at('2026-11-25T13:00:00Z'), now)
+    expect(times.map((d) => d.toISOString().slice(11, 16))).toEqual(['12:00'])
+    expect(
+      gapMinutes(
+        job,
+        job.times.map((s) => new Date(s)),
+      ),
+    ).toBe(60)
+    expect(gapMinutes({ ...job, times: null }, [])).toBe(1440)
   })
 })

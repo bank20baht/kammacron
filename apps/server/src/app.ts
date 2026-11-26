@@ -16,7 +16,7 @@ import { systemRoutes } from './routes/system'
 import { staticRoutes } from './static'
 import { ServiceError } from './services/errors'
 
-const MCP_INSTRUCTIONS = `kammacron is a Kanban board whose "claude"-tagged cards are worked by an unattended Claude worker.
+const MCP_INSTRUCTIONS = `kammacron is a Kanban board with cron jobs: its "auto-pilot"-tagged cards are worked by unattended agents (the project's worker, and Claude or Codex on a schedule).
 Cards are numbered (#12). Use list_projects for project ids, list_cards to find cards, get_card for one card in full.
 ${CARD_RULES}
 Moving a card to review needs a reason. Nothing is ever deleted: archive_card instead.

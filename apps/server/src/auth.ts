@@ -27,8 +27,11 @@ export type AuthState = {
   loginCodes: Map<string, number>
 }
 
-/** What one worker run's token may write: its own card, and nothing else that exists. */
-export type RunScope = { runId: number; cardId: number }
+/**
+ * What one worker run's token may write: a worker round's run, its own card and nothing else that
+ * exists; an agent schedule's run (no card of its own), the cards of its project.
+ */
+export type RunScope = { runId: number; cardId: number } | { runId: number; projectId: number }
 
 /** Paths that need the token or the session; everything else (the web app's files) is public. */
 const PROTECTED = /^\/(api|mcp|live|files)(\/|$)/

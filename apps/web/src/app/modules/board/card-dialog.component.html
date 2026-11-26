@@ -7,8 +7,8 @@
     ></baht-badge>
     @if (c.human) {
       <baht-badge tone="info" [label]="t('card.human')"></baht-badge>
-    } @else if (c.tags.includes('claude')) {
-      <baht-badge tone="neutral" [label]="t('card.claude')"></baht-badge>
+    } @else if (c.tags.includes('auto-pilot')) {
+      <baht-badge tone="neutral" [label]="t('card.autopilot')"></baht-badge>
     }
     <span class="grow"></span>
     <baht-menu

@@ -31,7 +31,8 @@ import {
 import { CardDialogComponent } from './card-dialog.component'
 
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
-const CLAUDE = 'claude'
+/** The tag that opens a card to agents (the worker's rounds and agent schedules). */
+const AUTOPILOT = 'auto-pilot'
 /** Tags a tile shows before the rest become "+N" (the card itself shows them all). */
 const TILE_TAGS = 4
 const ACCENT: Record<CardStatus, string> = {
@@ -87,9 +88,9 @@ export class BoardComponent {
     COLUMNS.map((key) => ({ key, label: statusLabel(this.t, key), accent: ACCENT[key] })),
   )
   protected readonly ago = ago
-  protected readonly claude = CLAUDE
+  protected readonly autopilot = AUTOPILOT
   protected readonly otherTags = computed(
-    () => (tags: readonly string[]) => tags.filter((tag) => tag !== CLAUDE),
+    () => (tags: readonly string[]) => tags.filter((tag) => tag !== AUTOPILOT),
   )
   protected readonly shownTags = computed(
     () => (tags: readonly string[]) => this.otherTags()(tags).slice(0, TILE_TAGS),
@@ -207,7 +208,7 @@ export class BoardComponent {
     this.formNumber.update((n) => n + 1)
     this.newValue.set({
       project_id: project ? String(project.id) : null,
-      owner: 'claude',
+      owner: 'autopilot',
       tags: [],
     })
     this.createError.set('')
@@ -221,7 +222,7 @@ export class BoardComponent {
     owner: string
     tags?: string[]
   }) {
-    const others = (input.tags ?? []).filter((t) => t !== CLAUDE)
+    const others = (input.tags ?? []).filter((t) => t !== AUTOPILOT)
     const [card] = await firstValueFrom(
       this.api.cards.batch.post({
         cards: [
@@ -229,7 +230,7 @@ export class BoardComponent {
             project_id: input.project_id,
             title: input.title,
             body: input.body ?? '',
-            tags: input.owner === 'claude' ? [CLAUDE, ...others] : others,
+            tags: input.owner === 'autopilot' ? [AUTOPILOT, ...others] : others,
             human: input.owner === 'human',
           },
         ],
@@ -244,7 +245,7 @@ export class BoardComponent {
         project_id: Number(data['project_id']),
         title: typeof data['title'] === 'string' ? data['title'].trim() : '',
         body: typeof data['body'] === 'string' ? data['body'] : '',
-        owner: typeof data['owner'] === 'string' ? data['owner'] : 'claude',
+        owner: typeof data['owner'] === 'string' ? data['owner'] : 'autopilot',
         tags: Array.isArray(data['tags']) ? (data['tags'] as string[]) : [],
       })
       this.creating.set(false)
@@ -261,7 +262,7 @@ export class BoardComponent {
     if (!project || typeof title !== 'string' || !title.trim()) return
     this.busy.set(true)
     try {
-      await this.createOne({ project_id: project.id, title: title.trim(), owner: 'claude' })
+      await this.createOne({ project_id: project.id, title: title.trim(), owner: 'autopilot' })
       form.reset()
     } catch (error) {
       this.error.set(describeError(error))

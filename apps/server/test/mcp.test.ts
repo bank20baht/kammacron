@@ -63,7 +63,7 @@ describe('mcp', () => {
     const project = await t.json<{ id: number }>('POST', '/api/projects', { slug: 'p', name: 'P' })
     const created = await rpc('tools/call', {
       name: 'create_cards',
-      arguments: { cards: [{ project_id: project.id, title: 'from mcp', tags: ['claude'] }] },
+      arguments: { cards: [{ project_id: project.id, title: 'from mcp', tags: ['auto-pilot'] }] },
     })
     expect(created.body.result?.isError).toBeFalsy()
     const [card] = JSON.parse(must(created.body.result?.content?.[0]).text) as { id: number }[]

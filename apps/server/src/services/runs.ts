@@ -6,6 +6,8 @@ import {
   runEvents,
   runSteps,
   runs,
+  schedules,
+  type Agent,
   type RunEventType,
   type RunStatus,
   type StepStatus,
@@ -30,14 +32,27 @@ export const listRuns = (db: Executor, query: RunQuery = {}) => {
   if (query.status !== undefined) where.push(eq(runs.status, query.status))
   if (query.before !== undefined) where.push(lt(runs.id, query.before))
   return db
-    .select({ run: runs, card_title: cards.title })
+    .select({ run: runs, ...runLabels })
     .from(runs)
-    .innerJoin(cards, eq(cards.id, runs.card_id))
+    .leftJoin(cards, eq(cards.id, runs.card_id))
+    .leftJoin(schedules, eq(schedules.id, runs.schedule_id))
     .where(where.length ? and(...where) : undefined)
     .orderBy(desc(runs.id))
     .limit(Math.min(query.limit ?? 50, 200))
-    .then((rows) => rows.map((r) => ({ ...r.run, card_title: r.card_title })))
+    .then((rows) => rows.map(withLabels))
 }
+
+/**
+ * What names a run beside its id: the card a worker round ran, or the agent schedule that started
+ * it. Select them with `leftJoin(cards)` and `leftJoin(schedules)`.
+ */
+export const runLabels = { card_title: cards.title, schedule_name: schedules.name }
+
+export const withLabels = (r: {
+  run: Run
+  card_title: string | null
+  schedule_name: string | null
+}) => ({ ...r.run, card_title: r.card_title, schedule_name: r.schedule_name })
 
 const getRun = async (db: Executor, id: number) => {
   const [row] = await db.select().from(runs).where(eq(runs.id, id))
@@ -65,7 +80,7 @@ export const startStep = async (
   input: {
     run_id: number
     position: number
-    kind: 'claude' | 'run'
+    kind: 'claude' | 'codex' | 'run'
     name: string
     command: string | null
   },
@@ -96,7 +111,7 @@ export const skipSteps = (
   runId: number,
   steps: readonly {
     position: number
-    kind: 'claude' | 'run'
+    kind: 'claude' | 'codex' | 'run'
     name: string
     command: string | null
   }[],
@@ -110,7 +125,13 @@ export const skipSteps = (
 
 export const createRun = async (
   db: Executor,
-  input: { project_id: number; card_id: number; log_path: string | null },
+  input: {
+    project_id: number
+    card_id: number | null
+    schedule_id?: number | null
+    agent?: Agent
+    log_path: string | null
+  },
 ) =>
   firstRow(
     await db
@@ -139,7 +160,7 @@ export const addRunEvent = (
 export const previousRuns = (db: Executor, cardId: number, limit = 5) =>
   db.select().from(runs).where(eq(runs.card_id, cardId)).orderBy(desc(runs.id)).limit(limit)
 
-/** On boot: a run still `running` died with the process. Returns their cards. */
+/** On boot: a run still `running` died with the process. Returns their cards (null: none). */
 export const markInterruptedRuns = async (db: Executor) => {
   const gone = await db
     .update(runs)

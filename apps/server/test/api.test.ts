@@ -91,7 +91,7 @@ describe('auth', () => {
 describe('cards', () => {
   test('a batch can wait on its own cards by ref; get_card shows the edge', async () => {
     const [small, big] = await create([
-      { ref: 'small', project_id: projectId, title: 'fix the typo', tags: ['claude'] },
+      { ref: 'small', project_id: projectId, title: 'fix the typo', tags: ['auto-pilot'] },
       { project_id: projectId, title: 'redesign', human: true, waits_on: ['small'] },
     ])
     const full = await t.json<{ waits_on: { id: number }[] }>(
@@ -147,28 +147,34 @@ describe('cards', () => {
 
   test('search by text, tag and status', async () => {
     await create([
-      { project_id: projectId, title: 'login bug', tags: ['claude'] },
+      { project_id: projectId, title: 'login bug', tags: ['auto-pilot'] },
       { project_id: projectId, title: 'docs', body: 'mentions a BUG here' },
       { project_id: projectId, title: 'other' },
     ])
     expect(await t.json<Card[]>('GET', '/api/cards?q=bug')).toHaveLength(2)
-    expect(await t.json<Card[]>('GET', '/api/cards?tag=claude')).toHaveLength(1)
+    expect(await t.json<Card[]>('GET', '/api/cards?tag=auto-pilot')).toHaveLength(1)
     expect(await t.json<Card[]>('GET', '/api/cards?status=done')).toHaveLength(0)
   })
 })
 
 describe('worker selection', () => {
-  test('picks claude cards that wait on nothing unfinished, by priority then age; one claimer wins', async () => {
+  test('picks auto-pilot cards that wait on nothing unfinished, by priority then age; one claimer wins', async () => {
     await t.json('PATCH', `/api/projects/${String(projectId)}`, {
       worker_enabled: true,
       repo_path: '/tmp/x',
     })
     const [dep, blocked, low, high] = await create([
-      { ref: 'dep', project_id: projectId, title: 'dep', tags: ['claude'] },
-      { project_id: projectId, title: 'blocked', tags: ['claude'], waits_on: ['dep'], priority: 9 },
-      { project_id: projectId, title: 'low', tags: ['claude'], priority: 1 },
-      { project_id: projectId, title: 'high', tags: ['claude'], priority: 5 },
-      { project_id: projectId, title: 'human', tags: ['claude'], human: true, priority: 99 },
+      { ref: 'dep', project_id: projectId, title: 'dep', tags: ['auto-pilot'] },
+      {
+        project_id: projectId,
+        title: 'blocked',
+        tags: ['auto-pilot'],
+        waits_on: ['dep'],
+        priority: 9,
+      },
+      { project_id: projectId, title: 'low', tags: ['auto-pilot'], priority: 1 },
+      { project_id: projectId, title: 'high', tags: ['auto-pilot'], priority: 5 },
+      { project_id: projectId, title: 'human', tags: ['auto-pilot'], human: true, priority: 99 },
       { project_id: projectId, title: 'untagged', priority: 99 },
     ])
     const picked = await pickableCards(t.ctx.db, projectId, 10)
@@ -186,7 +192,7 @@ describe('worker selection', () => {
   })
 
   test('nothing is picked while the project has no repo or the worker is off', async () => {
-    await create([{ project_id: projectId, title: 'x', tags: ['claude'] }])
+    await create([{ project_id: projectId, title: 'x', tags: ['auto-pilot'] }])
     expect(await pickableCards(t.ctx.db, projectId)).toHaveLength(0)
   })
 })

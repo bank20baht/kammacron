@@ -19,10 +19,12 @@ import {
   daysWith,
   every,
   FREQUENT_MINUTES,
+  gapMinutes,
   occurrences,
   type CronJobLike,
 } from '../../shared/cron'
 import { ago } from '../../shared/format'
+import { runLabel } from '../../shared/schedule'
 import { runStatusLabel } from '../runs/runs.component'
 
 type Layer = 'worker' | 'schedule' | 'housekeeping' | 'runs'
@@ -68,6 +70,7 @@ type Job = CronJobLike & {
   project_name: string | null
   project_slug: string | null
   command: string | null
+  cron?: string | null
 }
 
 /** Local midnight of a `YYYY-MM-DD` day, `days` later. */
@@ -244,14 +247,14 @@ export class CalendarComponent {
     const meta = [job.project_name, job.command].filter(Boolean).join(' · ')
     const tone = JOB_TONE[job.kind] ?? 'neutral'
     const times = occurrences(job, from, to)
-    if (job.every_minutes < FREQUENT_MINUTES)
+    if (gapMinutes(job, times) < FREQUENT_MINUTES)
       return daysWith(times).map((day) => ({
         target,
         event: {
           id: `${job.key}@${day}`,
           title: this.t('calendar.frequentTitle', {
             name: this.nameOf(job),
-            every: every(this.t, job.every_minutes),
+            every: job.cron ?? every(this.t, job.every_minutes),
           }),
           start: day,
           allDay: true,
@@ -283,7 +286,7 @@ export class CalendarComponent {
         target: `/runs/${String(run.id)}`,
         event: {
           id: `run:${String(run.id)}`,
-          title: `#${String(run.card_id)} ${run.card_title}`,
+          title: runLabel(run),
           start: new Date(run.started_at).toISOString(),
           end: new Date(run.ended_at ?? Date.now()).toISOString(),
           tone: RUN_TONE[run.status] ?? 'neutral',

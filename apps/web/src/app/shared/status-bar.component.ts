@@ -9,6 +9,7 @@ import { firstValueFrom } from 'rxjs'
 import { I18n } from '../core/i18n/i18n.service'
 import { LiveService } from '../services/live.service'
 import { ago } from './format'
+import { runLabel } from './schedule'
 
 /** The band on every page: working or paused, the run going, cards in review, alerts. */
 @Component({
@@ -32,11 +33,7 @@ import { ago } from './format'
       } @else if (s.running.length > 0) {
         @for (run of s.running; track run.run_id) {
           <a [routerLink]="['/runs', run.run_id]">
-            <baht-badge
-              tone="info"
-              busy
-              [label]="'#' + run.card_id + ' ' + run.card_title"
-            ></baht-badge>
+            <baht-badge tone="info" busy [label]="runLabel(run)"></baht-badge>
           </a>
         }
       } @else {
@@ -76,6 +73,7 @@ export class StatusBarComponent {
   private readonly live = inject(LiveService).live
   private readonly api = inject(Api).client.api
   protected readonly t = inject(I18n).t
+  protected readonly runLabel = runLabel
 
   protected readonly status = liveSignal(() => this.live.subscribe('GET', '/api/status'))
   private readonly alerts = liveSignal(() =>

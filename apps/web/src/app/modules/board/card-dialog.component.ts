@@ -22,7 +22,7 @@ import { cardForm, REGISTRY, sameOriginImage, sendBackForm } from '../../shared/
 import { RUN_TONE, statusLabel, type CardStatus } from '../../shared/tones'
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
-const CLAUDE = 'claude'
+const AUTOPILOT = 'auto-pilot'
 
 type CardData = NonNullable<ReturnType<CardDialogComponent['card']>['data']>
 type RunStatus = NonNullable<CardData['last_run']>['status']
@@ -128,9 +128,9 @@ export class CardDialogComponent {
       title: card.title,
       body: card.body,
       status: card.status,
-      owner: card.human ? 'human' : card.tags.includes(CLAUDE) ? 'claude' : 'none',
+      owner: card.human ? 'human' : card.tags.includes(AUTOPILOT) ? 'autopilot' : 'none',
       priority: card.priority,
-      tags: card.tags.filter((t) => t !== CLAUDE),
+      tags: card.tags.filter((t) => t !== AUTOPILOT),
       waits_on: card.waits_on.map((w) => String(w.id)).join(', '),
     }
   }
@@ -155,7 +155,7 @@ export class CardDialogComponent {
     const d = form.getData()
     const owner = text(d['owner'])
     const others = Array.isArray(d['tags'])
-      ? (d['tags'] as string[]).filter((t) => t !== CLAUDE)
+      ? (d['tags'] as string[]).filter((t) => t !== AUTOPILOT)
       : []
     const waits = text(d['waits_on'])
       .split(/[\s,#]+/)
@@ -169,7 +169,7 @@ export class CardDialogComponent {
         this.api.cards({ id }).patch({
           title: text(d['title']),
           body: text(d['body']),
-          tags: owner === 'claude' ? [CLAUDE, ...others] : others,
+          tags: owner === 'autopilot' ? [AUTOPILOT, ...others] : others,
           human: owner === 'human',
           priority: Math.round(Number(d['priority']) || 0),
           waits_on: waits,

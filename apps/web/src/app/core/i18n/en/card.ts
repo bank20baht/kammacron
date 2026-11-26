@@ -2,7 +2,7 @@
 export const card = {
   heading: 'Card #{id}',
   human: 'Human',
-  claude: 'Claude',
+  autopilot: 'Auto pilot',
   more: 'More',
   archive: 'Archive',
   needsReview: 'Needs your review',

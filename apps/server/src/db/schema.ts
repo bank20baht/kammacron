@@ -71,6 +71,12 @@ export type Playbook = { name: string; steps: PlaybookStep[] }
 
 export const DEFAULT_PLAYBOOK_NAME = 'default'
 export const PLAYBOOK_TAG = 'playbook:'
+/** The tag that opens a card to agents: the worker's rounds and agent schedules take it. */
+export const AUTOPILOT_TAG = 'auto-pilot'
+
+/** The coding agents a schedule can run. */
+export const AGENTS = ['claude', 'codex'] as const
+export type Agent = (typeof AGENTS)[number]
 
 export const DEFAULT_PLAYBOOKS: Playbook[] = [
   { name: DEFAULT_PLAYBOOK_NAME, steps: [{ kind: 'claude', name: 'Claude' }] },
@@ -181,9 +187,11 @@ export const runs = pgTable(
     project_id: integer('project_id')
       .notNull()
       .references(() => projects.id),
-    card_id: integer('card_id')
-      .notNull()
-      .references(() => cards.id),
+    /** The card a worker round ran; null for an agent schedule's run, which has none. */
+    card_id: integer('card_id').references(() => cards.id),
+    /** The agent schedule that started this run; null for a worker round's. */
+    schedule_id: integer('schedule_id').references(() => schedules.id),
+    agent: text('agent', { enum: AGENTS }).notNull().default('claude'),
     status: text('status', { enum: RUN_STATUSES }).notNull().default('running'),
     started_at: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     ended_at: timestamp('ended_at', { withTimezone: true }),
@@ -237,7 +245,7 @@ export const runSteps = pgTable(
       .references(() => runs.id),
     /** Position in the playbook, from 0. */
     position: integer('position').notNull(),
-    kind: text('kind', { enum: ['claude', 'run'] }).notNull(),
+    kind: text('kind', { enum: ['claude', 'codex', 'run'] }).notNull(),
     name: text('name').notNull(),
     command: text('command'),
     status: text('status', { enum: STEP_STATUSES }).notNull().default('running'),
@@ -281,8 +289,9 @@ export const alerts = pgTable('alerts', {
 })
 
 /**
- * A command run on a schedule that opens a card when it fails (nightly tests, a link check):
- * work for the board found without anyone filing it.
+ * A cron job of a project. It runs exactly one of: a shell command (a failure opens a card), a
+ * playbook (a card each time, which the worker runs), or an agent (Claude or Codex with the
+ * schedule's own prompt, in the project directory, with the board's MCP tools).
  */
 export const schedules = pgTable('schedules', {
   id: serial('id').primaryKey(),
@@ -290,17 +299,30 @@ export const schedules = pgTable('schedules', {
     .notNull()
     .references(() => projects.id),
   name: text('name').notNull(),
-  /** A shell command whose failure opens a card; or null with `playbook` set. */
+  /** A shell command whose failure opens a card. */
   command: text('command'),
   /** A playbook to run on the interval: each time, a card tagged `playbook:<name>` the worker runs. */
   playbook: text('playbook'),
+  /** An agent to run with `prompt`. */
+  agent: text('agent', { enum: AGENTS }),
+  prompt: text('prompt'),
+  /** An agent's prompt comes with the board: the auto-pilot cards and how to take one. */
+  use_board: boolean('use_board').notNull().default(true),
+  /** An agent's model; null: the agent's own default. */
+  model: text('model'),
+  /** When it runs: a 5-field cron expression (local time), or null for every `interval_minutes`. */
+  cron: text('cron'),
   interval_minutes: integer('interval_minutes').notNull().default(1440),
   next_run_at: timestamp('next_run_at', { withTimezone: true }),
   last_run_at: timestamp('last_run_at', { withTimezone: true }),
   last_exit_code: integer('last_exit_code'),
+  /** How the last time ended, in a few words (`exit 1`, `run 12 succeeded`). */
+  last_result: text('last_result'),
   /** The card it opened last; while that card is open, a failure comments on it instead. */
   last_card_id: integer('last_card_id').references(() => cards.id),
-  card_tags: text('card_tags').array().notNull().default(['claude']),
+  /** An agent schedule's last run. */
+  last_run_id: integer('last_run_id'),
+  card_tags: text('card_tags').array().notNull().default([AUTOPILOT_TAG]),
   enabled: boolean('enabled').notNull().default(true),
   ...timestamps,
 })

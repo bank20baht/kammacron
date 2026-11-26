@@ -141,11 +141,16 @@ export const toolLists = (
   return { allowed, denied }
 }
 
-const mcpConfigPath = (env: WorkerEnv, project: Project) =>
+export const mcpConfigPath = (env: WorkerEnv, project: Project) =>
   join(env.dataDir, 'mcp', `${project.slug}.json`)
 
 /** kammacron (with this run's own token) and the project's servers that Settings turned on. */
-const writeMcpConfig = async (env: WorkerEnv, project: Project, dir: string, token: string) => {
+export const writeMcpConfig = async (
+  env: WorkerEnv,
+  project: Project,
+  dir: string,
+  token: string,
+) => {
   const own = await approvedServers(env.dataDir, project, dir)
   if (own.changed.length > 0)
     await addAlert(env.db, {
@@ -172,7 +177,7 @@ const runTokenOf = (env: WorkerEnv, runId: number) =>
   [...env.runTokens].find(([, scope]) => scope.runId === runId)?.[0] ?? ''
 
 /** Every string a run's output must not carry. */
-const secretsOf = (env: WorkerEnv, runId: number) =>
+export const secretsOf = (env: WorkerEnv, runId: number) =>
   [env.apiToken(), ...passedSecrets(), runTokenOf(env, runId)].filter(Boolean)
 
 type Attachment = { filename: string; path: string }
@@ -334,10 +339,18 @@ const stopRun = async (ctx: Context, stoppedByUser: boolean) => {
 }
 
 /** Keeps the step reachable by Stop while it goes. */
-const track = async <T>(ctx: Context, handle: { stop: () => void; result: Promise<T> }) => {
+const track = <T>(ctx: Context, handle: { stop: () => void; result: Promise<T> }) =>
+  trackRun(ctx.env, ctx.run.id, handle)
+
+/** Keeps a run's process reachable by Stop while it goes. */
+export const trackRun = async <T>(
+  env: WorkerEnv,
+  runId: number,
+  handle: { stop: () => void; result: Promise<T> },
+) => {
   const entry: RunHandle = { stop: handle.stop, stoppedByUser: false }
-  ctx.env.handles.set(ctx.run.id, entry)
-  const result = await handle.result.finally(() => ctx.env.handles.delete(ctx.run.id))
+  env.handles.set(runId, entry)
+  const result = await handle.result.finally(() => env.handles.delete(runId))
   return { result, stoppedByUser: entry.stoppedByUser }
 }
 
@@ -348,7 +361,7 @@ const RULE_FILES = ['CLAUDE.md', '.claude/CLAUDE.md', '.claude-worker/prompt.md'
  * The project's instructions. Claude Code would read CLAUDE.md itself, but only together with the
  * directory's settings, which a run does not load; so kammacron hands the files over.
  */
-const projectRules = async (dir: string) => {
+export const projectRules = async (dir: string) => {
   const found: string[] = []
   for (const name of RULE_FILES) {
     const text = await readFile(join(dir, name), 'utf8').catch(() => '')
@@ -629,5 +642,5 @@ const noPlaybook = async (env: WorkerEnv, project: Project, card: Card, run: Run
   })
 }
 
-const isDir = async (path: string) =>
+export const isDir = async (path: string) =>
   (await Bun.spawn(['test', '-d', path], { stdout: 'ignore', stderr: 'ignore' }).exited) === 0

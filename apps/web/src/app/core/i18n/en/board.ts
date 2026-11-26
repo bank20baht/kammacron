@@ -29,6 +29,6 @@ export const board = {
   getStarted: 'Get started',
   cards: 'Cards',
   priority: 'P{priority}',
-  claudeWorking: 'Claude is working',
+  claudeWorking: 'An agent is working',
   review: 'Review',
 } as const

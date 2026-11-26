@@ -28,6 +28,7 @@ export type TestApp = {
 export const testApp = async (
   options: {
     claudeBin?: string
+    codexBin?: string
     serverUrl?: () => string
     publicUrl?: string
   } = {},
@@ -43,6 +44,7 @@ export const testApp = async (
     worker: false,
     serverUrl: () => options.serverUrl?.() ?? 'http://127.0.0.1:0',
     claudeBin: options.claudeBin,
+    codexBin: options.codexBin,
     notify: () => Promise.resolve(),
     publicUrl: options.publicUrl,
   })

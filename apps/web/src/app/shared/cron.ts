@@ -5,6 +5,8 @@ export type CronJobLike = {
   every_minutes: number
   next_at: string | null
   off: string | null
+  /** A cron schedule's times in the range asked for; then the interval says nothing. */
+  times?: string[] | null
 }
 
 /** Jobs that run this often or more read as one line a day, not a mark per run. */
@@ -21,13 +23,27 @@ export const occurrences = (
   now: Date = new Date(),
   cap = 400,
 ): Date[] => {
-  if (job.off !== null || job.next_at === null || job.every_minutes <= 0) return []
+  if (job.off !== null) return []
+  if (job.times) {
+    const listed = job.times.map((t) => new Date(t))
+    return listed.filter((d) => d >= from && d < to && d >= now).slice(0, cap)
+  }
+  if (job.next_at === null || job.every_minutes <= 0) return []
   const step = job.every_minutes * 60_000
   let at = Math.max(new Date(job.next_at).getTime(), now.getTime())
   if (at < from.getTime()) at += Math.ceil((from.getTime() - at) / step) * step
   const out: Date[] = []
   for (; at < to.getTime() && out.length < cap; at += step) out.push(new Date(at))
   return out
+}
+
+/** How far apart a job's runs are, in minutes: its interval, or the shortest gap of its cron times. */
+export const gapMinutes = (job: CronJobLike, times: readonly Date[]): number => {
+  if (!job.times) return job.every_minutes
+  let gap = Infinity
+  for (let i = 1; i < times.length; i++)
+    gap = Math.min(gap, ((times[i]?.getTime() ?? 0) - (times[i - 1]?.getTime() ?? 0)) / 60_000)
+  return gap
 }
 
 /** `YYYY-MM-DD` of a local day. */

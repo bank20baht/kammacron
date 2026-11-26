@@ -2,6 +2,7 @@ import type { Registry } from '@20baht/ui'
 import { defineForm } from '@20baht/ui/engine'
 
 import type { Translate } from '../core/i18n/i18n.service'
+import type { ScheduleKind, Timing } from './schedule'
 import { uploadImage } from './upload'
 
 /*
@@ -29,7 +30,7 @@ const body = (t: Translate) =>
   }) as const
 
 const owners = (t: Translate) => [
-  { key: 'claude', label: t('forms.card.ownerClaude') },
+  { key: 'autopilot', label: t('forms.card.ownerAutopilot') },
   { key: 'human', label: t('forms.card.ownerHuman') },
 ]
 
@@ -345,10 +346,16 @@ export const projectForm = (t: Translate) =>
     ],
   })
 
-/** What a schedule runs: a command, or one of the project's playbooks. */
-export const COMMAND = 'command'
-
-export const scheduleForm = (t: Translate, playbooks: readonly string[]) =>
+/**
+ * A schedule: its name, what it runs (only the fields of `kind`) and when (only the fields of
+ * `timing`). The page picks kind and timing with tabs above the form.
+ */
+export const scheduleForm = (
+  t: Translate,
+  kind: ScheduleKind,
+  timing: Timing,
+  playbooks: readonly string[],
+) =>
   defineForm({
     form_id: 'schedule',
     form_name: t('forms.schedule.name'),
@@ -358,49 +365,149 @@ export const scheduleForm = (t: Translate, playbooks: readonly string[]) =>
         type: 'text',
         key: 'name',
         label: t('forms.schedule.scheduleName'),
-        placeholder: t('forms.schedule.namePlaceholder'),
+        placeholder: t(`forms.schedule.namePlaceholder.${kind}`),
         required: true,
-        width: '1/3',
+        width: '1/2',
       },
-      {
-        order: 2,
-        type: 'dropdown',
-        key: 'runs',
-        label: t('forms.schedule.runs'),
-        help: t('forms.schedule.runsHelp'),
-        width: '1/3',
-        options: [
-          { key: COMMAND, label: t('forms.schedule.runsCommand') },
-          ...playbooks.map((name) => ({
-            key: name,
-            label: t('forms.schedule.runsPlaybook', { name }),
-          })),
-        ],
-      },
-      {
-        order: 3,
-        type: 'number',
-        key: 'interval_minutes',
-        label: t('forms.schedule.interval'),
-        width: '1/3',
-      },
-      {
-        order: 4,
-        type: 'text',
-        key: 'command',
-        label: t('forms.schedule.command'),
-        placeholder: 'curl -fsS --max-time 10 https://example.com/health',
-        help: t('forms.schedule.commandHelp'),
-      },
-      {
-        order: 5,
-        type: 'tags',
-        key: 'card_tags',
-        label: t('forms.schedule.cardTags'),
-        help: t('forms.schedule.cardTagsHelp'),
-      },
+      ...runsFields(t, kind, playbooks),
+      ...timingFields(t, timing),
     ],
   })
+
+const runsFields = (t: Translate, kind: ScheduleKind, playbooks: readonly string[]) => {
+  switch (kind) {
+    case 'claude':
+    case 'codex':
+      return [
+        {
+          order: 2,
+          type: 'text',
+          key: 'model',
+          label: t('forms.schedule.model'),
+          help: t('forms.schedule.modelHelp'),
+          width: '1/2',
+        },
+        {
+          order: 3,
+          type: 'textarea',
+          key: 'prompt',
+          label: t('forms.schedule.prompt'),
+          placeholder: t('forms.schedule.promptPlaceholder'),
+          help: t('forms.schedule.promptHelp'),
+          required: true,
+        },
+        {
+          order: 4,
+          type: 'checkbox',
+          key: 'use_board',
+          label: t('forms.schedule.useBoard'),
+          help: t('forms.schedule.useBoardHelp'),
+        },
+      ] as const
+    case 'playbook':
+      return [
+        {
+          order: 2,
+          type: 'dropdown',
+          key: 'playbook',
+          label: t('forms.schedule.playbook'),
+          help: t('forms.schedule.playbookHelp'),
+          required: true,
+          width: '1/2',
+          options: playbooks.map((name) => ({ key: name, label: name })),
+        },
+      ] as const
+    case 'command':
+      return [
+        {
+          order: 2,
+          type: 'text',
+          key: 'command',
+          label: t('forms.schedule.command'),
+          placeholder: 'curl -fsS --max-time 10 https://example.com/health',
+          help: t('forms.schedule.commandHelp'),
+          required: true,
+        },
+        {
+          order: 3,
+          type: 'tags',
+          key: 'card_tags',
+          label: t('forms.schedule.cardTags'),
+          help: t('forms.schedule.cardTagsHelp'),
+        },
+      ] as const
+  }
+}
+
+/** Cron's day numbers, Sunday first. */
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+
+const timingFields = (t: Translate, timing: Timing) => {
+  const time = {
+    order: 11,
+    type: 'time',
+    key: 'time',
+    label: t('forms.schedule.time'),
+    required: true,
+    width: '1/3',
+  } as const
+  switch (timing) {
+    case 'interval':
+      return [
+        {
+          order: 10,
+          type: 'number',
+          key: 'interval_minutes',
+          label: t('forms.schedule.interval'),
+          required: true,
+          width: '1/3',
+        },
+      ] as const
+    case 'hourly':
+      return [
+        {
+          order: 10,
+          type: 'number',
+          key: 'minute',
+          label: t('forms.schedule.minute'),
+          help: t('forms.schedule.minuteHelp'),
+          width: '1/3',
+        },
+      ] as const
+    case 'daily':
+    case 'weekdays':
+      return [time] as const
+    case 'weekly':
+      return [
+        {
+          order: 10,
+          type: 'dropdown',
+          key: 'weekday',
+          label: t('forms.schedule.weekday'),
+          required: true,
+          width: '1/3',
+          options: WEEKDAYS.map((d, i) => ({
+            key: String(i),
+            label: t(`forms.schedule.day.${d}`),
+          })),
+        },
+        time,
+      ] as const
+    case 'cron':
+      return [
+        {
+          order: 10,
+          type: 'text',
+          key: 'cron',
+          label: t('forms.schedule.cron'),
+          placeholder: '0 */2 * * 1-5',
+          help: t('forms.schedule.cronHelp'),
+          required: true,
+          width: '1/2',
+        },
+      ] as const
+  }
+}
 
 /** The name of a new playbook: what the tag `playbook:<name>` says. */
 export const playbookNameForm = (t: Translate) =>

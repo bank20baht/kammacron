@@ -2,12 +2,19 @@ import { idempotency } from '@20baht/elysia-idempotency'
 import { pgStore } from '@20baht/elysia-idempotency/pg'
 import { isToolCall } from '@20baht/elysia-openapi-mcp'
 import { liveMacro, liveRoute } from '@20baht/live/elysia'
+import { eq } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import { runScopeOf, type AuthState } from '../auth'
 import type { AppContext } from '../context'
 import { idParams, oneOf } from './params'
-import { CARD_STATUSES, idempotencyKeys, type CommentAuthor } from '../db/schema'
+import {
+  AUTOPILOT_TAG,
+  CARD_STATUSES,
+  cards,
+  idempotencyKeys,
+  type CommentAuthor,
+} from '../db/schema'
 import { invalid } from '../services/errors'
 import {
   addComment,
@@ -21,11 +28,11 @@ import {
 } from '../services/cards'
 
 /** Rules for making cards, shared by the MCP server's instructions and the worker's prompt. */
-export const CARD_RULES = `A card tagged "claude" is picked up by an unattended worker that runs the project's playbook on it (a Claude step, and the project's own commands).
-Tag a card "claude" only when the work is reversible and has a clear done condition.
+export const CARD_RULES = `A card tagged "${AUTOPILOT_TAG}" is open to agents: the project's worker runs its playbook on it, and an agent schedule may take it.
+Tag a card "${AUTOPILOT_TAG}" only when the work is reversible and has a clear done condition.
 A card tagged "playbook:<name>" runs that playbook of its project instead of the default one (list_projects shows each project's playbooks).
 Work that touches security, data or migrations, release or deploy, a breaking API, money, or a product decision is for a person: set human=true.
-When a task is mostly a person's, split what Claude can do alone into small "claude" cards and make the big card wait on them (waits_on).`
+When a task is mostly a person's, split what an agent can do alone into small "${AUTOPILOT_TAG}" cards and make the big card wait on them (waits_on).`
 
 const Status = oneOf(CARD_STATUSES, { description: 'todo, doing, review or done' })
 const Id = idParams('Card number, as in #12')
@@ -47,14 +54,31 @@ const authorOf = (
   return run ? { author: 'claude-worker', run_id: run.runId } : { author: 'mcp', run_id: null }
 }
 
-/** A worker's run writes to the card it holds, and to no other card that exists. */
-const onlyItsCard = (request: Request, auth: AuthState, id: number) => {
-  const run = isToolCall(request) ? runScopeOf(request, auth) : undefined
-  if (run && run.cardId !== id)
-    throw invalid(
-      'NOT_YOUR_CARD',
-      `this run works on card #${String(run.cardId)} only, not #${String(id)}`,
-    )
+/**
+ * A worker round's run writes to the card it holds, and to no other card that exists; an agent
+ * schedule's run, to the cards of its own project.
+ */
+const onlyItsCard = async (ctx: AppContext, request: Request, id: number) => {
+  const run = isToolCall(request) ? runScopeOf(request, ctx.auth) : undefined
+  if (!run) return
+  if ('cardId' in run) {
+    if (run.cardId !== id)
+      throw invalid(
+        'NOT_YOUR_CARD',
+        `this run works on card #${String(run.cardId)} only, not #${String(id)}`,
+      )
+    return
+  }
+  const card = await getCard(ctx.db, id)
+  if (card.project_id !== run.projectId)
+    throw invalid('NOT_YOUR_CARD', `card #${String(id)} is not in this run's project`)
+}
+
+/** An agent schedule's run that moves a card to doing holds it, as a worker round's run does. */
+const holdIfAgent = async (ctx: AppContext, request: Request, id: number, status: string) => {
+  const run = isToolCall(request) ? runScopeOf(request, ctx.auth) : undefined
+  if (status === 'doing' && run && !('cardId' in run))
+    await ctx.db.update(cards).set({ claimed_by_run: run.runId }).where(eq(cards.id, id))
 }
 
 const NewCard = t.Object({
@@ -89,7 +113,7 @@ export const cardRoutes = (ctx: AppContext) => {
     change: { leavesReview?: boolean; human?: boolean | undefined },
   ) => {
     if (!isToolCall(request)) return
-    onlyItsCard(request, ctx.auth, id)
+    await onlyItsCard(ctx, request, id)
     const card = await getCard(ctx.db, id)
     if (change.leavesReview && card.status === 'review')
       throw invalid('REVIEW_IS_THE_PERSONS', `card #${String(id)} is in review; the owner decides`)
@@ -194,7 +218,9 @@ export const cardRoutes = (ctx: AppContext) => {
         '/cards/:id/move',
         async ({ params, body, request }) => {
           await toolWrite(request, Number(params.id), { leavesReview: true })
-          return moveCard(ctx.db, Number(params.id), body)
+          const moved = await moveCard(ctx.db, Number(params.id), body)
+          await holdIfAgent(ctx, request, Number(params.id), body.status)
+          return moved
         },
         {
           params: Id,
@@ -218,8 +244,8 @@ export const cardRoutes = (ctx: AppContext) => {
       )
       .post(
         '/cards/:id/comments',
-        ({ params, body, request }) => {
-          onlyItsCard(request, ctx.auth, Number(params.id))
+        async ({ params, body, request }) => {
+          await onlyItsCard(ctx, request, Number(params.id))
           return addComment(ctx.db, Number(params.id), {
             ...authorOf(request, ctx.auth),
             body: body.body,

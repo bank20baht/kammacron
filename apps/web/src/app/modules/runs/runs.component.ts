@@ -10,6 +10,7 @@ import { I18n, type Translate } from '../../core/i18n/i18n.service'
 import { status } from '../../core/i18n/en/status'
 import { LiveService } from '../../services/live.service'
 import { cost, duration, stamp } from '../../shared/format'
+import { runLabel } from '../../shared/schedule'
 import { RUN_TONE } from '../../shared/tones'
 
 const PAGE_SIZE = 50
@@ -177,7 +178,7 @@ export class RunsComponent {
   protected readonly rows = computed(() =>
     (this.runs().data?.rows ?? []).map((r) => ({
       id: r.id,
-      card: `#${String(r.card_id)} ${r.card_title}`,
+      card: runLabel(r),
       status: r.status,
       started: stamp(r.started_at),
       took: duration(r.started_at, r.ended_at),

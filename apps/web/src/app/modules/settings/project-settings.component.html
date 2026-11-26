@@ -129,14 +129,24 @@
         @for (s of schedules().data ?? []; track s.id) {
           <div class="row">
             <strong>{{ s.name }}</strong>
-            <baht-code [code]="s.command ?? 'playbook:' + s.playbook"></baht-code>
+            <baht-code [code]="runsWhat(s)"></baht-code>
+            @if (s.agent && s.use_board) {
+              <baht-badge tone="info" [label]="t('project.schedules.board')"></baht-badge>
+            }
             <span class="muted">{{
               t('project.schedules.line', {
-                minutes: s.interval_minutes,
+                when: whenOf(s),
                 last: ago(s.last_run_at),
-                exit: s.last_exit_code ?? t('common.none'),
+                result:
+                  s.last_result ??
+                  (s.last_exit_code === null ? t('common.none') : 'exit ' + s.last_exit_code),
               })
             }}</span>
+            @if (s.last_run_id) {
+              <baht-button size="sm" variant="ghost" (click)="go('/runs/' + s.last_run_id)">{{
+                t('project.schedules.lastRun')
+              }}</baht-button>
+            }
             <baht-button size="sm" variant="ghost" (click)="toggleSchedule(s.id, !s.enabled)">{{
               s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
             }}</baht-button>
@@ -144,10 +154,46 @@
         } @empty {
           <p class="muted">{{ t('project.schedules.empty') }}</p>
         }
-        <baht-form #sf="bahtForm" [form]="scheduleForm()" [value]="scheduleValue"></baht-form>
-        <baht-button variant="secondary" [disabled]="busy()" (click)="addSchedule(sf.element)">{{
-          t('project.schedules.add')
-        }}</baht-button>
+        <div class="row">
+          <span class="muted">{{ t('project.schedules.runs') }}</span>
+          <baht-tabs
+            variant="pill"
+            [label]="t('project.schedules.runs')"
+            [tabs]="kindTabs()"
+            [value]="scheduleKind()"
+            (bahtChange)="pickKind($any($event).value)"
+          ></baht-tabs>
+        </div>
+        <div class="row">
+          <span class="muted">{{ t('project.schedules.when') }}</span>
+          <baht-tabs
+            variant="pill"
+            [label]="t('project.schedules.when')"
+            [tabs]="timingTabs()"
+            [value]="timing()"
+            (bahtChange)="pickTiming($any($event).value)"
+          ></baht-tabs>
+        </div>
+        @if (scheduleKind() === 'playbook' && playbookNames().length === 0) {
+          <p class="muted">{{ t('project.schedules.noPlaybook') }}</p>
+        } @else {
+          <baht-form
+            #sf="bahtForm"
+            [form]="scheduleForm()"
+            [value]="scheduleValue()"
+            (bahtChange)="scheduleChanged($any($event).data)"
+          ></baht-form>
+          <div class="row">
+            <span class="muted">{{ cronPreview() }}</span>
+            <span class="grow"></span>
+            <baht-button
+              variant="secondary"
+              [disabled]="busy()"
+              (click)="addSchedule(sf.element)"
+              >{{ t('project.schedules.add') }}</baht-button
+            >
+          </div>
+        }
       </baht-card>
     }
   } @else if (project.error()) {

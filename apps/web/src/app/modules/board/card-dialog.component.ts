@@ -23,9 +23,9 @@ import { LiveService } from '../../services/live.service'
 import { ago, cost, stamp } from '../../shared/format'
 import { cardForm, REGISTRY, sameOriginImage, sendBackForm } from '../../shared/forms'
 import { RUN_TONE, statusLabel, type CardStatus } from '../../shared/tones'
+import { changesOf, formValueOf, type CardFormValue } from './card-changes'
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
-const AUTOPILOT = 'auto-pilot'
 
 type CardData = NonNullable<ReturnType<CardDialogComponent['card']>['data']>
 type RunStatus = NonNullable<CardData['last_run']>['status']
@@ -82,8 +82,11 @@ export class CardDialogComponent {
   })
   /** The Send back note: emptied when another card comes in, so a note is never sent to the wrong card. */
   private readonly backForm = viewChild<{ element: BahtForm }>('back')
-  /** The form's starting data: taken once per card, so live frames never wipe an edit. */
-  protected readonly start = signal<Record<string, unknown> | null>(null)
+  /**
+   * The form's clean data: the card as loaded, and as it changes after while nothing is being
+   * edited. An edit in progress is never wiped by a live frame.
+   */
+  protected readonly start = signal<CardFormValue | null>(null)
   private loadedFor: number | null = null
 
   protected readonly cardForm = computed(() => cardForm(this.t))
@@ -126,9 +129,16 @@ export class CardDialogComponent {
   constructor() {
     effect(() => {
       const card = this.card().data
-      if (!card || this.loadedFor === card.id) return
+      if (!card) return
+      if (this.loadedFor === card.id) {
+        // someone else changed the card (an agent, another tab): a form with no edit follows it
+        untracked(() => {
+          if (!this.dirty() && !this.busy()) this.follow(card)
+        })
+        return
+      }
       this.loadedFor = card.id
-      this.start.set(this.valueOf(card))
+      this.start.set(formValueOf(card))
       // the same dialog shows another card (Review moves on): nothing of the last one stays
       untracked(() => {
         this.dirty.set(false)
@@ -138,16 +148,10 @@ export class CardDialogComponent {
     })
   }
 
-  private valueOf(card: NonNullable<ReturnType<typeof this.card>['data']>) {
-    return {
-      title: card.title,
-      body: card.body,
-      status: card.status,
-      owner: card.human ? 'human' : card.tags.includes(AUTOPILOT) ? 'autopilot' : 'none',
-      priority: card.priority,
-      tags: card.tags.filter((t) => t !== AUTOPILOT),
-      waits_on: card.waits_on.map((w) => String(w.id)).join(', '),
-    }
+  /** Gives the form the card as it is now, when that differs from what the form holds. */
+  private follow(card: CardData): void {
+    const next = formValueOf(card)
+    if (JSON.stringify(next) !== JSON.stringify(this.start())) this.start.set(next)
   }
 
   private async act(work: () => Promise<unknown>): Promise<boolean> {
@@ -166,30 +170,15 @@ export class CardDialogComponent {
 
   protected async save(form: BahtForm): Promise<void> {
     const card = this.card().data
-    if (!card || !form.validate().valid) return
+    const start = this.start()
+    if (!card || !start || !form.validate().valid) return
     const d = form.getData()
-    const owner = text(d['owner'])
-    const others = Array.isArray(d['tags'])
-      ? (d['tags'] as string[]).filter((t) => t !== AUTOPILOT)
-      : []
-    const waits = text(d['waits_on'])
-      .split(/[\s,#]+/)
-      .filter(Boolean)
-      .map(Number)
-      .filter((n) => Number.isInteger(n) && n > 0)
     const id = String(card.id)
     const status = text(d['status'])
+    // only what was changed here: the card may have been written to since the form was filled
+    const patch = changesOf(start, d, card.tags)
     const ok = await this.act(async () => {
-      await firstValueFrom(
-        this.api.cards({ id }).patch({
-          title: text(d['title']),
-          body: text(d['body']),
-          tags: owner === 'autopilot' ? [AUTOPILOT, ...others] : others,
-          human: owner === 'human',
-          priority: Math.round(Number(d['priority']) || 0),
-          waits_on: waits,
-        }),
-      )
+      if (Object.keys(patch).length > 0) await firstValueFrom(this.api.cards({ id }).patch(patch))
       if ((status === 'todo' || status === 'doing' || status === 'done') && status !== card.status)
         await firstValueFrom(this.api.cards({ id }).move.post({ status }))
     })
@@ -202,6 +191,8 @@ export class CardDialogComponent {
   protected cancel(form: BahtForm): void {
     form.reset()
     this.dirty.set(false)
+    const card = this.card().data
+    if (card) this.follow(card)
   }
 
   protected comment(body: string): Promise<boolean> {

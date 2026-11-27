@@ -14,6 +14,7 @@ import { spawnCodex } from './codex'
 import { childEnv, claudeHeld, holdClaude, type WorkerEnv } from './env'
 import { agentPrompt, agentRules } from './prompt'
 import {
+  claudeBaseArgs,
   isDir,
   mcpConfigPath,
   projectRules,
@@ -90,23 +91,12 @@ const claudeSpawn = async (
     ...common,
     bin: env.claudeBin,
     args: [
-      '-p',
-      '--output-format',
-      'stream-json',
-      '--verbose',
-      '--max-turns',
-      String(project.max_turns),
-      '--allowedTools',
-      tools.allowed.join(','),
-      '--disallowedTools',
-      tools.denied.join(','),
-      '--mcp-config',
-      mcp.path,
-      '--strict-mcp-config',
-      '--setting-sources',
-      'user',
-      '--append-system-prompt',
-      rules,
+      ...claudeBaseArgs({
+        maxTurns: project.max_turns,
+        tools,
+        mcpPath: mcp.path,
+        systemPrompt: rules,
+      }),
       ...(agent ? ['--agents', agentsJson(agent, mcp.servers, model), '--agent', agent.name] : []),
       ...(model ? ['--model', model] : []),
     ],

@@ -1,12 +1,12 @@
 import { liveMacro, liveRoute } from '@20baht/live/elysia'
 import { parseTableQuery, tableQuery } from '@20baht/table-query'
-import { and, count, eq, sql } from 'drizzle-orm'
+import { and, count, eq, isNotNull, sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
 import { AGENTS, cards, projects, RUN_STATUSES, runs, schedules } from '../db/schema'
 import { CLAUDE_MODELS, claudeAgents, codexModels, hasCli } from '../services/agents'
-import { listAlerts, markAlertsRead } from '../services/alerts'
+import { countUnreadAlerts, listAlerts, markAlertsRead } from '../services/alerts'
 import { claudeLimits, codexLimits } from '../services/limits'
 import { listCronJobs, runsBetween } from '../services/calendar'
 import { getCard, moveCard, updateCard } from '../services/cards'
@@ -306,9 +306,8 @@ export const runRoutes = (ctx: AppContext) =>
         const paused = await ctx.db
           .select({ id: projects.id, name: projects.name, reason: projects.paused_reason })
           .from(projects)
-          .where(and(eq(projects.archived, false)))
-          .then((rows) => rows.filter((r) => r.reason !== null))
-        const unread = (await listAlerts(ctx.db, { unread: true, limit: 200 })).length
+          .where(and(eq(projects.archived, false), isNotNull(projects.paused_reason)))
+        const unread = await countUnreadAlerts(ctx.db)
         return {
           paused: settings.paused,
           running,

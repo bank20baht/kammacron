@@ -402,6 +402,7 @@ export const schema = {
   comments,
   runs,
   runEvents,
+  runSteps,
   attachments,
   alerts,
   schedules,

@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from 'drizzle-orm'
+import { count, desc, eq, inArray } from 'drizzle-orm'
 
 import { firstRow, type Executor } from '../db'
 import { alerts } from '../db/schema'
@@ -33,6 +33,12 @@ export const listAlerts = (db: Executor, { unread = false, limit = 50 } = {}) =>
     .where(unread ? eq(alerts.read, false) : undefined)
     .orderBy(desc(alerts.id))
     .limit(limit)
+
+/** How many the person has not read: all of them, not a page of them. */
+export const countUnreadAlerts = async (db: Executor) => {
+  const [row] = await db.select({ n: count() }).from(alerts).where(eq(alerts.read, false))
+  return row?.n ?? 0
+}
 
 export const markAlertsRead = (db: Executor, ids: readonly number[]) =>
   ids.length === 0

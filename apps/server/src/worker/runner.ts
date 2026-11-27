@@ -1,4 +1,4 @@
-import { appendFile, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { appendFile, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import { eq } from 'drizzle-orm'
@@ -246,23 +246,23 @@ const returnCard = async (
   else await moveCard(env.db, cardId, { status: 'todo' })
 }
 
+/** Thrown inside the claim's transaction to undo the run row: someone else has the card. */
+class Taken extends Error {}
+
 /** The claim: a run row and the card's move to doing, together or not at all. */
 const claim = async (env: WorkerEnv, project: Project, cardId: number, logDir: string) =>
   env.db
     .transaction(async (tx) => {
       const run = await createRun(tx, { project_id: project.id, card_id: cardId, log_path: null })
       const card = await claimCard(tx, cardId, run.id)
-      if (!card) {
-        tx.rollback()
-        return null
-      }
+      if (!card) throw new Taken()
       return {
         run: await updateRun(tx, run.id, { log_path: join(logDir, `${String(run.id)}.jsonl`) }),
         card,
       }
     })
     .catch((error: unknown) => {
-      if (error instanceof Error && error.message.includes('Rollback')) return null
+      if (error instanceof Taken) return null
       throw error
     })
 
@@ -377,42 +377,59 @@ export const projectRules = async (dir: string) => {
   return found.length > 0 ? found.join('\n\n') : null
 }
 
+/**
+ * What every `claude -p` of kammacron's is started with, a card's step or a schedule's agent: the
+ * stream it reads, the tools allowed and refused, only the MCP servers it names, and nothing from
+ * the directory's `.claude/` (its hooks and apiKeyHelper would run commands here).
+ */
+export const claudeBaseArgs = (o: {
+  maxTurns: number
+  tools: { allowed: readonly string[]; denied: readonly string[] }
+  mcpPath: string
+  systemPrompt: string
+}) => [
+  '-p',
+  '--output-format',
+  'stream-json',
+  '--verbose',
+  '--max-turns',
+  String(o.maxTurns),
+  '--allowedTools',
+  o.tools.allowed.join(','),
+  '--disallowedTools',
+  o.tools.denied.join(','),
+  '--mcp-config',
+  o.mcpPath,
+  '--strict-mcp-config',
+  '--setting-sources',
+  'user',
+  '--append-system-prompt',
+  o.systemPrompt,
+]
+
 const claudeArgs = async (ctx: Context, step: ClaudeStep, index: number) => {
   const { env, project, card, dir, run } = ctx
   const rules = await projectRules(dir)
   const mcp = await writeMcpConfig(env, project, dir, runTokenOf(env, run.id))
   const tools = toolLists(project, step, mcp.servers, env.dataDir)
   const model = step.model ?? project.model
+  const attachmentsDir =
+    ctx.runDir.attachments.length > 0 ? join(ctx.runDir.dir, 'attachments') : null
   return [
-    '-p',
-    '--output-format',
-    'stream-json',
-    '--verbose',
-    '--max-turns',
-    String(step.max_turns ?? project.max_turns),
-    '--allowedTools',
-    tools.allowed.join(','),
-    '--disallowedTools',
-    tools.denied.join(','),
-    '--mcp-config',
-    mcp.path,
-    '--strict-mcp-config',
-    // nothing from the directory's .claude/: its hooks and apiKeyHelper would run commands here
-    '--setting-sources',
-    'user',
-    ...(ctx.runDir.attachments.length > 0
-      ? [`--add-dir=${join(ctx.runDir.dir, 'attachments')}`]
-      : []),
-    '--append-system-prompt',
-    workerRules({
-      project,
-      cardId: card.id,
-      projectRules: rules,
-      attachmentsDir:
-        ctx.runDir.attachments.length > 0 ? join(ctx.runDir.dir, 'attachments') : null,
-      steps: ctx.steps,
-      index,
+    ...claudeBaseArgs({
+      maxTurns: step.max_turns ?? project.max_turns,
+      tools,
+      mcpPath: mcp.path,
+      systemPrompt: workerRules({
+        project,
+        cardId: card.id,
+        projectRules: rules,
+        attachmentsDir,
+        steps: ctx.steps,
+        index,
+      }),
     }),
+    ...(attachmentsDir ? [`--add-dir=${attachmentsDir}`] : []),
     ...(model ? ['--model', model] : []),
   ]
 }
@@ -668,4 +685,4 @@ const noPlaybook = async (env: WorkerEnv, project: Project, card: Card, run: Run
 }
 
 export const isDir = async (path: string) =>
-  (await Bun.spawn(['test', '-d', path], { stdout: 'ignore', stderr: 'ignore' }).exited) === 0
+  (await stat(path).catch(() => null))?.isDirectory() ?? false

@@ -236,6 +236,34 @@ export type Move = {
   position?: number | undefined
 }
 
+/** Cards of one column closer than this are spread out again. */
+const MIN_GAP = 1e-6
+
+/**
+ * A card dropped between two others takes the middle of their positions, and the middle of a
+ * middle runs out of digits after some fifty drops into one gap. When two cards of the column
+ * have come this close, the column is numbered 1, 2, 3… in the order it has.
+ */
+const spreadColumn = async (db: Executor, projectId: number, status: CardStatus) => {
+  const column = await db
+    .select({ id: cards.id, position: cards.position })
+    .from(cards)
+    .where(and(eq(cards.project_id, projectId), eq(cards.status, status)))
+    .orderBy(asc(cards.position), asc(cards.id))
+  const crowded = column.some((card, i) => {
+    const prev = column[i - 1]
+    return prev !== undefined && card.position - prev.position < MIN_GAP
+  })
+  if (!crowded) return false
+  for (const [i, card] of column.entries())
+    if (card.position !== i + 1)
+      await db
+        .update(cards)
+        .set({ position: i + 1 })
+        .where(eq(cards.id, card.id))
+  return true
+}
+
 export const moveCard = (db: Executor, id: number, move: Move) =>
   db.transaction(async (tx) => {
     const card = await cardRow(tx, id)
@@ -245,7 +273,7 @@ export const moveCard = (db: Executor, id: number, move: Move) =>
     const position =
       move.position ??
       (card.status === move.status ? card.position : await endOf(tx, card.project_id, move.status))
-    return firstRow(
+    const moved = firstRow(
       await tx
         .update(cards)
         .set({
@@ -260,6 +288,10 @@ export const moveCard = (db: Executor, id: number, move: Move) =>
         .where(eq(cards.id, id))
         .returning(),
     )
+    // only a card placed by hand can crowd a column: the end of a column is a whole step away
+    if (move.position !== undefined && (await spreadColumn(tx, card.project_id, move.status)))
+      return cardRow(tx, id)
+    return moved
   })
 
 export const archiveCard = async (db: Executor, id: number, archived = true) => {

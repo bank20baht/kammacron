@@ -267,6 +267,42 @@ describe('the card list', () => {
   })
 })
 
+describe('a column kept in order by hand', () => {
+  test('cards dropped into one gap again and again keep their order: the column is spread out', async () => {
+    const made = await create(['a', 'b', 'c'].map((title) => ({ project_id: projectId, title })))
+    const ids = made.map((card) => must(card).id)
+    const [a, b, c] = [must(ids[0]), must(ids[1]), must(ids[2])]
+    type Row = { id: number; position: number }
+    const move = (id: number, position: number) =>
+      t.json<Row>('POST', `/api/cards/${String(id)}/move`, { status: 'todo', position })
+    const column = async () =>
+      (await t.json<Row[]>('GET', '/api/cards?status=todo')).map((row) => [row.id, row.position])
+    expect(await column()).toEqual([
+      [a, 1],
+      [b, 2],
+      [c, 3],
+    ])
+    // a gap halved until it is nearly gone: c right after a, then b in between, and so on
+    const low = 1
+    let high = 2
+    for (let i = 0; i < 30; i++) {
+      high = (low + high) / 2
+      await move(i % 2 === 0 ? c : b, high)
+    }
+    const after = await column()
+    expect(after.map(([id]) => id)).toEqual([a, b, c])
+    expect(after.map(([, position]) => position)).toEqual([1, 2, 3])
+    // and the answer to the move that crowded it carries the new position
+    high = 2
+    let last: Row | undefined
+    for (let i = 0; i < 25; i++) {
+      high = (low + high) / 2
+      last = await move(c, high)
+    }
+    expect(Number.isInteger(must(last).position)).toBe(true)
+  })
+})
+
 describe('a run and its events', () => {
   test('the newest page, earlier pages by `before`, and how many there are', async () => {
     const [card] = await create([{ project_id: projectId, title: 'long run' }])

@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { newLoginCode, useLoginCode } from '../src/auth'
 import { banner, bannerText } from '../src/banner'
 import { launchdPlist, systemdUnit } from '../src/service'
 import { linkedIds, sniffImage } from '../src/services/attachments'
@@ -227,5 +228,31 @@ describe('the CLI banner', () => {
     expect(text).toContain('| $$$$$$/')
     expect(bannerText('1.2.3', false, 80)).toContain('┴ ┴┴ ┴')
     expect(text).toContain('* * * * *  board · cron · agents   v1.2.3')
+  })
+})
+
+describe('one-time sign-in codes', () => {
+  const state = () => ({
+    apiToken: 't',
+    sessionSecret: 's',
+    allowedHosts: [],
+    runOf: () => undefined,
+    loginCodes: new Map<string, number>(),
+  })
+
+  test('a code works once', () => {
+    const s = state()
+    const code = newLoginCode(s)
+    expect(useLoginCode(s, code)).toBe(true)
+    expect(useLoginCode(s, code)).toBe(false)
+  })
+
+  test('the link start prints lasts as long as asked, a default code a minute', () => {
+    const s = state()
+    const long = newLoginCode(s, 10 * 60_000)
+    const short = newLoginCode(s)
+    const now = Date.now()
+    expect(s.loginCodes.get(long)).toBeGreaterThan(now + 9 * 60_000)
+    expect(s.loginCodes.get(short)).toBeLessThanOrEqual(now + 60_000)
   })
 })

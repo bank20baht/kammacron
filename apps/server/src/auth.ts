@@ -23,7 +23,7 @@ export type AuthState = {
   verifyOAuth?: ((token: string) => Promise<boolean>) | undefined
   /** The run a worker's token belongs to, while that run goes. */
   runOf: (token: string) => RunScope | undefined
-  /** Single-use sign-in codes of `kammacron open`, with when each expires. */
+  /** Single-use sign-in codes (`kammacron open`, the link `start` prints), with when each expires. */
   loginCodes: Map<string, number>
 }
 
@@ -106,12 +106,15 @@ export const runScopeOf = (request: Request, state: AuthState) => {
 
 const LOGIN_CODE_MS = 60_000
 
-/** A code that opens one session, once, within a minute. */
-export const newLoginCode = (state: AuthState) => {
+/**
+ * A code that opens one session, once, within a minute (or `ms`). It stands in for the API token
+ * in a link: the token never goes in an address, where history and synced tabs would keep it.
+ */
+export const newLoginCode = (state: AuthState, ms = LOGIN_CODE_MS) => {
   for (const [code, expires] of state.loginCodes)
     if (expires < Date.now()) state.loginCodes.delete(code)
   const code = newToken()
-  state.loginCodes.set(code, Date.now() + LOGIN_CODE_MS)
+  state.loginCodes.set(code, Date.now() + ms)
   return code
 }
 

@@ -5,7 +5,7 @@ import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 
-import { identityProof } from './auth'
+import { identityProof, newLoginCode } from './auth'
 import { banner } from './banner'
 import { newToken, readSecrets, sameSecret, secretsPath } from './secrets'
 import { clientHost, DEFAULT_PORT, readLock, resolveDataDir, startServer } from './server'
@@ -99,6 +99,9 @@ const version = async () => {
   return '0.0.0-dev'
 }
 
+/** How long the sign-in link `start` prints works: long enough to switch to the browser. */
+const START_CODE_MS = 10 * 60_000
+
 const which = async (name: string) => {
   const r = await exec(['sh', '-c', `command -v ${name}`], { cwd: '/' })
   return r.code === 0 ? r.stdout.trim() : null
@@ -119,6 +122,12 @@ switch (command) {
     const top = banner(v)
     if (top) console.log(top)
     console.log(`kammacron ${v} on ${handle.url} (data: ${dataDir})`)
+    // a link that signs this browser in, once: only to a person at a terminal, never to a service's
+    // log file, and with a one-time code, never the API token
+    if (process.stdout.isTTY) {
+      const code = newLoginCode(handle.ctx.auth, START_CODE_MS)
+      console.log(`open (signs you in, once, within 10 minutes): ${handle.url}/login#code=${code}`)
+    }
     const stop = () => {
       // exit however stopping ends, and within 10 s even if something hangs
       setTimeout(() => process.exit(1), 10_000).unref()

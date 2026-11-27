@@ -12,7 +12,9 @@ kammacron needs [Bun](https://bun.sh) 1.3 or later on the machine that runs it, 
 bunx kammacron start
 ```
 
-`kammacron open` signs your browser in. It serves the web app on [http://127.0.0.1:7420](http://127.0.0.1:7420) and keeps its data in `~/.kammacron`. Stop it with Ctrl+C.
+It serves the web app on [http://127.0.0.1:7420](http://127.0.0.1:7420) and keeps its data in `~/.kammacron`. Stop it with Ctrl+C.
+
+It also prints a link that signs your browser in: click it. The link carries a one-time code, not the API token, and works once, within 10 minutes; after that, `kammacron open` signs a browser in. A service (below) prints no link, so none lands in its log.
 
 ## Keep it running
 

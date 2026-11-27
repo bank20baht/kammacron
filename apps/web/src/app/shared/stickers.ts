@@ -1,8 +1,10 @@
 import '@20baht/stickers/element'
 import { registerSticker } from '@20baht/stickers'
+import { cloud } from '@20baht/stickers/icons/cloud'
 import { cron } from '@20baht/stickers/icons/cron'
 import { kanban } from '@20baht/stickers/icons/kanban'
 import { key } from '@20baht/stickers/icons/key'
+import { lockScreen } from '@20baht/stickers/icons/lock-screen'
 import { motorbikeTaxi } from '@20baht/stickers/icons/motorbike-taxi'
 import { password } from '@20baht/stickers/icons/password'
 import { pottedPlant } from '@20baht/stickers/icons/potted-plant'
@@ -22,9 +24,11 @@ import { tukTuk } from '@20baht/stickers/icons/tuk-tuk'
  * (danger red) slot goes beside a neutral message: red means failed here.
  */
 for (const icon of [
+  cloud,
   cron,
   kanban,
   key,
+  lockScreen,
   motorbikeTaxi,
   password,
   pottedPlant,

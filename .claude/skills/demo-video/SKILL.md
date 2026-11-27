@@ -1,6 +1,6 @@
 ---
 name: demo-video
-description: Make (or remake) kammacron's "AI factory" demo video from the real app and a real terminal — a bug-hunting cron job files cards, a second cron job fixes them one a minute, shown side by side — in a modern mechanical shadow-puppet (หนังตะลุง) style with Thai captions and light music. Use when the user asks for a demo, intro or promo video of kammacron, or to update it after a new feature.
+description: Make (or remake) kammacron's "AI factory" demo video from the real app and a real terminal — a bug-hunting cron job files cards, a second cron job fixes them one a minute, shown side by side — in the storybook paper style with a perforated (ลายฉลุ) buffalo mascot, Thai captions and light music. Use when the user asks for a demo, intro or promo video of kammacron, or to update it after a new feature.
 ---
 
 # kammacron demo video ("AI factory")
@@ -20,29 +20,27 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
    Done. The first run at about 1.3x, later ones sped up ("โหมดโรงงาน ×N"), waits fast-forwarded.
    A top strip counts 🐞 cards / 🔧 doing / ✅ Done / 👀 review, from the real board.
 5. **Terminal**: `git log --oneline` and `git diff --stat` of the shop: the agent's real commits.
-6. **Factory card** (machines "Cron หาบัค" → belt → "Cron แก้บัค" → Done, the buffalo walking
-   below) with the real numbers, then the **end card** (`bunx kammacron start`, kammacron.pages.dev).
+6. **Paper conveyor card** (machines "Cron หาบัค" → belt → "Cron แก้บัค" → Done, the buffalo
+   walking in the corner) with the real numbers, then the **end card** (`bunx kammacron start`, kammacron.pages.dev).
 
 ## What the owner asked for (keep it so)
 
 - **Real everything**: the real web app and a real terminal, real Claude runs. Never fake a
   result; captions say what *this* recording's agent did (a card in Review, a card left to a person).
 - **Thai captions** on the leather caption band *below* the windows — never over the page.
-- **Southern Thai shadow puppets (หนังตะลุง), mechanical and modern** (the owner's choice on
-  2026-11-27, replacing the paper pop-up look): a lit amber screen (จอหนัง, a soft lamp glow is
-  the one gradient) framed in perforated leather (ลายฉลุ, geometric: lozenges, flame curls, dots,
-  a coloured gel in some holes); windows hang from the frame on puppet rods (ไม้ตับ) with brass
-  rivets at the corners; plaques and tags are leather with gel faces; card pieces swing down on
-  their rods and settle. Colours: the brand's orange and blue, plus jade, saffron, crimson.
-- **The mascot** is the app's buffalo (gear horns, the clock over its head, a ผ้าขาวม้า) as a
-  jointed leather puppet (`paper.buffalo`): head, legs and tail on rivets, cut outlines between
-  the pieces, two control rods. It walks and nods on the cards; it stands still in the wide
-  margins of single-window scenes (a gear tower on the other side; split scenes get perforated
-  posts). An original design from the logo, not a copy of any traditional character.
+- **Storybook paper pop-up** graphics: textured paper, torn edges, pieces that stand up off the
+  page one after another. Bright, flat colours, **no gradients**.
+- **The mascot** (the owner's ask on 2026-11-27): the app's buffalo (gear horns, the clock over its
+  head, a ผ้าขาวม้า) cut from dark card with perforations (ลายฉลุ) and coloured inlays, like a
+  หนังตะลุง puppet but in the paper's colours (`paper.buffalo`): head, legs and tail on pins. It
+  stands in both wide margins of single-window scenes, facing the window, and walks on the
+  factory and end cards. An original design from the logo, not a copy of a traditional
+  character. (A full shadow-puppet look was tried and set aside: commit `e7602dd`, video
+  `kammacron-cron-agents.mp4` of 12:08 on 2026-11-27.)
 - The browser windows show an **address bar with the real URL** of that moment; terminal windows
-  have a title bar.
+  have a title bar; washi tape on the corners.
 - **Light, bright background music** (synthesised in `music.py`, no licence issues) and a soft
-  "pop" when a piece swings in.
+  paper "pop" when cards stand up.
 - **Under two minutes**. Side-by-side windows when something moves by itself.
 
 ## Run it
@@ -81,8 +79,8 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
 - `ffmpeg -af ebur128` says about −20 LUFS. You cannot hear it: say so, and that the chords
   were checked (each bar's strongest pitch classes match C–G–Am–F).
 - **Saving**: `docs/screenshots/` is the owner's folder (git-ignored). Look before you write:
-  never overwrite a file you did not make in this session. `kammacron-cron-agents.mp4` is this
-  video's name.
+  never overwrite a file you did not make in this session, and keep earlier cuts (the owner
+  wants them kept): save a new cut under a new name (`kammacron-cron-agents-<what>.mp4`).
 
 ## Adapting it to a new feature
 
@@ -90,7 +88,7 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
   records the URL timeline), then an entry in `SINGLE` (one window) or `SPLITS` (two) in
   `compose.py` with its captions `(from, to, tag, text)` on the clip's own timeline.
 - A new card: a function in `paper.py` returning `(html, seconds, pop times)` (build it from
-  `plaque`, `tag`, `gear_svg`, `buffalo`, wrapped in `doc`); capture it with `paper.capture` like
+  `piece`, `tag`, `buffalo`, wrapped in `doc`); capture it with `paper.capture` like
   `factory()`; add it to `main()` in `compose.py`.
 - Keep the total under two minutes: speed up typing (`speed` per scene), fast-forward waits.
 
@@ -118,9 +116,9 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
 - vhs: quote paths; `Wait /regex/` for live states; `Menlo, Sukhumvit Set` draws Thai (Menlo
   alone garbles ำ). Never `git show` in a tape: it prints the author's name and email.
 - Thai text in images: render with Chromium (Pillow misplaces Thai marks).
-- SVG ids must be unique on a page: each perforated band gets its own clipPath id
-  (`chalu_band`), or every band clips to the first one's width. Jointed SVG parts rotate with
-  `transform-box:view-box` and a `transform-origin` in the viewBox's units (the rivet).
+- `clip-path` cuts a `drop-shadow` off: shadow on a wrapper. A pop-up starts at
+  `rotateX(-86deg)`, not past 90°. The buffalo's jointed SVG parts rotate with
+  `transform-box:view-box` and a `transform-origin` in the viewBox's units (the pin).
 - Python 3.9 here: no backslashes inside f-string expressions.
 - Scripts derive every path from the work dir; `repo.txt` (written by `setup.sh`) points at
   this repo.
@@ -132,9 +130,8 @@ kit/setup.sh            work dir: scripts, bin/kammacron, tapes, the shop repo
 kit/make.sh             one clean recording (copied into the work dir)
 kit/scripts/record.py   the web scenes (Playwright), marks, URL and card-count timelines
 kit/scripts/compose.py  the cut: windows on the screen, captions, speeds, cards, music, mux
-kit/scripts/paper.py    the shadow-puppet look (the module keeps its old name): the buffalo, perforated
-                        bands, rivets, rods, gears; backdrops, window mounts, captions, bars; the
-                        factory and end cards
+kit/scripts/paper.py    paper style: cards (factory, end, …), backdrops, tape, captions, bars, and
+                        the perforated buffalo
 kit/scripts/music.py    the synthesised track and the pop
 kit/scripts/common.py   work dir, API, sign-in, visible cursor
 kit/tapes/              vhs: shell setup (template) and the git scene

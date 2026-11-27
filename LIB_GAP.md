@@ -1,52 +1,41 @@
 # Library gaps
 
-Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.41**, with
-`@20baht/element` **0.1.1**, on 2026-11-27. Two gaps are open (a theme switch fades through both
-themes; a chart series' own colour reaches only the first series), each with a workaround in the
-app. The seventeen below it are resolved, six
-of them in 0.3.41 (a workflow step's own label, a new definition that keeps the run, hidden fields,
-an alert's actions, an app's field type named and framed through `@20baht/ui`, segmented-nav items
-that keep their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold
-button, `clock` and `bot` icons).
+Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.42** (with
+`@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on 2026-11-27. No gap is open. The
+nineteen below are resolved, two of them in 0.3.42 (a theme switch that lands at once, a chart
+series' own colour for every series), six in 0.3.41 (a workflow step's own label, a new definition
+that keeps the run, hidden fields, an alert's actions, an app's field type named and framed through
+`@20baht/ui`, segmented-nav items that keep their width), four in 0.3.38 (a `schedule` field type,
+`baht-cron`, the app shell's fold button, `clock` and `bot` icons).
 
-## Open: a theme switch fades through both themes
+## Resolved: a theme switch fades through both themes
 
 Affected: `<baht-theme-toggle>`, every `--baht-*` colour with a transition; owner: `@20baht/ui`.
 
-**What happens.** Flipping `data-baht-theme` restyles the page, and every element whose colours
-have a transition (`.baht-button` 120ms, an app's own hover or highlight) fades to the new theme at
-its own pace. For that moment the page shows both themes at once: verified in kammacron 0.3.41,
-150ms after a switch to light the Pause button is still the dark theme's near-black with near-white
-text under a light header, and the Kanban columns are still dark with their headings already dark.
-The toggle's own icon is blank in that moment.
+**Was.** Flipping `data-baht-theme` faded every coloured part at its own pace (`.baht-button`
+120ms, an app's own hovers), so for a moment the page showed both themes: in kammacron 0.3.41,
+150ms after a switch to light the Pause button was still near-black with near-white text, and the
+board's columns were still dark under headings already dark. The app held transitions itself
+(`core/theme-switch.ts`, a class on `<html>` for two frames).
 
-**Wanted.** The toggle (and any code that sets `data-baht-theme` through the library) holds
-transitions for the frame the new theme is drawn in, so the theme lands at once. A theme switch is
-not a motion with a purpose; it should not animate.
+**Published fix.** 0.3.42: the toggle sets `data-baht-theme-switching` on its target for the frame
+the new theme is drawn in, and `tokens.css` holds transitions under it. It does so on a click, on
+setting `theme`, and when another writer changes the attribute (its observer): every way the app's
+theme changes. kammacron's workaround is gone.
 
-**Workaround in kammacron.** `core/theme-switch.ts` watches `data-baht-theme` on `<html>` and puts
-`.app-theme-switching` there for two frames; `styles.css` sets `transition: none !important` under
-it. Public API only (the attribute the toggle documents); remove it when the library does the same.
-
-## Open: a chart series' own colour reaches only the first series
+## Resolved: a chart series' own colour reaches only the first series
 
 Affected: `<baht-bar-chart>`, `<baht-line-chart>` (`ChartSeries.color`); owner: `@20baht/dashboard`
 (re-exported by `@20baht/ui`).
 
-**What happens.** `ChartSeries` documents `color?: string`, and the charts pass it on as
-`chartColor(seriesIndex, s.color)`, but `chartColor(i, override)` returns the override only when
-`i === 0`. In a chart of several series, every series after the first keeps the categorical
-`--baht-chart-N` whatever its `color` says. Verified in 0.3.41 (`@20baht/dashboard` 0.2.7,
-`chart-math.js`).
+**Was.** The charts passed a series' `color` through `chartColor(seriesIndex, s.color)`, which
+returns the override only for index 0: every later series kept the categorical `--baht-chart-N`.
+Stats' run outcomes could not wear the status colours, and "review" came out the success green.
+The app set the chart's own `--baht-chart-1..3` on a class instead.
 
-**Why it matters here.** Stats draws run outcomes (done, review, failed). They should wear the
-app's status colours, not the categorical order, which made "review" the success green.
-
-**Wanted.** A series' `color` wins for every series, as the type says.
-
-**Workaround in kammacron.** The outcomes chart has the class `app-outcomes`, and `styles.css`
-sets its own `--baht-chart-1..3` (public tokens) to the status colours. Remove it, and pass
-`color` on each series, when the library honours it.
+**Published fix.** `@20baht/dashboard` 0.2.8 (with `@20baht/ui` 0.3.42): the bar and line charts
+use `s.color ?? chartColor(i)` for every series, legend included. Stats passes `color` on each
+series (`OUTCOME` in `stats.component.ts`); the class and the token override are gone.
 
 ## Resolved: a workflow step's label is also the key its rules and data use
 

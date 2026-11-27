@@ -67,17 +67,6 @@ html:is([data-baht-theme], :not([data-baht-theme])) {
   --baht-font-mono: ui-monospace, SFMono-Regular, Menlo, 'Noto Sans Thai Variable', monospace;
 }
 
-/*
- * A chart of outcomes speaks the app's status colours: done green, review gold, failed red, in
- * both themes (checked with the dataviz palette validator: CVD ΔE 12.5, normal 21.4). Set on the
- * chart's own series tokens, since `ChartSeries.color` only reaches the first series (LIB_GAP).
- */
-baht-bar-chart.app-outcomes {
-  --baht-chart-1: #1f7a4d;
-  --baht-chart-2: #c98a00;
-  --baht-chart-3: #c8202f;
-}
-
 /* The shell: a header band on the surface colour, with a hairline under it; the current link
    tinted with the primary, links with rounded corners (konmek's frame). */
 html {
@@ -104,14 +93,6 @@ html {
   font-size: var(--baht-text-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-/* The frame a theme changes in (core/theme-switch.ts): nothing fades, the new colours land at once. */
-.app-theme-switching,
-.app-theme-switching *,
-.app-theme-switching *::before,
-.app-theme-switching *::after {
-  transition: none !important;
 }
 
 /* Every routed page: the shell's full width, so nothing is left blank on the right. */

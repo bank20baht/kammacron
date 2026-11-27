@@ -7,7 +7,6 @@ import { liveSignal } from '@20baht/angular/live'
 
 import { I18n } from './core/i18n/i18n.service'
 import { currentKey, navWith } from './core/navigation/navigation'
-import { instantThemeSwitch } from './core/theme-switch'
 import { LiveService } from './services/live.service'
 import { SessionService } from './services/session.service'
 import { StatusBarComponent } from './shared/status-bar.component'
@@ -41,11 +40,6 @@ export class App {
   private readonly projects = liveSignal(() =>
     this.open() ? this.live.subscribe('GET', '/api/projects', { query: {} }) : null,
   )
-
-  constructor() {
-    // a theme lands in one frame, not as two themes fading past each other
-    instantThemeSwitch()
-  }
 
   /** No navigator before the session exists (the token page). */
   protected readonly items = computed(() =>

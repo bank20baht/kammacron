@@ -23,6 +23,12 @@ const columnsOf = (t: Translate): ColumnMap => ({
   cost: { label: t('stats.column.cost'), align: 'end' },
 })
 
+/**
+ * Run outcomes in the app's status colours (done green, review gold, failed red), the same in both
+ * themes: checked with the dataviz palette validator (CVD ΔE 12.5, normal-vision 21.4).
+ */
+const OUTCOME = { done: '#1f7a4d', review: '#c98a00', failed: '#c8202f' } as const
+
 /** What the worker did, week by week: done, handed back, failed, and what it cost. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -112,7 +118,6 @@ const columnsOf = (t: Translate): ColumnMap => ({
         <div class="charts">
           <baht-card [heading]="t('stats.outcomes')">
             <baht-bar-chart
-              class="app-outcomes"
               [label]="t('stats.runsPerWeek')"
               stacked
               [categories]="categories()"
@@ -169,9 +174,21 @@ export class StatsComponent {
   protected readonly series = computed<ChartSeries[]>(() => {
     const weeks = this.weeksOf()
     return [
-      { name: this.t('stats.series.shipped'), values: weeks.map((w) => w.done) },
-      { name: this.t('stats.series.review'), values: weeks.map((w) => w.review) },
-      { name: this.t('stats.series.failed'), values: weeks.map((w) => w.failed) },
+      {
+        name: this.t('stats.series.shipped'),
+        values: weeks.map((w) => w.done),
+        color: OUTCOME.done,
+      },
+      {
+        name: this.t('stats.series.review'),
+        values: weeks.map((w) => w.review),
+        color: OUTCOME.review,
+      },
+      {
+        name: this.t('stats.series.failed'),
+        values: weeks.map((w) => w.failed),
+        color: OUTCOME.failed,
+      },
     ]
   })
   protected readonly costSeries = computed<ChartSeries[]>(() => [

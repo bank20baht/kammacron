@@ -47,7 +47,7 @@ decides), red is failed: in badges, the board's column edges, the calendar, and 
 chart (`#1F7A4D` / `#C98A00` / `#C8202F` in both themes, checked with the dataviz palette
 validator). A chosen item (a queue card, a board tile, a choice) is the primary, never a status
 colour. The library theme toggle continues to manage `data-baht-theme` and system preference; a
-switch lands in one frame (`core/theme-switch.ts`).
+switch lands in one frame (the toggle holds transitions while it draws the new theme, 0.3.42).
 
 ## Type
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { brotliDecompressSync } from 'node:zlib'
 
 import { newLoginCode, useLoginCode } from '../src/auth'
 import { banner, bannerText } from '../src/banner'
@@ -227,6 +228,36 @@ describe('static', () => {
         expect(await cache(name)).toBe('public, max-age=31536000, immutable')
       expect(await cache('sw.js')).toBe('no-cache')
       expect(await cache('board')).toBe('no-cache')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('text goes out compressed when the browser takes it, and unpacks to the file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kc-web-'))
+    try {
+      const js = `console.log(${JSON.stringify('kammacron '.repeat(500))})`
+      await Bun.write(join(dir, 'main-L7F2M64O.js'), js)
+      await Bun.write(join(dir, 'index.html'), '<p>app</p>')
+      const app = staticRoutes(dir)
+      const get = (encoding: string) =>
+        app.handle(
+          new Request('http://x/main-L7F2M64O.js', { headers: { 'accept-encoding': encoding } }),
+        )
+      const br = await get('gzip, deflate, br')
+      expect(br.headers.get('content-encoding')).toBe('br')
+      expect(br.headers.get('content-type')).toContain('javascript')
+      const brBody = new Uint8Array(await br.arrayBuffer())
+      expect(brBody.length).toBeLessThan(js.length / 4)
+      expect(brotliDecompressSync(brBody).toString()).toBe(js)
+      const gz = await get('gzip')
+      expect(gz.headers.get('content-encoding')).toBe('gzip')
+      expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await gz.arrayBuffer())))).toBe(
+        js,
+      )
+      const plain = await get('')
+      expect(plain.headers.get('content-encoding')).toBeNull()
+      expect(await plain.text()).toBe(js)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

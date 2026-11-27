@@ -74,10 +74,8 @@ const ONE_COLUMN = '(width < 900px)'
       border-radius: var(--baht-radius-md);
       background: var(--baht-color-surface);
       cursor: pointer;
-      transition:
-        border-color 150ms ease,
-        background-color 150ms ease,
-        transform 160ms var(--app-ease-out);
+      /* only the press moves; a card chosen (Enter, or the next after a decision) shows at once */
+      transition: transform 160ms var(--app-ease-out);
     }
     .item:focus-visible {
       border-color: var(--baht-color-border-strong);
@@ -85,6 +83,10 @@ const ONE_COLUMN = '(width < 900px)'
     @media (hover: hover) and (pointer: fine) {
       .item:hover {
         border-color: var(--baht-color-border-strong);
+        /* the pointer's hover may ease in; the keyboard's choice never does */
+        transition:
+          border-color 150ms ease,
+          transform 160ms var(--app-ease-out);
       }
     }
     .item:active {

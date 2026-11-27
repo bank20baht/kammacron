@@ -60,14 +60,18 @@
   border-radius: var(--baht-radius-md);
   background: var(--baht-color-surface);
   cursor: grab;
+  /* a tile chosen or moved with the keyboard shows at once; only the press and the drag fade */
   transition:
-    border-color 150ms ease,
     opacity 150ms ease,
     transform 160ms var(--app-ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
   .tile:hover {
     border-color: var(--baht-color-border-strong);
+    transition:
+      border-color 150ms ease,
+      opacity 150ms ease,
+      transform 160ms var(--app-ease-out);
   }
 }
 /* pressed: the board heard the click (or the start of a drag) */

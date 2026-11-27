@@ -1,11 +1,31 @@
 # Library gaps
 
 Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.41**, with
-`@20baht/element` **0.1.1**, on 2026-11-27. No gap is open. The seventeen below are resolved, six
+`@20baht/element` **0.1.1**, on 2026-11-27. One gap is open (a theme switch fades through both
+themes), with a workaround in the app. The seventeen below it are resolved, six
 of them in 0.3.41 (a workflow step's own label, a new definition that keeps the run, hidden fields,
 an alert's actions, an app's field type named and framed through `@20baht/ui`, segmented-nav items
 that keep their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold
 button, `clock` and `bot` icons).
+
+## Open: a theme switch fades through both themes
+
+Affected: `<baht-theme-toggle>`, every `--baht-*` colour with a transition; owner: `@20baht/ui`.
+
+**What happens.** Flipping `data-baht-theme` restyles the page, and every element whose colours
+have a transition (`.baht-button` 120ms, an app's own hover or highlight) fades to the new theme at
+its own pace. For that moment the page shows both themes at once: verified in kammacron 0.3.41,
+150ms after a switch to light the Pause button is still the dark theme's near-black with near-white
+text under a light header, and the Kanban columns are still dark with their headings already dark.
+The toggle's own icon is blank in that moment.
+
+**Wanted.** The toggle (and any code that sets `data-baht-theme` through the library) holds
+transitions for the frame the new theme is drawn in, so the theme lands at once. A theme switch is
+not a motion with a purpose; it should not animate.
+
+**Workaround in kammacron.** `core/theme-switch.ts` watches `data-baht-theme` on `<html>` and puts
+`.app-theme-switching` there for two frames; `styles.css` sets `transition: none !important` under
+it. Public API only (the attribute the toggle documents); remove it when the library does the same.
 
 ## Resolved: a workflow step's label is also the key its rules and data use
 

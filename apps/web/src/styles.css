@@ -73,6 +73,14 @@ html {
   text-transform: uppercase;
 }
 
+/* The frame a theme changes in (core/theme-switch.ts): nothing fades, the new colours land at once. */
+.app-theme-switching,
+.app-theme-switching *,
+.app-theme-switching *::before,
+.app-theme-switching *::after {
+  transition: none !important;
+}
+
 /* Every routed page: the shell's full width, so nothing is left blank on the right. */
 .app-page {
   display: flex;

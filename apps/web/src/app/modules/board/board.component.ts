@@ -11,8 +11,7 @@ import { Router, RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import { guess } from '@20baht/live/browser'
-import type { BahtForm, FormDefinition, NavItem } from '@20baht/ui'
-import type { FormValues } from '@20baht/ui/engine'
+import type { BahtForm, NavItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -20,7 +19,7 @@ import { IllustrationComponent } from '../../shared/illustration/illustration.co
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
-import { newCardForm, quickAddForm, REGISTRY } from '../../shared/forms'
+import { quickAddForm } from '../../shared/forms'
 import { statusLabel, type CardStatus } from '../../shared/tones'
 import { dataOf, trimmed } from '../../shared/form-data'
 import {
@@ -33,6 +32,9 @@ import {
 import { CronWizardComponent } from '../cron/cron-wizard.component'
 import { AUTOPILOT } from './card-changes'
 import { CardDialogComponent } from './card-dialog.component'
+import { positionAt } from './card-position'
+import { newCardBody } from './new-card'
+import { NewCardComponent } from './new-card.component'
 
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
 /** Tags a tile shows before the rest become "+N" (the card itself shows them all). */
@@ -53,6 +55,7 @@ const isStatus = (value: string): value is CardStatus => COLUMNS.some((c) => c =
     BAHT_UI,
     CardDialogComponent,
     CronWizardComponent,
+    NewCardComponent,
     RouterLink,
     KanbanComponent,
     KanbanTileDirective,
@@ -166,35 +169,9 @@ export class BoardComponent {
 
   // a new card
   protected readonly creating = signal(false)
-  /** A form keeps what was typed into it, so each new card gets a form of its own. */
-  protected readonly formNumber = signal(0)
   protected readonly error = signal<string | null>(null)
-  protected readonly createError = signal('')
   protected readonly busy = signal(false)
-  protected readonly registry = REGISTRY
   protected readonly quickAddForm = computed(() => quickAddForm(this.t))
-  protected readonly newValue = signal<Record<string, unknown>>({})
-  protected readonly newForm = computed<FormDefinition>(() => {
-    const form = newCardForm(this.t)
-    // the board shows one project, or there is only one: the card goes there, nothing to ask
-    const known = this.project() !== null || (this.projects().data ?? []).length <= 1
-    return {
-      ...form,
-      fields: form.fields
-        .filter((f) => !(known && f.key === 'project_id'))
-        .map((f) =>
-          f.key === 'project_id'
-            ? {
-                ...f,
-                options: (this.projects().data ?? []).map((p) => ({
-                  key: String(p.id),
-                  label: p.name,
-                })),
-              }
-            : f,
-        ),
-    }
-  })
 
   // a new cron job, from New ▾
   protected readonly newItems = computed(() => [
@@ -239,61 +216,10 @@ export class BoardComponent {
     void this.router.navigate([], { queryParams: { card: id }, queryParamsHandling: 'merge' })
   }
 
-  protected startNew(): void {
-    const project = this.project() ?? this.projects().data?.[0]
-    this.formNumber.update((n) => n + 1)
-    this.newValue.set({
-      project_id: project ? String(project.id) : null,
-      owner: 'autopilot',
-      tags: [],
-    })
-    this.createError.set('')
-    this.creating.set(true)
-  }
-
-  private async createOne(input: {
-    project_id: number
-    title: string
-    body?: string
-    owner: string
-    tags?: string[]
-  }) {
-    const others = (input.tags ?? []).filter((t) => t !== AUTOPILOT)
-    const [card] = await firstValueFrom(
-      this.api.cards.batch.post({
-        cards: [
-          {
-            project_id: input.project_id,
-            title: input.title,
-            body: input.body ?? '',
-            tags: input.owner === 'autopilot' ? [AUTOPILOT, ...others] : others,
-            human: input.owner === 'human',
-          },
-        ],
-      }),
-    )
-    return card
-  }
-
-  protected async create(submitted: Record<string, unknown>): Promise<void> {
-    // `newForm` is the new-card form with its project field filled in or left out, so the element
-    // cannot say what it holds: this names it once
-    const data = submitted as Partial<FormValues<ReturnType<typeof newCardForm>>>
-    try {
-      const card = await this.createOne({
-        // no project field when the board knows it: the one the form started with
-        project_id: Number(data.project_id ?? this.newValue()['project_id']),
-        title: trimmed(data.title),
-        body: data.body ?? '',
-        owner: data.owner ?? 'autopilot',
-        tags: data.tags ?? [],
-      })
-      this.creating.set(false)
-      if (card) this.open(card.id)
-    } catch (error) {
-      this.createError.set(describeError(error))
-    }
-  }
+  /** The projects a new card can go to, and the one on screen. */
+  protected readonly cardProjects = computed(() =>
+    (this.projects().data ?? []).map((p) => ({ id: p.id, name: p.name })),
+  )
 
   /** Quick add in To do: a Claude card in this project, titled and nothing else. */
   protected async quickAdd(form: BahtForm): Promise<void> {
@@ -302,7 +228,11 @@ export class BoardComponent {
     if (!project || !title) return
     this.busy.set(true)
     try {
-      await this.createOne({ project_id: project.id, title, owner: 'autopilot' })
+      await firstValueFrom(
+        this.api.cards.batch.post({
+          cards: [newCardBody({ project_id: project.id, title, owner: 'autopilot' })],
+        }),
+      )
       form.reset()
     } catch (error) {
       this.error.set(describeError(error))
@@ -325,18 +255,10 @@ export class BoardComponent {
   protected async move({ id, to, before }: KanbanMove): Promise<void> {
     if (!isStatus(to)) return
     const status = to
-    const column = this.byColumn()[status].filter((c) => c.id !== id)
-    const at = before === null ? column.length : column.findIndex((c) => c.id === before)
-    const prev = column[at - 1]?.position
-    const next = column[at]?.position
-    const position =
-      prev === undefined
-        ? next === undefined
-          ? 1
-          : next - 1
-        : next === undefined
-          ? prev + 1
-          : (prev + next) / 2
+    const position = positionAt(
+      this.byColumn()[status].filter((c) => c.id !== id),
+      before,
+    )
     const board = this.cards.subscription()
     const body =
       status === 'review'

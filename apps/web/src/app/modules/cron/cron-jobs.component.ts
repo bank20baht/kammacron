@@ -125,12 +125,22 @@ import { CronWizardComponent } from './cron-wizard.component'
             (click)="edit(s)"
             >{{ t('cron.edit') }}</baht-button
           >
-          <baht-button size="sm" variant="ghost" (click)="toggle(s.id, !s.enabled)">{{
-            s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
-          }}</baht-button>
-          <baht-button size="sm" variant="ghost" (click)="remove(s.id, s.name)">{{
-            t('project.schedules.remove')
-          }}</baht-button>
+          <baht-button
+            size="sm"
+            variant="ghost"
+            [disabled]="busy()"
+            (click)="toggle(s.id, !s.enabled)"
+            >{{
+              s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
+            }}</baht-button
+          >
+          <baht-button
+            size="sm"
+            variant="ghost"
+            [disabled]="busy()"
+            (click)="remove(s.id, s.name)"
+            >{{ t('project.schedules.remove') }}</baht-button
+          >
         </div>
       } @empty {
         @if (schedules().data) {

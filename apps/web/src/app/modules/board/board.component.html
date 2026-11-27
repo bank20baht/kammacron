@@ -10,7 +10,7 @@
           [label]="t('board.newCard')"
           [menuLabel]="t('board.newMenu')"
           [items]="newItems()"
-          (bahtClick)="startNew()"
+          (bahtClick)="creating.set(true)"
           (bahtSelect)="addCronJob()"
         ></baht-split-button>
       </baht-page-header>
@@ -68,7 +68,7 @@
           [label]="t('board.newCard')"
           [menuLabel]="t('board.newMenu')"
           [items]="newItems()"
-          (bahtClick)="startNew()"
+          (bahtClick)="creating.set(true)"
           (bahtSelect)="addCronJob()"
         ></baht-split-button>
       </baht-page-header>
@@ -216,16 +216,10 @@
   (added)="jobAdded($event)"
 ></web-cron-wizard>
 
-@for (n of [formNumber()]; track n) {
-  <baht-form-modal
-    [heading]="t('board.newCard')"
-    [submitLabel]="t('board.createCard')"
-    [open]="creating()"
-    [form]="newForm()"
-    [value]="newValue()"
-    [registry]="registry"
-    [error]="createError()"
-    (bahtSubmit)="create($event.data)"
-    (bahtClose)="creating.set(false)"
-  ></baht-form-modal>
-}
+<web-new-card
+  [open]="creating()"
+  [projects]="cardProjects()"
+  [project]="project()?.id ?? null"
+  (closed)="creating.set(false)"
+  (created)="open($event)"
+></web-new-card>

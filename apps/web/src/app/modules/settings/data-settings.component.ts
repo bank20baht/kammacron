@@ -174,14 +174,19 @@ export class DataSettingsComponent {
     void this.read()
   }
 
+  /** Counts each read, so an answer that comes after a later one was asked for is dropped. */
+  private reads = 0
+
   /** What is kept; with `choice`, as those lengths would leave it. */
   private async read(choice?: Record<Key, string>): Promise<void> {
+    const mine = ++this.reads
     try {
       const summary = await firstValueFrom(this.api.data.get({ query: choice ?? {} }))
+      if (mine !== this.reads) return
       if (!choice) this.saved.set(summary.retention)
       this.kinds.set(summary.kinds)
     } catch (error) {
-      this.message.set({ tone: 'danger', text: describeError(error) })
+      if (mine === this.reads) this.message.set({ tone: 'danger', text: describeError(error) })
     }
   }
 

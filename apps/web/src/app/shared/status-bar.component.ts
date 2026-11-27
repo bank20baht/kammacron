@@ -3,7 +3,8 @@ import { RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import type { NotificationItem } from '@20baht/ui'
-import { Api } from '@kammacron/kit'
+import { toast } from '@20baht/ui/overlay'
+import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../core/i18n/i18n.service'
@@ -94,12 +95,21 @@ export class StatusBarComponent {
     })),
   )
 
-  protected async setPaused(paused: boolean): Promise<void> {
-    await firstValueFrom(this.api.settings.patch({ paused }))
+  protected setPaused(paused: boolean): Promise<void> {
+    return this.act(() => firstValueFrom(this.api.settings.patch({ paused })))
   }
 
-  protected async readAll(): Promise<void> {
+  protected readAll(): Promise<void> {
     const ids = (this.alerts().data ?? []).filter((a) => !a.read).map((a) => a.id)
-    await firstValueFrom(this.api.alerts.read.post({ ids }))
+    return this.act(() => firstValueFrom(this.api.alerts.read.post({ ids })))
+  }
+
+  /** The band has no place of its own for an error: a failed Pause must still be seen. */
+  private async act(work: () => Promise<unknown>): Promise<void> {
+    try {
+      await work()
+    } catch (error) {
+      toast.danger(describeError(error))
+    }
   }
 }

@@ -7,6 +7,7 @@ import {
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core'
 import { BAHT_UI } from '@20baht/angular'
 import type { BahtForm, TabItem } from '@20baht/ui'
@@ -250,11 +251,21 @@ export class PlaybookEditorComponent {
 
   constructor() {
     effect(() => {
-      this.load(this.playbooks())
+      const playbooks = this.playbooks()
+      // The project row answers again for many reasons (a round ran, Resume, another tab): the
+      // same playbooks are not loaded twice, and a draft is not replaced under the person.
+      untracked(() => {
+        if (JSON.stringify(playbooks) === this.loaded || this.dirty()) return
+        this.load(playbooks)
+      })
     })
   }
 
+  /** The playbooks the editor last took in, as JSON. */
+  private loaded: string | null = null
+
   private load(playbooks: readonly Playbook[]): void {
+    this.loaded = JSON.stringify(playbooks)
     const books = playbooks.map((p) => ({
       key: this.nextKey++,
       name: p.name,
@@ -365,6 +376,8 @@ export class PlaybookEditorComponent {
     this.error.set(null)
     try {
       await firstValueFrom(this.api.projects({ id: this.projectId() }).patch({ playbooks }))
+      // what was saved is what the editor holds: the project answering with it changes nothing here
+      this.loaded = JSON.stringify(playbooks)
       this.dirty.set(false)
       this.saved.emit()
     } catch (error) {

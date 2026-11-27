@@ -24,6 +24,19 @@ import { mergeEvents, type RunEventRow } from './run-events'
 import { RunTimelineComponent } from './run-timeline.component'
 import { runStatusLabel } from './runs.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/accordion'
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/breadcrumbs'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/code'
+import '@20baht/ui/components/copy-button'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/markdown-view'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/skeleton'
+import '@20baht/ui/components/tabs'
+
 type StepStatus = 'running' | 'succeeded' | 'failed' | 'stopped' | 'skipped'
 
 /** One run: what went wrong first, then the facts, Claude's summary and every event (live). */

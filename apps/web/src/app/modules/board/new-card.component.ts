@@ -19,6 +19,9 @@ import { trimmed } from '../../shared/form-data'
 import { newCardForm, REGISTRY } from '../../shared/forms'
 import { newCardBody } from './new-card'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/form-modal'
+
 /** The New card modal: which project (when the board cannot tell), title, owner, body, tags. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,

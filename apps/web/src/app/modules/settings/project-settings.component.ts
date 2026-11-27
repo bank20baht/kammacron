@@ -25,6 +25,17 @@ import { countOf, filled, trimmed, type FormOf } from '../../shared/form-data'
 import { CronJobsComponent } from '../cron/cron-jobs.component'
 import { PlaybookEditorComponent } from './playbook-editor.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/breadcrumbs'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/form'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/save-bar'
+import '@20baht/ui/components/skeleton'
+import '@20baht/ui/components/tabs'
+
 type Check = {
   ok: boolean
   checks: { name: string; ok: boolean; detail: string }[]

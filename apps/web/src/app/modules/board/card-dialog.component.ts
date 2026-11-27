@@ -27,6 +27,16 @@ import { attempt } from '../../shared/attempt'
 import { trimmed, type FormOf } from '../../shared/form-data'
 import { changesOf, formValueOf, type CardFormValue } from './card-changes'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/choice-group'
+import '@20baht/ui/components/comments'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/form'
+import '@20baht/ui/components/image-preview'
+import '@20baht/ui/components/menu'
+import '@20baht/ui/components/skeleton'
+
 type CardData = NonNullable<ReturnType<CardDialogComponent['card']>['data']>
 type RunStatus = NonNullable<CardData['last_run']>['status']
 

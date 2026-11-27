@@ -36,6 +36,13 @@ import { narrowScreen } from '../../shared/narrow'
 import { runLabel } from '../../shared/schedule'
 import { runStatusLabel } from '../runs/runs.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/filter'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/table'
+
 type Layer = 'worker' | 'schedule' | 'housekeeping' | 'runs'
 const LAYERS: readonly Layer[] = ['worker', 'schedule', 'housekeeping', 'runs']
 const VIEWS: readonly CalendarView[] = ['month', 'week', 'day']

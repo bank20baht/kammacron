@@ -23,11 +23,13 @@ export default defineConfig([
       },
     ],
   }),
-  // elements.ts registers the <baht-*> the app draws: lint fails on a drawn tag it does not bring
+  // elements.ts registers the shell's <baht-*>, and each component imports the ones it draws:
+  // lint fails on a tag a template draws that neither brings
   ...bahtui({
     files: WEB,
     tokenFiles: ['apps/web/src/styles.css'],
-    elements: ['apps/web/src/elements.ts', 'apps/web/src/elements-later.ts'],
+    elements: ['apps/web/src/elements.ts'],
+    perComponent: true,
   }),
   // the web app's service worker: plain JS served as is, with a worker's globals
   {

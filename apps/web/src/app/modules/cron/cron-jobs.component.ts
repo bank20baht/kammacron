@@ -16,6 +16,13 @@ import { BAHT_STICKERS } from '../../shared/stickers'
 import { attemptWithNotice, type Notice } from '../../shared/attempt'
 import { CronWizardComponent } from './cron-wizard.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/code'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/skeleton'
+
 /**
  * One project's cron jobs: the list (turn on or off, the last run) and the button that adds one in
  * the three-step wizard. On the Cron jobs page, and in the project's settings.

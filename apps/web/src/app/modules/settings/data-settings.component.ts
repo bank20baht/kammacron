@@ -9,6 +9,12 @@ import { firstValueFrom } from 'rxjs'
 import { I18n, type Translate } from '../../core/i18n/i18n.service'
 import { attemptWithNotice, type Notice } from '../../shared/attempt'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/form'
+import '@20baht/ui/components/skeleton'
+
 const KEYS = [
   'run_log_retention_days',
   'step_output_retention_days',

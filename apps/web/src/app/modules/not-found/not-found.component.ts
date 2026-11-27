@@ -9,6 +9,9 @@ import {
 } from '../../shared/sticker-backdrop.component'
 import { BAHT_STICKERS } from '../../shared/stickers'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/card'
+
 /** Shown for a URL no route owns. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,

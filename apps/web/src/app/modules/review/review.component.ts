@@ -24,6 +24,13 @@ import { narrowScreen } from '../../shared/narrow'
 import { CardDialogComponent } from '../board/card-dialog.component'
 import { pickCard } from './pick-card'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/empty-state'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/skeleton'
+
 /** The width under which the queue and the card take turns instead of sitting side by side. */
 const ONE_COLUMN = '(width < 900px)'
 

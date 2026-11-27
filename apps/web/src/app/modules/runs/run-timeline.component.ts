@@ -22,6 +22,10 @@ import {
   type TimelineEvent,
 } from './run-events'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/filter'
+import '@20baht/ui/components/icon'
+
 const FILTERS: readonly EventFilter[] = ['all', 'tools', 'messages', 'errors']
 /** Rows drawn at first, and added by each "Show earlier": a long run stays a short page. */
 const PAGE = 200

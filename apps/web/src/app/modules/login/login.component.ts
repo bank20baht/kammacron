@@ -12,6 +12,13 @@ import {
 import { BAHT_STICKERS } from '../../shared/stickers'
 import { trimmed, type FormOf } from '../../shared/form-data'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/code'
+import '@20baht/ui/components/copy-button'
+import '@20baht/ui/components/form'
+
 /** The API token, once, for the session cookie; or the code `kammacron open` put in the address. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,

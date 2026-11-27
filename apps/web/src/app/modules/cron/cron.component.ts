@@ -12,6 +12,13 @@ import { CronJobsComponent } from './cron-jobs.component'
 import { ProjectWizardComponent } from '../settings/project-wizard.component'
 import { UsageLimitsComponent } from './limits.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/empty-state'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/skeleton'
+import '@20baht/ui/components/tabs'
+
 /**
  * Cron jobs, where they are looked for: a project picked with tabs (`?project=<slug>`, the first
  * one by default), its jobs and the form that adds one.

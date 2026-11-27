@@ -2,9 +2,9 @@ import { bootstrapApplication } from '@angular/platform-browser'
 import { App } from './app/app'
 import { appConfig } from './app/app.config'
 
-// Registers the <baht-*> custom elements in chunks of their own; they upgrade in place as each
-// lands: first what the shell and the board draw, then the rest (see elements.ts).
-void import('./elements').then(() => import('./elements-later'))
+// Registers the shell's <baht-*> elements in a chunk of their own; they upgrade in place once it
+// lands. A page's elements come with the page (see elements.ts).
+void import('./elements')
 
 // The service worker makes it installable (a Dock or taskbar app) and says how to start the
 // server when it is down; it caches nothing. Browsers give it only on localhost or https.

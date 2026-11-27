@@ -36,6 +36,15 @@ import { positionAt } from './card-position'
 import { newCardBody } from './new-card'
 import { NewCardComponent } from './new-card.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/empty-state'
+import '@20baht/ui/components/form'
+import '@20baht/ui/components/modal'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/segmented-nav'
+import '@20baht/ui/components/split-button'
+
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
 /** Tags a tile shows before the rest become "+N" (the card itself shows them all). */
 const TILE_TAGS = 4

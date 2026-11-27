@@ -13,6 +13,13 @@ import { cost, duration, stamp } from '../../shared/format'
 import { runLabel } from '../../shared/schedule'
 import { RUN_TONE } from '../../shared/tones'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/filter'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/search'
+import '@20baht/ui/components/section-header'
+import '@20baht/ui/components/table'
+
 const PAGE_SIZE = 50
 
 /** A run status the catalog names (`status.run.*`). */

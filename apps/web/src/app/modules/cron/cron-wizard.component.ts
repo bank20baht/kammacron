@@ -26,6 +26,12 @@ import {
 } from '../../shared/cron-wizard'
 import { REGISTRY, type AgentOptions } from '../../shared/forms'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/modal'
+import '@20baht/ui/components/skeleton'
+import '@20baht/ui/components/workflow'
+
 type Project = { id: number; name: string; playbooks: readonly { name: string }[] }
 type Data = Record<string, Record<string, unknown> | undefined>
 

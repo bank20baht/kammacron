@@ -19,6 +19,13 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { claudeStepForm, playbookNameForm, runStepForm } from '../../shared/forms'
 import { countOf, trimmed, type FormOf } from '../../shared/form-data'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/form'
+import '@20baht/ui/components/save-bar'
+import '@20baht/ui/components/tabs'
+
 type ClaudeStep = {
   kind: 'claude'
   name: string

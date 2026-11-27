@@ -24,6 +24,17 @@ import { filled, trimmed, type FormOf } from '../../shared/form-data'
 import { DataSettingsComponent } from './data-settings.component'
 import { ProjectWizardComponent } from './project-wizard.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/code'
+import '@20baht/ui/components/copy-button'
+import '@20baht/ui/components/form'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/section-header'
+import '@20baht/ui/components/table'
+import '@20baht/ui/components/tabs'
+
 const projectColumns = (t: Translate): ColumnMap => ({
   name: t('settings.projects.columns.name'),
   slug: { label: t('settings.projects.columns.slug'), cell: 'code' },

@@ -15,6 +15,18 @@ import { IllustratedCardComponent } from '../../shared/illustration/illustrated-
 import { currentLocale, I18n, type Translate } from '../../core/i18n/i18n.service'
 import { cost } from '../../shared/format'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/bar-chart'
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/line-chart'
+import '@20baht/ui/components/page-header'
+import '@20baht/ui/components/skeleton'
+import '@20baht/ui/components/stat'
+import '@20baht/ui/components/table'
+import '@20baht/ui/components/tabs'
+
 const columnsOf = (t: Translate): ColumnMap => ({
   week: t('stats.column.week'),
   runs: { label: t('stats.column.runs'), numeric: true },

@@ -15,6 +15,10 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { BAHT_STICKERS } from '../../shared/stickers'
 import { ProjectWizardComponent } from '../settings/project-wizard.component'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/page-header'
+
 /** First start: the tools on the PATH, and a first project. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,

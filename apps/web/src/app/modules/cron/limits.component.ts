@@ -13,6 +13,11 @@ import { firstValueFrom } from 'rxjs'
 import { I18n } from '../../core/i18n/i18n.service'
 import { ago } from '../../shared/format'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/card'
+import '@20baht/ui/components/icon'
+import '@20baht/ui/components/meter'
+
 type LimitWindow = { key: string; minutes: number; used: number; resets_at: string | null }
 type AgentLimits = {
   windows: LimitWindow[]

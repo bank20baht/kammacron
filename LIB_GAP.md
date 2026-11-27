@@ -1,13 +1,14 @@
 # Library gaps
 
 Verified against the published `@20baht/ui`, `@20baht/angular`, `@20baht/engine` and
-`@20baht/strict` **0.3.45** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
-2026-11-27. Two gaps are open, both found while cutting what the first screen loads: `<baht-form>`
-brings the element of every field type, and `bahtui/registered-element` cannot check elements
-registered page by page. The thirty below them are resolved: one in 0.3.45 (a directive of the
-Angular adapter is a module of its own), six in 0.3.44 (the per-element stylesheets, and five in
-the types the Angular adapter and the engine give, found by taking every `$any($event)` out of
-the templates and reading each form's data as `FormValues`).
+`@20baht/strict` **0.3.46** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
+2026-11-28. One gap is open, in a fix of the day before: `bahtui/registered-element`'s
+`perComponent` passes a component that imports a type from `@20baht/ui` (fixed in the library's
+repo, not yet released). The thirty-two below it are resolved: two in 0.3.46 (a form loads four
+field elements only when it has such a field; elements checked page by page), one in 0.3.45 (a
+directive of the Angular adapter is a module of its own), six in 0.3.44 (the per-element
+stylesheets, and five in the types the Angular adapter and the engine give, found by taking every
+`$any($event)` out of the templates and reading each form's data as `FormValues`).
 Four were resolved in 0.3.43, all found while registering only the elements the app draws
 (`<baht-form>` brings `schedule` and `cron`; `@20baht/strict` flags the whole library imported,
 reads its field elements from the engine, and fails on a drawn element nothing registers), two in
@@ -17,40 +18,50 @@ actions, an app's field type named and framed through `@20baht/ui`, segmented-na
 their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold button,
 `clock` and `bot` icons).
 
-## Open (`@20baht/ui`): `<baht-form>` brings the element of every field type
+## Open (`@20baht/strict`): `perComponent` passes a component that imports a type of the library
+
+Affected: `bahtui/registered-element` with `perComponent` (0.3.46); owner: `@20baht/strict`.
+
+**What happens.** The rule reads a component's `import type { BahtForm } from '@20baht/ui'` as
+importing the whole library, which registers every element, and stops looking: 14 of kammacron's
+22 components that draw elements passed whatever they drew. Found the day `perComponent` was
+adopted here, because the first lint named 28 missing imports where 112 were due.
+
+**Wanted.** Type-only imports skipped when a file's imports are read.
+
+**Fixed in the library's repo** (commit `d496dfd`, with a test), not released yet. kammacron's
+imports were written with that rule and are complete; until the release, lint here does not
+check a component that imports a type from `@20baht/ui`.
+
+## Resolved (`@20baht/ui`): `<baht-form>` brings the element of every field type
 
 Affected: `@20baht/ui/components/form` (and `workflow`, `form-modal`); owner: `@20baht/ui`.
 
-**What happens.** The form's module imports every built-in field's element, whatever the forms
-an app draws. kammacron's forms use text, textarea, markdown, password, number, toggle, dropdown,
-radio, tags, schedule and cron; the chunk its first screen waits for also carries
-`baht-reference-dialog` (14 KB), `baht-reference-picker` (10 KB), `baht-repeater` (10 KB),
-`baht-column-picker` (8 KB), `baht-datepicker` (8 KB), `baht-file` (6 KB) and
-`baht-filter-builder` (5 KB): about 60 KB of a 386 KB chunk, measured with the build's stats on
-0.3.45. (flatpickr itself is already loaded only when a date field is drawn.)
+**Was.** The form's module imported every built-in field's element. kammacron's forms use eleven
+field types, none of them `reference`, `repeater`, `date` or `file`, and its first chunk carried
+those elements and what they bring: about 60 KB.
 
-**Wanted.** The form loading a field's element when a form with that type is given to it (a
-dynamic import per type, as the date field does for flatpickr), or a `form-core` entry that brings
-no field elements and leaves them to the app's own imports.
+**Published fix.** 0.3.46: the form asks for those four when it is first given a form that has
+one (a repeater's own fields too); the rest still come with its module. Measured here: the
+elements a first screen waited for went from 386 KB to 322 KB, with none of the seven modules
+left in it. `css/components/index.json` still lists their sheets under `form`.
 
-**Workaround.** None.
-
-## Open (`@20baht/strict`): `registered-element` cannot check elements registered page by page
+## Resolved (`@20baht/strict`): `registered-element` cannot check elements registered page by page
 
 Affected: `bahtui/registered-element`; owner: `@20baht/strict`.
 
-**What happens.** The rule takes a list of files and passes a tag that any of them registers. An
-app that wants each lazy page to import the elements it draws (so a page's elements arrive with
-the page) cannot have that checked: a page that forgets an import passes as long as another page
-has it, and draws an empty unknown element whenever it is opened first.
+**Was.** The rule passed a tag any listed file registered, so an app could not have each lazy
+page import its own elements and have that checked. kammacron registered everything on every
+page, in two files loaded one after the other.
 
-**Wanted.** A mode that checks a template against what its own component file imports (plus
-files named as "always loaded", for the shell's), so registration can follow the routes.
-
-**Workaround.** Every element stays registered on every page, in two files loaded one after the
-other: `apps/web/src/elements.ts` (what the shell and the board draw, which the first screen waits
-for) and `elements-later.ts` (charts, the calendar, the workflow, the table's extras: 100 KB),
-both given to the rule.
+**Published fix.** 0.3.46: `perComponent` (`bahtui({ files, elements, perComponent: true })`): a
+template also passes on what its own component file imports. `apps/web/src/elements.ts` now holds
+the shell's six elements, every component imports the ones its template draws, and
+`elements-later.ts` is gone. Beyond the first script (331 KB), the shell's elements are 150 KB,
+and a page brings its own: the runs list 104 KB, the calendar 127 KB, stats 154 KB, the board
+235 KB (it needs the form), where every page used to wait for 322 KB and then fetch 100 KB more.
+`scripts/element-styles.ts` reads the imports of every file under `src/` for the one stylesheet.
+See the open gap above for what 0.3.46's rule misses.
 
 ## Resolved (`@20baht/angular`): one directive imported brings all 98
 

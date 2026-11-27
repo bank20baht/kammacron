@@ -4,6 +4,9 @@ import { BAHT_UI } from '@20baht/angular'
 import { IllustrationComponent } from './illustration.component'
 import type { Illustration } from './illustration.registry'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/card'
+
 /** Editorial composition of a library Card. No interaction, tokens, or state ownership. */
 @Component({
   selector: 'app-illustrated-card',

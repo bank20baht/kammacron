@@ -28,6 +28,13 @@ import {
   projectWizard,
 } from '../../shared/project-wizard'
 
+// the elements this component's template draws: they arrive with it (see src/elements.ts)
+import '@20baht/ui/components/alert'
+import '@20baht/ui/components/error-state'
+import '@20baht/ui/components/modal'
+import '@20baht/ui/components/skeleton'
+import '@20baht/ui/components/workflow'
+
 type Data = Record<string, Record<string, unknown> | undefined>
 
 /**

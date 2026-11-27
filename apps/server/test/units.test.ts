@@ -10,7 +10,7 @@ import { launchdPlist, systemdUnit } from '../src/service'
 import { linkedIds, sniffImage } from '../src/services/attachments'
 import { staticRoutes } from '../src/static'
 import type { Project } from '../src/services/projects'
-import { classify, eventsOf, redact } from '../src/worker/claude'
+import { classify, eventsOf, redact, spawnJsonLines } from '../src/worker/claude'
 import { checkDir, exec, gitIn, localGit } from '../src/worker/git'
 import { toolLists } from '../src/worker/runner'
 
@@ -302,5 +302,69 @@ describe('one-time sign-in codes', () => {
     const now = Date.now()
     expect(s.loginCodes.get(long)).toBeGreaterThan(now + 9 * 60_000)
     expect(s.loginCodes.get(short)).toBeLessThanOrEqual(now + 60_000)
+  })
+})
+
+describe('an agent process', () => {
+  test('of a flood of stderr only the end is kept, redacted, and stdout still comes through', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kc-agent-'))
+    try {
+      const bin = join(dir, 'noisy-agent.ts')
+      await Bun.write(
+        bin,
+        [
+          "process.stderr.write('warning: noise\\n'.repeat(15000) + 'fatal: token sk-SECRET-1 gone\\n')",
+          "console.log(JSON.stringify({ type: 'result', result: 'done' }))",
+        ].join('\n'),
+      )
+      const lines: string[] = []
+      const handle = spawnJsonLines(
+        {
+          bin: process.execPath,
+          args: [bin],
+          cwd: dir,
+          env: { PATH: process.env['PATH'] ?? '' },
+          prompt: '',
+          onLine: (line) => {
+            lines.push(line)
+          },
+          onEvent: () => undefined,
+          secrets: ['sk-SECRET-1'],
+          timeoutMs: 20_000,
+        },
+        { onJson: () => undefined, eventsOf: () => [], finish: (ended) => ended },
+      )
+      const ended = await Promise.race([
+        handle.result,
+        Bun.sleep(10_000).then(() => 'hung' as const),
+      ])
+      expect(ended).not.toBe('hung')
+      if (ended === 'hung') return
+      expect(lines).toContain('{"type":"result","result":"done"}')
+      expect(ended.stderr.length).toBeLessThanOrEqual(16_000)
+      expect(ended.stderr).toContain('fatal: token')
+      expect(ended.stderr).not.toContain('sk-SECRET-1')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('exec', () => {
+  test('the timeout ends what the command started, not only the shell', async () => {
+    const t0 = Date.now()
+    const r = await exec(['sh', '-c', 'sleep 30; echo late'], { cwd: tmpdir(), timeoutMs: 300 })
+    expect(Date.now() - t0).toBeLessThan(5000)
+    expect(r.code).not.toBe(0)
+    expect(r.stdout).not.toContain('late')
+  })
+
+  test('keeps only the tail when asked', async () => {
+    const r = await exec(['sh', '-c', 'yes line | head -n 50000; echo END'], {
+      cwd: tmpdir(),
+      tail: 50,
+    })
+    expect(r.stdout.length).toBe(50)
+    expect(r.stdout.trim().endsWith('END')).toBe(true)
   })
 })

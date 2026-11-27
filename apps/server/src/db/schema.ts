@@ -159,7 +159,11 @@ export const cards = pgTable(
     archived_at: timestamp('archived_at', { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index('cards_project_status').on(t.project_id, t.status)],
+  (t) => [
+    index('cards_project_status').on(t.project_id, t.status),
+    // what a removed run's cards point at (housekeeping), the card a run holds
+    index('cards_claimed_by_run').on(t.claimed_by_run),
+  ],
 )
 
 export const cardWaitsOn = pgTable(
@@ -234,7 +238,15 @@ export const runs = pgTable(
     log_path: text('log_path'),
     ...timestamps,
   },
-  (t) => [index('runs_card').on(t.card_id), index('runs_project').on(t.project_id)],
+  (t) => [
+    index('runs_card').on(t.card_id),
+    index('runs_project').on(t.project_id),
+    // /status and the worker ask for the running ones on every change of a card or run
+    index('runs_status').on(t.status),
+    // the calendar's range and the runs list's default sort
+    index('runs_started_at').on(t.started_at),
+    index('runs_schedule').on(t.schedule_id),
+  ],
 )
 
 export const RUN_EVENT_TYPES = ['assistant', 'tool_use', 'tool_result', 'system', 'result'] as const
@@ -253,7 +265,11 @@ export const runEvents = pgTable(
     data: jsonb('data'),
     ...timestamps,
   },
-  (t) => [index('run_events_run_seq').on(t.run_id, t.seq)],
+  (t) => [
+    index('run_events_run_seq').on(t.run_id, t.seq),
+    // the daily log cleanup deletes by age from the largest table
+    index('run_events_created_at').on(t.created_at),
+  ],
 )
 
 export const STEP_STATUSES = ['running', 'succeeded', 'failed', 'stopped', 'skipped'] as const
@@ -295,22 +311,31 @@ export const attachments = pgTable(
     uploaded_by: text('uploaded_by', { enum: ['user', 'mcp'] }).notNull(),
     ...timestamps,
   },
-  (t) => [index('attachments_card').on(t.card_id)],
+  (t) => [
+    index('attachments_card').on(t.card_id),
+    // a file shared by rows: whether any row still holds its bytes
+    index('attachments_sha256').on(t.sha256),
+  ],
 )
 
 export const ALERT_LEVELS = ['info', 'warning', 'error'] as const
 
 /** What the program wants the person to see: a pause it made, a revert, a run that broke. */
-export const alerts = pgTable('alerts', {
-  id: serial('id').primaryKey(),
-  level: text('level', { enum: ALERT_LEVELS }).notNull(),
-  project_id: integer('project_id').references(() => projects.id),
-  card_id: integer('card_id').references(() => cards.id),
-  run_id: integer('run_id').references(() => runs.id),
-  message: text('message').notNull(),
-  read: boolean('read').notNull().default(false),
-  ...timestamps,
-})
+export const alerts = pgTable(
+  'alerts',
+  {
+    id: serial('id').primaryKey(),
+    level: text('level', { enum: ALERT_LEVELS }).notNull(),
+    project_id: integer('project_id').references(() => projects.id),
+    card_id: integer('card_id').references(() => cards.id),
+    run_id: integer('run_id').references(() => runs.id),
+    message: text('message').notNull(),
+    read: boolean('read').notNull().default(false),
+    ...timestamps,
+  },
+  // what removing a card or a run unlinks
+  (t) => [index('alerts_card').on(t.card_id), index('alerts_run').on(t.run_id)],
+)
 
 /**
  * A cron job of a project. It runs exactly one of: a shell command (a failure opens a card), a

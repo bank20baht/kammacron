@@ -4,7 +4,16 @@ import { join } from 'node:path'
 
 import { eq, sql } from 'drizzle-orm'
 
-import { alerts, attachments, cards, comments, runs, runSteps, schedules } from '../src/db/schema'
+import {
+  alerts,
+  attachments,
+  cards,
+  comments,
+  runEvents,
+  runs,
+  runSteps,
+  schedules,
+} from '../src/db/schema'
 import { addAlert } from '../src/services/alerts'
 import { addComment, moveCard } from '../src/services/cards'
 import { createRun, endStep, startStep } from '../src/services/runs'
@@ -161,6 +170,29 @@ describe('retention', () => {
     expect(step?.output).toBeNull()
     expect((await t.ctx.db.select().from(alerts)).map((a) => a.message)).toEqual(['unread'])
   })
+})
+
+describe('a long backlog', () => {
+  test('old events go in batches, all of them; a newer one stays', async () => {
+    const { run } = await oldRun(40)
+    const old = daysAgo(40)
+    const rows = Array.from({ length: 12_000 }, (_, i) => ({
+      run_id: run,
+      seq: i + 1,
+      type: 'assistant' as const,
+      summary: 'x',
+      created_at: old,
+    }))
+    for (let i = 0; i < rows.length; i += 2000)
+      await t.ctx.db.insert(runEvents).values(rows.slice(i, i + 2000))
+    await t.ctx.db
+      .insert(runEvents)
+      .values({ run_id: run, seq: 12_001, type: 'assistant', summary: 'new' })
+    const done = await t.json<Record<string, number>>('POST', '/api/data/clean')
+    expect(done['run_log_retention_days']).toBe(12_000)
+    const left = await t.ctx.db.select().from(runEvents)
+    expect(left.map((e) => e.summary)).toEqual(['new'])
+  }, 60_000)
 })
 
 describe('what only a person removes', () => {

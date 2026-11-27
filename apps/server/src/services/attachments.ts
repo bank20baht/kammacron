@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt } from 'drizzle-orm'
 
 import { firstRow, type Executor } from '../db'
 import { attachments } from '../db/schema'
@@ -125,12 +125,18 @@ export const purgeOrphans = async (
     .delete(attachments)
     .where(and(isNull(attachments.card_id), lt(attachments.created_at, cutoff)))
     .returning()
-  for (const row of gone) {
-    const [still] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(attachments)
-      .where(eq(attachments.sha256, row.sha256))
-    if ((still?.n ?? 0) === 0) await rm(attachmentPath(filesDir, row), { force: true })
-  }
+  if (!gone.length) return 0
+  // the hashes another row still holds, asked once rather than a count per removed row
+  const hashes = [...new Set(gone.map((row) => row.sha256))]
+  const kept = new Set(
+    (
+      await db
+        .selectDistinct({ sha256: attachments.sha256 })
+        .from(attachments)
+        .where(inArray(attachments.sha256, hashes))
+    ).map((row) => row.sha256),
+  )
+  const freed = new Map(gone.filter((row) => !kept.has(row.sha256)).map((row) => [row.sha256, row]))
+  for (const row of freed.values()) await rm(attachmentPath(filesDir, row), { force: true })
   return gone.length
 }

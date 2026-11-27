@@ -2,7 +2,21 @@ import { join } from 'node:path'
 
 export type Exec = { code: number; stdout: string; stderr: string }
 
-/** Runs a command; never throws for a non-zero exit (the caller reads `code`). */
+/** A stream as text: all of it, or only its last `tail` characters. */
+const readText = async (stream: ReadableStream<Uint8Array>, tail?: number) => {
+  if (tail === undefined) return new Response(stream).text()
+  const decoder = new TextDecoder()
+  let text = ''
+  for await (const chunk of stream)
+    text = (text + decoder.decode(chunk, { stream: true })).slice(-tail)
+  return (text + decoder.decode()).slice(-tail)
+}
+
+/**
+ * Runs a command; never throws for a non-zero exit (the caller reads `code`). It runs in a process
+ * group of its own, so the timeout ends what it started too: a `sh -c` whose child still held the
+ * output pipe would otherwise keep this waiting long after the shell was killed.
+ */
 export const exec = async (
   cmd: readonly string[],
   options: {
@@ -11,6 +25,8 @@ export const exec = async (
     env?: Record<string, string | undefined>
     timeoutMs?: number
     input?: string
+    /** Keep only the last this many characters of stdout and of stderr (a command's long log). */
+    tail?: number
   },
 ): Promise<Exec> => {
   const proc = Bun.spawn([...cmd], {
@@ -19,16 +35,21 @@ export const exec = async (
     stdin: options.input === undefined ? 'ignore' : new TextEncoder().encode(options.input),
     stdout: 'pipe',
     stderr: 'pipe',
+    detached: true,
   })
   const timer =
     options.timeoutMs === undefined
       ? undefined
       : setTimeout(() => {
-          proc.kill('SIGKILL')
+          try {
+            process.kill(-proc.pid, 'SIGKILL')
+          } catch {
+            proc.kill('SIGKILL')
+          }
         }, options.timeoutMs)
   const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    readText(proc.stdout, options.tail),
+    readText(proc.stderr, options.tail),
     proc.exited,
   ])
   if (timer) clearTimeout(timer)

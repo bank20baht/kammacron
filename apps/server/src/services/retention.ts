@@ -202,9 +202,21 @@ export const dataSummary = async (
   return kinds
 }
 
+/**
+ * Ids a thousand at a time: a first clean-up over a long backlog would otherwise send one
+ * statement with more parameters than Postgres takes (65,535), and hold PGlite that much longer.
+ */
+const CHUNK = 1000
+const inChunks = async (ids: readonly number[], each: (chunk: number[]) => Promise<unknown>) => {
+  for (let i = 0; i < ids.length; i += CHUNK) await each(ids.slice(i, i + CHUNK))
+  return ids.length
+}
+
 /** Removes runs, their events and steps and log files; what pointed at them stops pointing. */
-const removeRuns = async (db: Executor, dataDir: string, ids: number[]) => {
-  if (!ids.length) return 0
+const removeRuns = (db: Executor, dataDir: string, ids: readonly number[]) =>
+  inChunks(ids, (chunk) => removeRunChunk(db, dataDir, chunk))
+
+const removeRunChunk = async (db: Executor, dataDir: string, ids: number[]) => {
   await db.update(alerts).set({ run_id: null }).where(inArray(alerts.run_id, ids))
   await db.update(cards).set({ claimed_by_run: null }).where(inArray(cards.claimed_by_run, ids))
   await db.update(schedules).set({ last_run_id: null }).where(inArray(schedules.last_run_id, ids))
@@ -215,14 +227,15 @@ const removeRuns = async (db: Executor, dataDir: string, ids: number[]) => {
     await rm(join(runLogDir(dataDir), `${String(id)}.jsonl`), { force: true }).catch(
       () => undefined,
     )
-  return ids.length
 }
 
 /**
  * Removes cards with their comments, attachments (their files go with the orphan sweep) and waits; the runs that worked them stay (Stats counts them), no longer pointing at a card.
  */
-const removeCards = async (db: Executor, ids: number[]) => {
-  if (!ids.length) return 0
+const removeCards = (db: Executor, ids: readonly number[]) =>
+  inChunks(ids, (chunk) => removeCardChunk(db, chunk))
+
+const removeCardChunk = async (db: Executor, ids: number[]) => {
   await db.update(runs).set({ card_id: null }).where(inArray(runs.card_id, ids))
   await db.update(alerts).set({ card_id: null }).where(inArray(alerts.card_id, ids))
   await db.update(schedules).set({ last_card_id: null }).where(inArray(schedules.last_card_id, ids))
@@ -233,7 +246,29 @@ const removeCards = async (db: Executor, ids: number[]) => {
   // unlinked, they are orphans: the sweep after removes them and their files
   await db.update(attachments).set({ card_id: null }).where(inArray(attachments.card_id, ids))
   await db.delete(cards).where(inArray(cards.id, ids))
-  return ids.length
+}
+
+/** Run events past their length, a batch at a time (indexed by age); how many went. */
+const EVENT_BATCH = 5000
+const removeOldEvents = async (db: Executor, days: number) => {
+  let gone = 0
+  for (;;) {
+    const batch = await db
+      .delete(runEvents)
+      .where(
+        inArray(
+          runEvents.id,
+          db
+            .select({ id: runEvents.id })
+            .from(runEvents)
+            .where(older(runEvents.created_at, days))
+            .limit(EVENT_BATCH),
+        ),
+      )
+      .returning({ id: runEvents.id })
+    gone += batch.length
+    if (batch.length < EVENT_BATCH) return gone
+  }
 }
 
 export type Housekept = Record<RetentionKey, number>
@@ -286,15 +321,12 @@ const housekeep = async (db: Executor, dataDir: string, r: Retention): Promise<H
   }
   if (r.run_log_retention_days !== null) {
     const days = r.run_log_retention_days
-    const events = await db
-      .delete(runEvents)
-      .where(older(runEvents.created_at, days))
-      .returning({ id: runEvents.id })
+    const events = await removeOldEvents(db, days)
     const stale = (await logFiles(dataDir)).filter((f) => dueFile(f, days))
     for (const f of stale) await rm(f.path, { force: true })
     const ids = stale.flatMap((f) => (f.runId === null ? [] : [f.runId]))
     if (ids.length) await db.update(runs).set({ log_path: null }).where(inArray(runs.id, ids))
-    done.run_log_retention_days = events.length
+    done.run_log_retention_days = events
   }
   if (r.alert_retention_days !== null) {
     const gone = await db

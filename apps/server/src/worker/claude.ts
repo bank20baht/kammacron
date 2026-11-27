@@ -1,5 +1,5 @@
 import type { RunEventType } from '../db/schema'
-import { redact } from './redact'
+import { createRedactor, redact } from './redact'
 
 /** One line of `claude -p --output-format stream-json`, as far as the worker reads it. */
 type StreamLine = {
@@ -177,6 +177,9 @@ export type ClaudeHandle = AgentHandle<ClaudeResult>
 
 export { redact }
 
+/** How much of an agent's stderr is kept: its end, where the reason it stopped is. */
+const STDERR_TAIL = 16_000
+
 /** How the process ended, for the agent's own reading of its lines. */
 type Ended = { exitCode: number; stderr: string; stopped: boolean }
 
@@ -212,6 +215,17 @@ export const spawnJsonLines = <L, T>(
   }
   const timeout = setTimeout(stop, options.timeoutMs)
 
+  // stderr is read alongside stdout and only its end kept: an agent can print megabytes of
+  // warnings, and the run needs the last lines (why it stopped), not all of them in memory
+  const stderrTail = (async () => {
+    const decoder = new TextDecoder()
+    const redactor = createRedactor(options.secrets)
+    let tail = ''
+    for await (const chunk of proc.stderr)
+      tail = (tail + redactor.push(decoder.decode(chunk, { stream: true }))).slice(-STDERR_TAIL)
+    return (tail + redactor.end()).slice(-STDERR_TAIL)
+  })()
+
   const result = (async (): Promise<T> => {
     const decoder = new TextDecoder()
     let buffer = ''
@@ -236,7 +250,7 @@ export const spawnJsonLines = <L, T>(
       for (const line of lines) await handle(line)
     }
     await handle(buffer)
-    const stderr = redact(await new Response(proc.stderr).text(), options.secrets)
+    const stderr = await stderrTail
     const exitCode = await proc.exited
     clearTimeout(timeout)
     if (killTimer) clearTimeout(killTimer)

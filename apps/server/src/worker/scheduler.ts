@@ -243,6 +243,8 @@ export const createScheduler = (env: WorkerEnv) => {
       cwd: dir,
       env: await childEnv(env),
       timeoutMs: 30 * 60_000,
+      // the card shows the last 3000 characters; a chatty command need not fill memory
+      tail: 8000,
     })
     await env.db
       .update(schedules)

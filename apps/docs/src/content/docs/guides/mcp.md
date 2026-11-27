@@ -24,19 +24,19 @@ They connect over OAuth, which needs an `https://` address: put a tunnel in fron
 
 ## Tools
 
-| Tool            | What it does                                                                                    |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| `list_projects` | The projects cards belong to                                                                    |
-| `list_cards`    | Find cards by project, status, tag or text                                                      |
-| `get_card`      | A card with its comments, what it waits on, its last run and its attachments                    |
-| `create_cards`  | Create one or more cards; cards of one batch can wait on each other by ref                      |
-| `update_card`   | Change a card: title, body, tags, human, priority, waits_on                                     |
-| `move_card`     | Move a card to todo, doing, review or done (review needs a reason)                              |
-| `add_comment`   | Comment on a card                                                                               |
-| `archive_card`  | Archive a card (there is no delete)                                                             |
-| `upload_image`  | Upload an image; put the returned Markdown in a card body or a comment                          |
-| `get_run`       | A run's summary, error, permission denials and events: why a run failed                         |
-| `get_calendar`  | The cron jobs (worker rounds, schedules, housekeeping) with their next run, and runs in a range |
+| Tool            | What it does                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `list_projects` | The projects cards belong to                                                                                       |
+| `list_cards`    | Find cards by project, status, tag or text                                                                         |
+| `get_card`      | A card with its comments, what it waits on, its last run and its attachments                                       |
+| `create_cards`  | Create one or more cards; cards of one batch can wait on each other by ref                                         |
+| `update_card`   | Change a card: title, body, tags, human, priority, waits_on                                                        |
+| `move_card`     | Move a card to todo, doing, review or done (review needs a reason)                                                 |
+| `add_comment`   | Comment on a card                                                                                                  |
+| `archive_card`  | Archive a card (there is no delete)                                                                                |
+| `upload_image`  | Upload an image; put the returned Markdown in a card body or a comment                                             |
+| `get_run`       | A run's summary, error, permission denials and its newest 200 events (`before` for earlier ones): why a run failed |
+| `get_calendar`  | The cron jobs (worker rounds, schedules, housekeeping) with their next run, and runs in a range                    |
 
 Settings, review decisions and the token are never tools: they stay in the web app and the CLI.
 

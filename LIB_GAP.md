@@ -2,8 +2,10 @@
 
 Verified against the published `@20baht/ui`, `@20baht/angular`, `@20baht/engine` and
 `@20baht/strict` **0.3.43** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
-2026-11-27. One gap is open: one stylesheet holds every element's styles. The twenty-three below it
-are resolved, four of them in 0.3.43, all found while registering only the elements the app draws
+2026-11-27. Six gaps are open: one stylesheet holds every element's styles, and five in the types
+the Angular adapter and the engine give (found on 2026-11-27 by taking every `$any($event)` out of
+the templates and reading each form's data as `FormValues`: 25 of the 30 casts were no longer
+needed, and what is left is below). The twenty-three below them are resolved, four of them in 0.3.43, all found while registering only the elements the app draws
 (`<baht-form>` brings `schedule` and `cron`; `@20baht/strict` flags the whole library imported,
 reads its field elements from the engine, and fails on a drawn element nothing registers), two in
 0.3.42 (a theme switch that lands at once, a chart series' own colour for every series), six in
@@ -27,6 +29,86 @@ element adopting its own rules when it is defined, so an app loads the styles of
 
 **Still so in 0.3.43** (`css/components.css` is the same 252 KB). **Workaround.** None in the app; the server sends the sheet compressed and cached for good (it is
 content-hashed), so it costs the 28 KB once.
+
+## Open (`@20baht/angular`): a form's data is typed in its events, not when it is read
+
+Affected: `BahtFormDirective<F>` (`#f="bahtForm"`); owner: `@20baht/angular`.
+
+**What happens.** `(bahtChange)` and `(bahtSubmit)` carry `FormValues<F>` / `ValidValues<F>`, but
+a page that saves from its own button reads `f.element.getData()`, and `element` is the plain
+`BahtForm`: `Record<string, unknown>`. Every Save in kammacron is such a button (card, project,
+settings, sign-in, quick add), so each narrowed the record by hand; it had five `text()` helpers
+with three behaviours. `[value]` is untyped the same way (`BahtForm['value']`): a starting value
+with a misspelt key compiles.
+
+**Wanted.** On the directive: `getData(): FormValues<F>`, `validate()` and `submit()` beside it,
+and `[value]` taking `Partial<FormValues<F>>`. (`typedForm(element, form)` of `@20baht/ui` does
+this for a plain element; the directive already knows `F`.)
+
+**Workaround.** `dataOf(form, element)` in `apps/web/src/app/shared/form-data.ts`: the one cast,
+given the same form the template binds.
+
+## Open (`@20baht/angular`): `<baht-form-modal>` is not typed by its form
+
+Affected: `BahtFormModalDirective`; owner: `@20baht/angular`.
+
+**What happens.** Unlike `BahtFormDirective<F>`, the modal's directive has no type parameter:
+`(bahtSubmit)` gives `data: Record<string, unknown>` whatever `[form]` was given.
+
+**Wanted.** `BahtFormModalDirective<F>` with `bahtSubmit: { data: ValidValues<F> }`, as the form
+has.
+
+**Workaround.** `NewCardComponent.create` casts the data to the new-card form's values
+(`apps/web/src/app/modules/board/new-card.component.ts`).
+
+## Open (`@20baht/engine`): a dropdown whose options come later holds only `null`
+
+Affected: `FormValues`, `defineForm`; owner: `@20baht/engine`.
+
+**What happens.** A dropdown or radio declared with `options: []` (the app fills them once it has
+read them: the projects a card can go to) gets the value type "one of no keys": `null`. Reading
+`data.project_id ?? fallback` is then an error under `no-unnecessary-condition`, and a comparison
+with any key does not compile.
+
+**Wanted.** An empty `options` literal reads as `string | null`, as `options_from` does; only a
+non-empty literal narrows to its keys.
+
+**Workaround.** `options: [] as { key: string; label: string }[]` on the field
+(`newCardForm` in `apps/web/src/app/shared/forms.ts`).
+
+## Open (`@20baht/angular`, `@20baht/ui`): a table's row comes back untyped, and its `id` may be nothing
+
+Affected: `BahtTableDirective`, `BahtTableOfDirective` (`bahtRowClick`, `bahtRowActions`,
+`bahtRowMenuSelect`); owner: `@20baht/angular` / `@20baht/ui`.
+
+**What happens.** `(bahtRowClick)` gives `{ row: Record<string, unknown>; index: number; id:
+unknown }` even when `[items]` (or `[table]`) is typed, so `$event.row.id` needs a cast or a
+handler that takes `unknown`. And `id` is `undefined` unless the table was given `row-key`
+(`idOf` in `baht-table.js`): the type says `unknown`, nothing says "set `row-key`", and a handler
+written against `id` does nothing on a click. (kammacron's three tables set no `row-key`; moving
+them to `$event.id` would have broken all three silently.)
+
+**Wanted.** The directive generic over its row (`BahtTableDirective<Row>`, inferred from
+`[items]`; `BahtTableOfDirective` from its table), with `row: Row` in the row events; and `id`
+typed `Row[rowKey] | undefined`, or the row's `id` field when no `row-key` is set.
+
+**Workaround.** `open($event.row['id'])` with a handler that takes `unknown` and checks it
+(`runs.component.ts`, `calendar.component.ts`, `settings.component.ts`).
+
+## Open (`@20baht/angular`): a picked option comes back as `string`, not one of the options
+
+Affected: `BahtChoiceGroupDirective`, `BahtFilterDirective`, `BahtTabsDirective` (`bahtChange`);
+owner: `@20baht/angular`.
+
+**What happens.** `[options]` is given keys the app knows (`'send-back' | 'approve' | 'take'`),
+and `(bahtChange)` answers `value: string` (`selected: string[]` for a filter): setting a typed
+signal from it does not compile.
+
+**Wanted.** The directive generic over the option key (`K extends string`, inferred from
+`[options]`), with `value: K` / `selected: K[]`.
+
+**Workaround.** A handler that takes the string and keeps only a key of its own: `decide()` in
+`card-dialog.component.ts`, `pickFilter()` in `run-timeline.component.ts`.
 
 ## Resolved (`@20baht/ui`): `<baht-form>` does not register the elements of two field types
 

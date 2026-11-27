@@ -6,9 +6,8 @@ import { SCHEDULE_KINDS, type ScheduleKind } from './schedule'
 
 /*
  * A new cron job as three short steps, in a modal (from the board's New ▾, the Cron jobs page and a
- * project's settings): what (the project, a template, what runs it), the task (the prompt, a
- * command or a playbook; the model and agent folded away) and when (the time, and a name the app
- * fills in). One `<baht-workflow>`: its rules show each step only the fields of what was picked.
+ * project's settings): what (the project, the job's name, who does it), the task (the prompt, a
+ * command or a playbook; the model and agent folded away) and when. One `<baht-workflow>`: its rules show each step only the fields of what was picked.
  */
 
 /** The icons of what a job runs. */
@@ -47,30 +46,8 @@ const choice = (
         })),
       }
 
-/** A job ready to use: what it runs, what it is told, when, and its name. */
-export const TEMPLATES = ['bugs', 'fix', 'deps'] as const
-export type TemplateKey = (typeof TEMPLATES)[number]
-/** The template field's own "nothing": start from an empty form. */
-export const BLANK = 'blank'
-
-const TEMPLATE_CRON: Record<TemplateKey, string> = {
-  bugs: '0 9 * * 1-5', // weekdays at 09:00
-  fix: '*/30 * * * *', // every 30 minutes
-  deps: '0 10 * * 1', // Mondays at 10:00
-}
-const TEMPLATE_ICONS: Record<TemplateKey, string> = {
-  bugs: 'search',
-  fix: 'check',
-  deps: 'refresh',
-}
-
-/** What a template fills in. */
-export const templateValues = (t: Translate, key: TemplateKey) => ({
-  prompt: t(`cron.wizard.templates.${key}.prompt`),
-  use_board: true,
-  when: TEMPLATE_CRON[key],
-  name: t(`cron.wizard.templates.${key}.label`),
-})
+/** A new job's time until one is picked: weekdays at 09:00. */
+const FIRST_WHEN = '0 9 * * 1-5'
 
 /** The step names: the form names the rules and the data are keyed by. */
 export const cronSteps = (t: Translate) => ({
@@ -121,7 +98,6 @@ const showWhen = (id: string, when: Condition, form: string, fields: string[]): 
 export const cronWizard = (t: Translate, c: CronWizardInput): WorkflowDefinition => {
   const s = cronSteps(t)
   const kinds = scheduleKinds(c.options)
-  const agentKinds = kinds.filter((k) => k === 'claude' || k === 'codex')
   const agents = c.options?.claude?.agents ?? []
   const claudeModels = c.options?.claude?.models ?? []
   const codexModels = c.options?.codex?.models ?? []
@@ -139,33 +115,15 @@ export const cronWizard = (t: Translate, c: CronWizardInput): WorkflowDefinition
           },
         ]
       : []),
-    // the templates are an agent's: without Claude or Codex there is nothing to fill in
-    ...(agentKinds.length
-      ? [
-          {
-            order: 2,
-            type: 'radio' as const,
-            variant: 'card' as const,
-            key: 'template',
-            label: t('cron.wizard.template'),
-            help: t('cron.wizard.templateHelp'),
-            options: [
-              ...TEMPLATES.map((key) => ({
-                key,
-                label: t(`cron.wizard.templates.${key}.label`),
-                description: t(`cron.wizard.templates.${key}.description`),
-                icon: TEMPLATE_ICONS[key],
-              })),
-              {
-                key: BLANK,
-                label: t('cron.wizard.blank'),
-                description: t('cron.wizard.blankHelp'),
-                icon: 'pencil',
-              },
-            ],
-          },
-        ]
-      : []),
+    {
+      order: 2,
+      type: 'text',
+      key: 'name',
+      label: t('forms.schedule.scheduleName'),
+      placeholder: t('cron.wizard.namePlaceholder'),
+      help: t('cron.wizard.nameHelp'),
+      required: true,
+    },
     {
       order: 3,
       type: 'radio',
@@ -278,14 +236,6 @@ export const cronWizard = (t: Translate, c: CronWizardInput): WorkflowDefinition
       // a week read Monday first, as the board's people read it
       week_starts: 'mon',
     },
-    {
-      order: 2,
-      type: 'text',
-      key: 'name',
-      label: t('forms.schedule.scheduleName'),
-      help: t('cron.wizard.nameHelp'),
-      required: true,
-    },
   ]
 
   const runs = (op: 'eq' | 'in', value: unknown): Condition => ({
@@ -352,8 +302,8 @@ type Data = Record<string, Record<string, unknown> | undefined>
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
-/** What a new job runs first: a template's agent, else the first this machine has. */
-export const firstKind = (options: AgentOptions | null): ScheduleKind =>
+/** What a new job runs first: the first agent this machine has, else a command. */
+const firstKind = (options: AgentOptions | null): ScheduleKind =>
   scheduleKinds(options)[0] ?? 'command'
 
 /** The data a new run starts from. */
@@ -372,17 +322,8 @@ export const cronStart = (
       model_codex: MODEL_DEFAULT,
       claude_agent: NO_AGENT,
     },
-    [s.when]: { when: TEMPLATE_CRON.bugs },
+    [s.when]: { when: FIRST_WHEN },
   }
-}
-
-/** A name for the job from what it does: the prompt's first line, the command, the playbook. */
-export const nameFrom = (task: Record<string, unknown> | undefined): string => {
-  const line =
-    text(task?.['prompt'])?.split('\n')[0] ??
-    text(task?.['command']) ??
-    (text(task?.['playbook']) ? `playbook ${String(task?.['playbook'])}` : '')
-  return line.length > 60 ? `${line.slice(0, 59).trimEnd()}…` : line
 }
 
 const kindOf = (v: unknown): ScheduleKind =>
@@ -406,7 +347,7 @@ export const cronJobBody = (t: Translate, data: Data, fixedProject: string | nul
   const when = data[s.when] ?? {}
   const kind = kindOf(what['runs'])
   const project = fixedProject ?? text(what['project_id'])
-  const base = { name: text(when['name']) ?? nameFrom(task), cron: text(when['when']) ?? '' }
+  const base = { name: text(what['name']) ?? '', cron: text(when['when']) ?? '' }
   if (kind === 'claude' || kind === 'codex') {
     const agent = task['more'] === true && kind === 'claude' ? text(task['claude_agent']) : null
     return {

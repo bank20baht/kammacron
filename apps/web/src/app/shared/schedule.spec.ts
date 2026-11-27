@@ -1,5 +1,5 @@
 import { t } from '../core/i18n/i18n.service'
-import { cronJobBody, cronWizard, nameFrom, templateValues } from './cron-wizard'
+import { cronJobBody, cronWizard } from './cron-wizard'
 import { scheduleKinds, type AgentOptions } from './forms'
 import { runsWhat } from './schedule'
 
@@ -37,7 +37,8 @@ describe('schedule', () => {
       w.forms[form]?.fields.map((f) => f.key) ?? []
     const none = wizard([])
     expect(none.forms.map((f) => f.form_name)).toEqual(['What', 'The task', 'When'])
-    expect(keys(none, 0)).toEqual(['template', 'runs'])
+    expect(keys(none, 0)).toEqual(['name', 'runs'])
+    expect(keys(none, 2)).toEqual(['when'])
     expect(keys(none, 1)).not.toContain('claude_agent')
     expect(keys(none, 1)).toContain('model_claude')
     expect(keys(none, 1)).not.toContain('model_codex')
@@ -49,7 +50,7 @@ describe('schedule', () => {
     })
   })
 
-  it('asks for the project only when there is more than one, and no template without an agent', () => {
+  it('asks for the project only when there is more than one', () => {
     const two = [
       { id: 1, name: 'A' },
       { id: 2, name: 'B' },
@@ -59,19 +60,19 @@ describe('schedule', () => {
       playbooks: [],
       options: null,
     }).forms[0]?.fields.map((f) => f.key)
-    expect(keys).toEqual(['project_id', 'runs'])
+    expect(keys).toEqual(['project_id', 'name', 'runs'])
   })
 
-  it('turns the steps into the API body: a name from the prompt, the model only when asked', () => {
+  it('turns the steps into the API body, with the model only when asked', () => {
     const data = {
-      What: { project_id: '2', runs: 'claude' },
+      What: { project_id: '2', name: 'Find bugs', runs: 'claude' },
       'The task': {
         prompt: 'Find bugs\nthen file cards',
         use_board: true,
         more: false,
         model_claude: 'haiku',
       },
-      When: { when: '0 9 * * 1-5', name: '' },
+      When: { when: '0 9 * * 1-5' },
     }
     expect(cronJobBody(t, data, null)).toEqual({
       project: '2',
@@ -87,7 +88,5 @@ describe('schedule', () => {
     })
     const more = { ...data, 'The task': { ...data['The task'], more: true } }
     expect(cronJobBody(t, more, '7')).toMatchObject({ project: '7', body: { model: 'haiku' } })
-    expect(nameFrom({ command: 'bun test' })).toBe('bun test')
-    expect(templateValues(t, 'bugs')).toMatchObject({ when: '0 9 * * 1-5', use_board: true })
   })
 })

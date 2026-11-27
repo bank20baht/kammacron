@@ -90,9 +90,8 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
 - The shell scrolls inside `.baht-shell-main` (`scroll="main"`), not the window: scroll that
   element (or `scrollIntoView`), never `window.scrollTo`.
 - A cron job is added in a three-step wizard (`web-cron-wizard`, a `<baht-workflow>` in a modal):
-  **Add cron job** on `/cron`, then What (Who does it) → Next → The task (prompt; Model and Agent
-  only after the **More options** toggle) → Next → When and the name (filled in from the prompt's
-  first line: empty it before typing) → **Add cron job**. Its Who does it, Agent and Model are
+  **Add cron job** on `/cron`, then What (the name, Who does it) → Next → The task (prompt; Model
+  and Agent only after the **More options** toggle) → Next → When → **Add cron job**. Its Who does it, Agent and Model are
   radio cards (the `input` is hidden: click its `label`); When is the library's `<baht-schedule>` (its value is a cron string): day chips are
   buttons named after the day ("Tuesday"), the time an `input[type=time]`, the cards
   `label.baht-choice:has(input[value="cron"])`, then a `<baht-cron>` of five inputs (a space moves

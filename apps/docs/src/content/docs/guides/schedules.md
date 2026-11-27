@@ -7,13 +7,11 @@ description: Claude or Codex with your own prompt, commands and playbooks on a t
 
 A cron job (a schedule) runs in the project's directory as it is, on its own time: the project's worker switch does not have to be on, only a directory set and the project not paused. Add one with **Add cron job** on the **Cron jobs** page (in the navigator, under Cron; with more than one project, pick it with the tabs at the top), with **New card ▾ → New cron job** on the board, or in a project's settings under **Schedules**. It takes three short steps:
 
-1. **What**: the project (asked only on the board's all-projects view), a template to start from, and **who does it**: Claude, Codex, a command or a playbook.
+1. **What**: the project (asked only on the board's all-projects view), the job's **name**, and **who does it**: Claude, Codex, a command or a playbook.
 2. **The task**: the prompt (with **Use the Kanban board**), the command, or the playbook. Claude's agent and the model are folded under **More options**; left folded, the agent's own defaults apply.
-3. **When**: the time, and a name, filled in from the template or the prompt's first line.
+3. **When**: the time, weekdays at 09:00 until you pick another.
 
-The templates fill in a prompt and a time you can change on the next steps: **Find bugs every morning** (weekdays at 09:00, files a card for each bug and fixes nothing), **Fix cards one at a time** (every 30 minutes, takes one auto-pilot card), and **Update dependencies weekly** (Mondays at 10:00). **Start blank** leaves it to you.
-
-![How to add a cron job, in eight numbered steps: New card ▾ then New cron job, pick a template, pick who does it, check the prompt, the model under More options, pick when, the name, Add cron job](../../../assets/howto/2-cron.png)
+![How to add a cron job, in seven numbered steps: New card ▾ then New cron job, the name, who does it, the prompt, the model under More options, when, Add cron job](../../../assets/howto/2-cron.png)
 
 ### When
 

@@ -16,8 +16,7 @@ export const cron = {
   wizard: {
     heading: 'New cron job',
     steps: { what: 'What', task: 'The task', when: 'When' },
-    template: 'Start from',
-    templateHelp: 'A job ready to use; change anything on the next steps',
+    /** The first jobs the new-project wizard offers. */
     templates: {
       bugs: {
         label: 'Find bugs every morning',
@@ -38,10 +37,9 @@ export const cron = {
           'Update the dependencies of this project to their newest compatible versions and run the tests. Commit when they pass; when they fail, put things back and file an auto-pilot card with what broke.',
       },
     },
-    blank: 'Start blank',
-    blankHelp: 'Write it yourself',
     runs: 'Who does it',
     more: 'More options: model and agent',
+    namePlaceholder: 'Find bugs every morning',
     nameHelp: 'Shown in the list and on the calendar',
     added: 'Cron job “{name}” added',
     seeJobs: 'See cron jobs',

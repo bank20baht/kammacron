@@ -1,13 +1,22 @@
 import type { FieldDescriptor, WorkflowDefinition } from '@20baht/ui'
 
 import type { Translate } from '../core/i18n/i18n.service'
-import { TEMPLATES, templateValues, type TemplateKey } from './cron-wizard'
 
 /*
  * A new project in three short steps, in a modal (Settings, the welcome page, an empty Cron jobs
  * page): its folder and name, what its agents may do, and a first cron job to start it off. One
  * `<baht-workflow>`; on submit the page creates the project, then the job.
  */
+
+/** A first cron job ready to use: what it is told, when, and its name. */
+const TEMPLATES = ['bugs', 'fix', 'deps'] as const
+type TemplateKey = (typeof TEMPLATES)[number]
+
+const TEMPLATE_CRON: Record<TemplateKey, string> = {
+  bugs: '0 9 * * 1-5', // weekdays at 09:00
+  fix: '*/30 * * * *', // every 30 minutes
+  deps: '0 10 * * 1', // Mondays at 10:00
+}
 
 /** The first job's own "nothing": no cron job yet. */
 export const NOT_NOW = 'none'
@@ -151,15 +160,12 @@ export const projectBody = (t: Translate, data: Data) => {
 }
 
 /** The first job a template makes, for the agent this machine has. */
-export const firstJob = (t: Translate, key: TemplateKey, agent: 'claude' | 'codex') => {
-  const v = templateValues(t, key)
-  return {
-    name: v.name,
-    cron: v.when,
-    agent,
-    prompt: v.prompt,
-    use_board: v.use_board,
-    model: null,
-    claude_agent: null,
-  }
-}
+export const firstJob = (t: Translate, key: TemplateKey, agent: 'claude' | 'codex') => ({
+  name: t(`cron.wizard.templates.${key}.label`),
+  cron: TEMPLATE_CRON[key],
+  agent,
+  prompt: t(`cron.wizard.templates.${key}.prompt`),
+  use_board: true,
+  model: null,
+  claude_agent: null,
+})

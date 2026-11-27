@@ -19,28 +19,14 @@ import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../../core/i18n/i18n.service'
-import {
-  BLANK,
-  TEMPLATES,
-  cronJobBody,
-  cronStart,
-  cronSteps,
-  cronWizard,
-  firstKind,
-  nameFrom,
-  templateValues,
-  type TemplateKey,
-} from '../../shared/cron-wizard'
+import { cronJobBody, cronStart, cronSteps, cronWizard } from '../../shared/cron-wizard'
 import { REGISTRY, type AgentOptions } from '../../shared/forms'
 
 type Project = { id: number; name: string; playbooks: readonly { name: string }[] }
 type Data = Record<string, Record<string, unknown> | undefined>
 
-const isTemplate = (v: unknown): v is TemplateKey =>
-  typeof v === 'string' && (TEMPLATES as readonly string[]).includes(v)
-
 /**
- * A new cron job in three steps, in a modal: what (the project, a template, who does it), the task,
+ * A new cron job in three steps, in a modal: what (the project, its name, who does it), the task,
  * and when. The board's New ▾, the Cron jobs page and a project's settings open it; `project` set
  * means the job's project is known and not asked.
  */
@@ -76,7 +62,6 @@ const isTemplate = (v: unknown): v is TemplateKey =>
             [busy]="busy()"
             [submitLabel]="t('cron.add')"
             (bahtDataChange)="changed($any($event).data)"
-            (bahtStepChange)="stepped($any($event).form_name)"
             (bahtSubmit)="submit($any($event).data)"
           ></baht-workflow>
         } @else {
@@ -111,7 +96,6 @@ export class CronWizardComponent {
   private readonly loaded = signal(false)
   /** The run so far, put back once the steps are rebuilt for another project. */
   private pending: unknown = null
-  private lastTemplate: unknown = null
 
   private readonly steps = computed(() => cronSteps(this.t))
   protected readonly definition = computed(
@@ -138,7 +122,6 @@ export class CronWizardComponent {
       const id = untracked(() => this.project() ?? String(this.projects()[0]?.id ?? '')) || null
       untracked(() => {
         this.error.set(null)
-        this.lastTemplate = null
         this.pending = null
         this.loaded.set(false)
         void this.load(id, true)
@@ -170,6 +153,7 @@ export class CronWizardComponent {
     this.loaded.set(true)
   }
 
+  /** Another project picked: its agents and models, the run kept. */
   protected changed(data: Data): void {
     const el = this.workflow()?.nativeElement
     if (!el) return
@@ -180,33 +164,7 @@ export class CronWizardComponent {
     if (!this.fixed() && project && project !== this.chosen()) {
       this.pending = el.getState()
       void this.load(project, false)
-      return
     }
-
-    const template = what['template']
-    if (template === this.lastTemplate) return
-    this.lastTemplate = template
-    if (isTemplate(template)) {
-      const v = templateValues(this.t, template)
-      const kind = firstKind(this.options())
-      if (kind === 'claude' || kind === 'codex') el.setValue(s.what, { runs: kind })
-      el.setValue(s.task, { prompt: v.prompt, use_board: v.use_board })
-      el.setValue(s.when, { when: v.when, name: v.name })
-    } else if (template === BLANK) {
-      el.setValue(s.task, { prompt: '' })
-      el.setValue(s.when, { name: '' })
-    }
-  }
-
-  /** On the last step, a name from what the job does, when none is given. */
-  protected stepped(form: string): void {
-    const el = this.workflow()?.nativeElement
-    const s = this.steps()
-    if (!el || form !== s.when) return
-    const data = el.getData() as Data
-    if (typeof data[s.when]?.['name'] === 'string' && String(data[s.when]?.['name']).trim()) return
-    const name = nameFrom(data[s.task])
-    if (name) el.setValue(s.when, { name })
   }
 
   protected async submit(data: Data): Promise<void> {

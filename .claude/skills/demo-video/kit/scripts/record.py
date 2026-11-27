@@ -137,14 +137,15 @@ def scroll_bottom(page):
 
 
 def schedule_scene(b, name, job, first):
-    """The Cron jobs page: Add cron job, then the wizard's three steps (who, the task, when)."""
+    """The Cron jobs page: Add cron job, then the wizard's three steps (name and who, the task, when)."""
     s = Scene(b, name)
     s.go('/cron')
     s.mark('start')
     s.wait(900)
     s.click(s.page.get_by_role('button', name='Add cron job'), 900)
     wizard = s.page.locator('web-cron-wizard')
-    # step 1, What: Claude does it (no template: the prompt is the job's own)
+    # step 1, What: its name, and Claude does it
+    s.type(field(wizard, 'name'), job['name'], delay=25)
     s.click(wizard.locator('label', has=s.page.locator('input[value="claude"]')).first, 600)
     s.click(wizard.get_by_role('button', name='Next'), 700)
     # step 2, The task: the prompt; Use the Kanban board is on; the model under More options
@@ -171,9 +172,6 @@ def schedule_scene(b, name, job, first):
     for i in range(5):
         boxes.nth(i).fill('')
     s.type(boxes.first, '* * * * *', delay=90)
-    # the name the wizard filled in from the prompt, replaced by the job's
-    field(wizard, 'name').fill('')
-    s.type(field(wizard, 'name'), job['name'], delay=25)
     s.wait(500)
     s.click(wizard.get_by_role('button', name='Add cron job'), 600)
     s.mark('added')

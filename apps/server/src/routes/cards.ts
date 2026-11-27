@@ -140,6 +140,9 @@ export const cardRoutes = (ctx: AppContext) => {
           tag: t.Optional(t.String({ description: 'Only cards with this tag' })),
           q: t.Optional(t.String({ description: 'Text in the title or body' })),
           archived: t.Optional(t.BooleanString({ description: 'true: archived cards instead' })),
+          lean: t.Optional(
+            t.BooleanString({ description: "true: each card's body left empty (a board's tiles)" }),
+          ),
         }),
         live: liveRoute(ctx.live, {
           topics: () => ['cards', 'card_waits_on', 'runs@status=running'],

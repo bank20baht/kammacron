@@ -4,6 +4,7 @@ import {
   asc,
   desc,
   eq,
+  getTableColumns,
   ilike,
   inArray,
   max,
@@ -38,6 +39,8 @@ export type CardQuery = {
   /** Text looked for in the title and the body. */
   q?: string | undefined
   archived?: boolean | undefined
+  /** Each card's body left empty: the board draws tiles, and a card opened is fetched whole. */
+  lean?: boolean | undefined
 }
 
 export const listCards = (db: Executor, query: CardQuery = {}) => {
@@ -51,7 +54,9 @@ export const listCards = (db: Executor, query: CardQuery = {}) => {
     if (text) where.push(text)
   }
   return db
-    .select()
+    .select(
+      query.lean ? { ...getTableColumns(cards), body: sql<string>`''` } : getTableColumns(cards),
+    )
     .from(cards)
     .where(and(...where))
     .orderBy(asc(cards.status), asc(cards.position), asc(cards.id))

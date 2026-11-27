@@ -212,7 +212,7 @@ export class ReviewComponent {
   private readonly attempt = signal(0)
   protected readonly cards = liveSignal(() => {
     this.attempt()
-    return this.live.subscribe('GET', '/api/cards', { query: { status: 'review' } })
+    return this.live.subscribe('GET', '/api/cards', { query: { status: 'review', lean: 'true' } })
   })
   /** No queue yet, and the server answered with an error or the stream is down. */
   protected readonly failed = computed(() => liveFailed(this.cards()))

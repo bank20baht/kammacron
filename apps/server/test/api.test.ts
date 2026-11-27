@@ -254,6 +254,19 @@ describe('runs search', () => {
   })
 })
 
+describe('the card list', () => {
+  test('lean leaves the bodies empty, and still finds by text in them', async () => {
+    await create([{ project_id: projectId, title: 'tile', body: 'a long description of the work' }])
+    type Row = { title: string; body: string }
+    const [full] = await t.json<Row[]>('GET', '/api/cards')
+    expect(full?.body).toBe('a long description of the work')
+    const [lean] = await t.json<Row[]>('GET', '/api/cards?lean=true')
+    expect(lean?.title).toBe('tile')
+    expect(lean?.body).toBe('')
+    expect(await t.json<Row[]>('GET', '/api/cards?lean=true&q=description')).toHaveLength(1)
+  })
+})
+
 describe('a run and its events', () => {
   test('the newest page, earlier pages by `before`, and how many there are', async () => {
     const [card] = await create([{ project_id: projectId, title: 'long run' }])

@@ -82,7 +82,8 @@ export class BoardComponent {
     const project = this.project()
     if (this.slug() && !project) return null
     return this.live.subscribe('GET', '/api/cards', {
-      query: project ? { project_id: String(project.id) } : {},
+      // tiles only: a card opened is fetched whole (card-dialog), so the bodies stay home
+      query: project ? { project_id: String(project.id), lean: 'true' } : { lean: 'true' },
     })
   })
 

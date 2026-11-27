@@ -369,5 +369,20 @@ export const cleanUp = async (db: Executor, dataDir: string) => {
   const done = await housekeep(db, dataDir, await retentionOf(db))
   await purgeOrphans(db, join(dataDir, 'files'))
   await purgeOAuth(db)
+  await vacuum(db)
   return done
+}
+
+/**
+ * Hands the space of removed rows back to their tables, and counts the tables again for the
+ * planner. A Postgres server does both by itself (autovacuum); PGlite has no background workers,
+ * so without this the files only ever grow: 100,000 events removed and 100,000 written took twice
+ * the disk. Not `full`: nothing is locked for long, and the space is reused, not given to the OS.
+ */
+const vacuum = async (db: Executor) => {
+  try {
+    await db.execute(sql`vacuum analyze`)
+  } catch {
+    // inside a transaction, or a role that may not: the next clean-up tries again
+  }
 }

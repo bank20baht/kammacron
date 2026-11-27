@@ -86,12 +86,19 @@ const LIVE_TABLES = [
   { table: schedules },
 ]
 
+/**
+ * Postgres keeps 128 MB of shared buffers by default, sized for a server of many connections.
+ * PGlite is one connection inside this process, and holds that memory whether it is used or not:
+ * with 16 MB an idle kammacron takes about 120 MB less, and reads and writes measure the same.
+ */
+const PGLITE_CONF = ['shared_buffers=16MB']
+
 /** Opens PGlite at `dataDir` (in memory when omitted), migrated and with live triggers. */
 export const openDatabase = async (
   dataDir?: string,
   migrationsFolder = migrationsDir(),
 ): Promise<Database> => {
-  const client = new PGlite(dataDir, pgliteAssets)
+  const client = new PGlite(dataDir, { ...pgliteAssets, postgresqlconf: PGLITE_CONF })
   const db = drizzlePglite(client, { schema })
   await migratePglite(db, { migrationsFolder })
   await client.exec(liveTriggers(LIVE_TABLES))

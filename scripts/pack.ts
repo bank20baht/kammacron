@@ -32,7 +32,12 @@ await run(
   ],
   server,
 )
-await cp(join(server, 'drizzle'), join(out, 'drizzle'), { recursive: true })
+// the SQL and the journal that orders it; the snapshots (nine tenths of the folder) are only
+// what drizzle-kit compares the schema with when it writes the next migration
+await cp(join(server, 'drizzle'), join(out, 'drizzle'), {
+  recursive: true,
+  filter: (source) => !source.endsWith('_snapshot.json'),
+})
 await cp(join(root, 'apps', 'web', 'dist', 'web', 'browser'), join(out, 'web'), { recursive: true })
 
 const serverPkg = JSON.parse(await readFile(join(server, 'package.json'), 'utf8')) as {

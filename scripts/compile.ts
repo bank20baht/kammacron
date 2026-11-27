@@ -37,10 +37,10 @@ const version =
   (JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { version?: string })
     .version ?? '0.0.0'
 const assets: [string, string][] = [
-  ...(await walk(join(server, 'drizzle'))).map((f): [string, string] => [
-    `drizzle/${relative(join(server, 'drizzle'), f)}`,
-    f,
-  ]),
+  // without the snapshots: only drizzle-kit reads them, to write the next migration
+  ...(await walk(join(server, 'drizzle')))
+    .filter((f) => !f.endsWith('_snapshot.json'))
+    .map((f): [string, string] => [`drizzle/${relative(join(server, 'drizzle'), f)}`, f]),
   ...(await walk(web)).map((f): [string, string] => [`web/${relative(web, f)}`, f]),
 ]
 const lines = [

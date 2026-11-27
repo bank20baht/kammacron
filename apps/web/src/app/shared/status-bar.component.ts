@@ -1,9 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
 import { RouterLink } from '@angular/router'
-import { BAHT_UI } from '@20baht/angular'
+import {
+  BahtBadgeDirective,
+  BahtButtonDirective,
+  BahtNotificationBellDirective,
+} from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import type { NotificationItem } from '@20baht/ui'
-import { toast } from '@20baht/ui/overlay'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -15,7 +18,7 @@ import { runLabel } from './schedule'
 /** The band on every page: working or paused, the run going, cards in review, alerts. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, RouterLink],
+  imports: [BahtBadgeDirective, BahtButtonDirective, BahtNotificationBellDirective, RouterLink],
   selector: 'app-status-bar',
   styles: `
     :host {
@@ -109,6 +112,9 @@ export class StatusBarComponent {
     try {
       await work()
     } catch (error) {
+      // asked for only now: the band is on every page, and the overlay (with the modal and the
+      // form engine behind it) would otherwise be in the first script every page waits for
+      const { toast } = await import('@20baht/ui/overlay')
       toast.danger(describeError(error))
     }
   }

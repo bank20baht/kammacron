@@ -2,7 +2,8 @@
 
 Verified against the published `@20baht/ui`, `@20baht/angular`, `@20baht/engine` and
 `@20baht/strict` **0.3.44** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
-2026-11-27. No gap is open. The twenty-nine below are resolved, six of them in 0.3.44: the
+2026-11-27. One gap is open: the Angular adapter's directives all load with the first script. The
+twenty-nine below it are resolved, six of them in 0.3.44: the
 per-element stylesheets, and five in the types the Angular adapter and the engine give (found by
 taking every `$any($event)` out of the templates and reading each form's data as `FormValues`).
 Four were resolved in 0.3.43, all found while registering only the elements the app draws
@@ -13,6 +14,24 @@ reads its field elements from the engine, and fails on a drawn element nothing r
 actions, an app's field type named and framed through `@20baht/ui`, segmented-nav items that keep
 their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold button,
 `clock` and `bot` icons).
+
+## Open (`@20baht/angular`): one directive imported brings all 98
+
+Affected: `@20baht/angular` (`dist/elements.js`); owner: `@20baht/angular`.
+
+**What happens.** Every directive is in one module, each with `static { this.ɵdir = … }` blocks,
+and the bundler keeps the whole module when any of it is imported: kammacron's shell draws six
+elements (`app-shell`, `theme-toggle`, `toast`, `badge`, `button`, `notification-bell`), imports
+those six directives by name, and its first script still carries all of `elements.js`: 49 KB of
+its 363 KB (measured with the build's stats, 0.3.44). `BAHT_UI` and the named imports give the
+same bytes. `"sideEffects": false` is set and does not help.
+
+**Wanted.** Directives the bundler can drop: one module per directive (`@20baht/angular/button`,
+as `@20baht/ui/components/<name>` does for the elements), or definitions written so the class is
+free of side effects (`static ɵdir = /* @__PURE__ */ …`).
+
+**Workaround.** None. The shell and the status band import their directives by name
+(`app.ts`, `status-bar.component.ts`), so they shed the rest the day the library allows it.
 
 ## Resolved (`@20baht/ui`): one stylesheet holds every element's styles
 

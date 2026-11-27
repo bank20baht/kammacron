@@ -1,7 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router'
-import { BAHT_UI } from '@20baht/angular'
+import {
+  BahtAppShellDirective,
+  BahtThemeToggleDirective,
+  BahtToastDirective,
+} from '@20baht/angular'
 import { filter, map } from 'rxjs'
 import { liveSignal } from '@20baht/angular/live'
 
@@ -14,7 +18,13 @@ import { StatusBarComponent } from './shared/status-bar.component'
 /** The frame every page sits in: brand, the navigator, the page. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, BAHT_UI, StatusBarComponent],
+  imports: [
+    RouterOutlet,
+    BahtAppShellDirective,
+    BahtThemeToggleDirective,
+    BahtToastDirective,
+    StatusBarComponent,
+  ],
   selector: 'app-root',
   templateUrl: './app.html',
   styleUrl: './app.css',

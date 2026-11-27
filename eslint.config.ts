@@ -23,7 +23,12 @@ export default defineConfig([
       },
     ],
   }),
-  ...bahtui({ files: WEB, tokenFiles: ['apps/web/src/styles.css'] }),
+  // elements.ts registers the <baht-*> the app draws: lint fails on a drawn tag it does not bring
+  ...bahtui({
+    files: WEB,
+    tokenFiles: ['apps/web/src/styles.css'],
+    elements: ['apps/web/src/elements.ts'],
+  }),
   // the web app's service worker: plain JS served as is, with a worker's globals
   {
     files: ['apps/web/public/sw.js'],

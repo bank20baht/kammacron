@@ -1,35 +1,16 @@
 # Library gaps
 
-Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.42** (with
-`@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1** and `@20baht/strict` **0.3.36**, on
-2026-11-27. Five gaps are open, all found while cutting the load down (registering only the
-elements the app draws): two in `@20baht/ui` (what `<baht-form>` registers, one stylesheet for
-every element) and three in `@20baht/strict`'s lint rules (the whole library imported, a stale
-list of field elements, a drawn element nothing registers). The
-nineteen below them are resolved, two of them in 0.3.42 (a theme switch that lands at once, a chart
-series' own colour for every series), six in 0.3.41 (a workflow step's own label, a new definition
-that keeps the run, hidden fields, an alert's actions, an app's field type named and framed through
-`@20baht/ui`, segmented-nav items that keep their width), four in 0.3.38 (a `schedule` field type,
-`baht-cron`, the app shell's fold button, `clock` and `bot` icons).
-
-## Open (`@20baht/ui`): `<baht-form>` does not register the elements of two built-in field types
-
-Affected: `<baht-form>`, `<baht-workflow>`, `<baht-form-modal>` with a `schedule` or `cron` field;
-owner: `@20baht/ui`.
-
-**What happens.** An app that registers only the elements it uses (`@20baht/ui/components/<name>`,
-not the whole `@20baht/ui`) relies on the form to bring its fields' elements. `baht-form.js` and
-`field-base.js` import the elements of every built-in type but two: `schedule` (`baht-schedule`)
-and `cron` (`baht-cron`). A form with one of them draws an empty unknown `<baht-schedule>`: no
-error, no build failure. In kammacron the cron wizard's step 3 (When) would be blank.
-
-**Wanted.** The form imports `baht-schedule` and `baht-cron` like its other field elements, so a
-schema's built-in types always draw. (Or: the docs say which field elements an app registers
-itself.)
-
-**Workaround.** `apps/web/src/elements.ts` imports `@20baht/ui/components/schedule`;
-`src/elements.spec.ts` fails when a form uses a built-in type whose element neither the form nor
-`elements.ts` registers.
+Verified against the published `@20baht/ui`, `@20baht/angular`, `@20baht/engine` and
+`@20baht/strict` **0.3.43** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
+2026-11-27. One gap is open: one stylesheet holds every element's styles. The twenty-three below it
+are resolved, four of them in 0.3.43, all found while registering only the elements the app draws
+(`<baht-form>` brings `schedule` and `cron`; `@20baht/strict` flags the whole library imported,
+reads its field elements from the engine, and fails on a drawn element nothing registers), two in
+0.3.42 (a theme switch that lands at once, a chart series' own colour for every series), six in
+0.3.41 (a workflow step's own label, a new definition that keeps the run, hidden fields, an alert's
+actions, an app's field type named and framed through `@20baht/ui`, segmented-nav items that keep
+their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold button,
+`clock` and `bot` icons).
 
 ## Open (`@20baht/ui`): one stylesheet holds every element's styles
 
@@ -44,58 +25,60 @@ render-blocking: kammacron's first load is 362 KB of script and 208 KB of this s
 **Wanted.** Per-element sheets (`css/components/<name>.css`, plus the shared base), or each
 element adopting its own rules when it is defined, so an app loads the styles of what it uses.
 
-**Workaround.** None in the app; the server sends the sheet compressed and cached for good (it is
+**Still so in 0.3.43** (`css/components.css` is the same 252 KB). **Workaround.** None in the app; the server sends the sheet compressed and cached for good (it is
 content-hashed), so it costs the 28 KB once.
 
-## Open (`@20baht/strict`): nothing flags importing the whole `@20baht/ui`
+## Resolved (`@20baht/ui`): `<baht-form>` does not register the elements of two field types
 
-Affected: `@20baht/strict/eslint`, the `angular` and `bahtui` presets; owner: `@20baht/strict`.
+Affected: `<baht-form>`, `<baht-workflow>`, `<baht-form-modal>` with a `schedule` or `cron` field;
+owner: `@20baht/ui`.
 
-**What happens.** `import('@20baht/ui')`, `import '@20baht/ui'`, or one value from it
-(`import { calendarRange } from '@20baht/ui'`) loads all 95 elements and the dashboard's charts.
-kammacron did both: `main.ts` loaded the library to register its elements, and the calendar took
-`calendarRange` from the index. Moving to `@20baht/ui/components/<name>` cut the elements' chunk
-from 449 KB to 270 KB. A probe component with both imports passes `eslint` with the presets as
-they are.
+**Was.** An app that registers only the elements it uses relies on the form to bring its fields'
+elements, and the form brought every built-in type's but `schedule` (`baht-schedule`) and `cron`
+(`baht-cron`): such a field drew as an empty unknown element, with no error. kammacron's cron
+wizard (step 3, When) needed `@20baht/ui/components/schedule` in `elements.ts`, and a test
+(`elements.spec.ts`) checked each form's field types against it.
 
-**Wanted.** A `bahtui/no-whole-library` rule in the presets: a value, side-effect or dynamic import
-of the bare `@20baht/ui` is an error naming the way out, `@20baht/ui/components/<name>` for an
-element and for what lives in an element's module (`calendarRange` is in
-`components/calendar`); `import type` stays allowed, as do `@20baht/ui/engine`, `/overlay`,
-`/motion` and the other entry points. It only pays with the next gap's check beside it.
+**Published fix.** 0.3.43: `baht-form.js` imports `baht-schedule` and `baht-cron` with its other
+field elements. The import and the test are gone; the wizard's step 3 draws (checked in the
+browser).
 
-**Workaround.** None in the lint; kammacron registers its elements in `apps/web/src/elements.ts`.
+## Resolved (`@20baht/strict`): nothing flags importing the whole `@20baht/ui`
 
-## Open (`@20baht/strict`): `no-hand-placed-field` misses three field elements
+Affected: `@20baht/strict/eslint`, the `bahtui` preset; owner: `@20baht/strict`.
+
+**Was.** `import('@20baht/ui')`, `import '@20baht/ui'` or one value from it (`calendarRange`)
+loaded all 95 elements and the dashboard's charts, and passed lint. kammacron did both, and moving
+to `@20baht/ui/components/<name>` cut the elements' chunk from 449 KB to 270 KB.
+
+**Published fix.** 0.3.43: `bahtui/no-whole-library` (on in the preset, every TS file) names the
+way out: `calendarRange` from `@20baht/ui/components/calendar`, `import
+'@20baht/ui/components/<name>'` for an element. `import type` and the other entry points pass.
+Checked with a probe component: both imports are errors.
+
+## Resolved (`@20baht/strict`): `no-hand-placed-field` misses three field elements
 
 Affected: `bahtui/no-hand-placed-field`; owner: `@20baht/strict`.
 
-**What happens.** The rule's `FIELD_PRIMITIVES` is a list written by hand, and it has drifted from
-the engine's field types: `<baht-tags>`, `<baht-schedule>` and `<baht-cron>` (field elements of
-the `tags`, `schedule` and `cron` types, the last two new in `@20baht/ui` 0.3.38) pass it, while
-`<baht-input>` beside them is flagged. Checked with a probe template.
+**Was.** The rule's list was written by hand and had drifted from the engine: `<baht-tags>`,
+`<baht-schedule>` and `<baht-cron>` passed it.
 
-**Wanted.** The list read from the engine (`BUILT_IN_TYPES[type].tag`, as `known-token` reads
-`tokens.css`), so a new field type is covered when it ships.
+**Published fix.** 0.3.43: the list adds the installed engine's `BUILT_IN_TYPES[type].tag`, so a
+new field type is covered when it ships. The probe's three are errors.
 
-**Workaround.** None needed today: kammacron places none of them by hand.
-
-## Open (`@20baht/strict`): nothing checks that a drawn element is registered
+## Resolved (`@20baht/strict`): nothing checks that a drawn element is registered
 
 Affected: the `bahtui` preset; owner: `@20baht/strict`.
 
-**What happens.** Once an app registers elements one by one (the gap above), a tag it draws but
-never imports is an empty unknown element: the Angular build passes (the directive in `BAHT_UI`
-knows the tag), and so does lint. The same holds for a form field whose element `<baht-form>` does
-not bring (`schedule`, `cron`: the `@20baht/ui` gap above), and for a sticker drawn by a name
-nobody passed to `registerSticker` (the name's type checks, the sticker stays blank).
+**Was.** With elements registered one by one, a tag drawn but never imported was an empty unknown
+element: the Angular build and lint both passed. kammacron checked it with a test of its own.
 
-**Wanted.** A rule in the `bahtui` preset with the app's registration file as an option
-(`elements: 'apps/web/src/elements.ts'`): every `<baht-*>` a template draws, and the element of
-every field type a form definition uses, is imported there, or comes with `<baht-form>`.
-
-**Workaround.** `apps/web/src/elements.spec.ts` does it as a test (templates and form `type:`
-values against `elements.ts`); it caught `schedule` missing from the cron wizard.
+**Published fix.** 0.3.43: `bahtui/registered-element`, on when the preset is given the app's
+registration file (`elements: ['apps/web/src/elements.ts']` in `eslint.config.ts`): every
+`<baht-*>` a template draws is imported there, or comes with an element that is (the form's
+fields). The probe's `<baht-tree>` is an error naming the line to add. Not covered: a sticker drawn
+by a name nobody registered (`@20baht/stickers` is not in `@20baht/ui`'s manifest); its name is
+typed, and kammacron registers its few in `shared/stickers.ts`.
 
 ## Resolved: a theme switch fades through both themes
 

@@ -2,9 +2,8 @@
  * The <baht-*> elements this app puts on a page, each registering itself; not the whole library
  * ('@20baht/ui' defines all of them, the dashboard's charts included). A tag used in a template
  * gets a line here, or it stays an empty unknown element.
- *
- * `<baht-form>` registers the elements of its field types itself, all but two: a `schedule` field
- * (the cron wizard's When) needs `schedule` here, a `cron` field `cron` (LIB_GAP.md).
+ * `<baht-form>` brings the elements of its field types itself. `bahtui/registered-element`
+ * (eslint.config.ts) fails on a tag a template draws that nothing here brings.
  */
 import '@20baht/ui/components/accordion'
 import '@20baht/ui/components/alert'
@@ -34,7 +33,6 @@ import '@20baht/ui/components/modal'
 import '@20baht/ui/components/notification-bell'
 import '@20baht/ui/components/page-header'
 import '@20baht/ui/components/save-bar'
-import '@20baht/ui/components/schedule'
 
 import '@20baht/ui/components/search'
 import '@20baht/ui/components/section-header'

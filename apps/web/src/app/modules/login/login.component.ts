@@ -6,18 +6,24 @@ import type { BahtForm } from '@20baht/ui'
 import { I18n } from '../../core/i18n/i18n.service'
 import { SessionService } from '../../services/session.service'
 import { loginForm } from '../../shared/forms'
+import { BAHT_STICKERS } from '../../shared/stickers'
 
 /** The API token, once, for the session cookie; or the code `kammacron open` put in the address. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [BAHT_UI, BAHT_STICKERS],
   selector: 'web-login',
   styles: `
     .center {
       display: grid;
       place-items: center;
+      align-content: center;
+      gap: var(--baht-space-2);
       min-height: 70dvh;
       padding: var(--baht-space-5);
+    }
+    baht-sticker {
+      width: 6rem;
     }
     .box {
       display: flex;
@@ -38,6 +44,14 @@ import { loginForm } from '../../shared/forms'
   `,
   template: `
     <div class="center">
+      <!-- the way in: a key, popping in once (a first visit's welcome), still after that -->
+      <baht-sticker
+        name="key"
+        aria-hidden="true"
+        [playOnce]="true"
+        [enter]="0.15"
+        [replayOnHover]="true"
+      ></baht-sticker>
       <baht-card [heading]="t('login.heading')" [subtitle]="t('login.subtitle')">
         <div class="box">
           <p class="muted">{{ t('login.run') }}</p>

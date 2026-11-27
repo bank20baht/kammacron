@@ -12,14 +12,19 @@ import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../../core/i18n/i18n.service'
+import { BAHT_STICKERS } from '../../shared/stickers'
 import { ProjectWizardComponent } from '../settings/project-wizard.component'
 
 /** First start: the tools on the PATH, and a first project. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, ProjectWizardComponent],
+  imports: [BAHT_UI, BAHT_STICKERS, ProjectWizardComponent],
   selector: 'web-welcome',
   styles: `
+    /* a first start: each step's card carries a small sticker in its corner, a beat apart */
+    baht-sticker {
+      width: 4rem;
+    }
     .stack {
       display: flex;
       flex-direction: column;
@@ -62,6 +67,14 @@ import { ProjectWizardComponent } from '../settings/project-wizard.component'
       </baht-page-header>
       <div class="stack">
         <baht-card [heading]="t('welcome.tools.heading')" [subtitle]="t('welcome.tools.subtitle')">
+          <baht-sticker
+            data-slot="actions"
+            name="terminal"
+            aria-hidden="true"
+            [playOnce]="true"
+            [enter]="0.2"
+            [replayOnHover]="true"
+          ></baht-sticker>
           <div class="row">
             @for (tool of system.value()?.tools ?? []; track tool.name) {
               <baht-badge
@@ -75,6 +88,15 @@ import { ProjectWizardComponent } from '../settings/project-wizard.component'
           [heading]="t('welcome.project.heading')"
           [subtitle]="t('welcome.project.subtitle')"
         >
+          <baht-sticker
+            data-slot="actions"
+            name="kanban"
+            aria-hidden="true"
+            [playOnce]="true"
+            [enter]="0.35"
+            [offset]="7"
+            [replayOnHover]="true"
+          ></baht-sticker>
           <div class="row">
             <baht-badge
               [tone]="hasRepo() ? 'success' : 'warning'"

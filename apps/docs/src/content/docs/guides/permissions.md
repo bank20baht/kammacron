@@ -1,6 +1,7 @@
 ---
 title: Permissions and safety
 description: The allowlist every Claude step gets, and what is always refused.
+sticker: shield
 ---
 
 kammacron never runs Claude Code with `--dangerously-skip-permissions`. Every Claude step gets an `--allowedTools` list and a `--disallowedTools` list; anything not allowed is refused, and the refusal is recorded on the run. Command steps of the playbook are yours, and run as written.

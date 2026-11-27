@@ -1,0 +1,52 @@
+---
+/**
+ * The page title, and the guide's sticker beside it when its frontmatter names one (`sticker:`).
+ * One small sticker a page: it pops in once and rests, replays when hovered, and is a still
+ * picture under reduced motion. Only that sticker's module is fetched (`loadSticker`).
+ */
+import Default from '@astrojs/starlight/components/PageTitle.astro'
+
+const { sticker } = Astro.locals.starlightRoute.entry.data
+---
+
+{
+  sticker ? (
+    <div class="titled">
+      <Default />
+      <baht-sticker data-sticker={sticker} once replay-on-hover enter="0.1" aria-hidden="true" />
+    </div>
+  ) : (
+    <Default />
+  )
+}
+
+<script>
+  import '@20baht/stickers/element'
+  import { isStickerName, loadSticker } from '@20baht/stickers/load'
+
+  for (const el of document.querySelectorAll<HTMLElement & { icon?: unknown }>(
+    'baht-sticker[data-sticker]',
+  )) {
+    const name = el.dataset['sticker'] ?? ''
+    if (isStickerName(name)) void loadSticker(name).then((icon) => (el.icon = icon))
+  }
+</script>
+
+<style>
+  .titled {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  baht-sticker {
+    flex: none;
+    width: 4.5rem;
+    margin-top: 1rem;
+  }
+  @media (max-width: 40rem) {
+    baht-sticker {
+      width: 3.5rem;
+    }
+  }
+</style>

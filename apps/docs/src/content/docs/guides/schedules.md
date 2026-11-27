@@ -1,6 +1,7 @@
 ---
 title: Cron jobs and the calendar
 description: Claude or Codex with your own prompt, commands and playbooks on a timer, and a calendar of everything that runs on its own.
+sticker: cron
 ---
 
 ## Cron jobs

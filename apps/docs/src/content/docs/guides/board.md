@@ -1,6 +1,7 @@
 ---
 title: The board
 description: Cards, owners, tags, priorities and what a card waits on.
+sticker: kanban
 ---
 
 ![The board of one project](../../../assets/board.png)

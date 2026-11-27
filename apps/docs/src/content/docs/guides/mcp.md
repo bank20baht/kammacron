@@ -1,6 +1,7 @@
 ---
 title: Agents and MCP
 description: The board as MCP tools for Claude Code, Codex, Claude Desktop and claude.ai.
+sticker: key
 ---
 
 kammacron serves an MCP server at `/mcp`. The worker uses it in every run, and so can you: plan with Claude Code and let it write the cards.

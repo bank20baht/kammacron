@@ -12,6 +12,7 @@ import { ago } from '../../shared/format'
 import { liveFailed } from '../../shared/live-state'
 import type { CronJob } from '../../shared/cron-wizard'
 import { runsWhat } from '../../shared/schedule'
+import { BAHT_STICKERS } from '../../shared/stickers'
 import { CronWizardComponent } from './cron-wizard.component'
 
 /**
@@ -20,7 +21,7 @@ import { CronWizardComponent } from './cron-wizard.component'
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, CronWizardComponent],
+  imports: [BAHT_UI, BAHT_STICKERS, CronWizardComponent],
   selector: 'web-cron-jobs',
   styles: `
     :host {
@@ -40,6 +41,16 @@ import { CronWizardComponent } from './cron-wizard.component'
     }
     .grow {
       flex: 1;
+    }
+    /* nothing set yet: a cron clock beside the words, the one moving thing on the empty list */
+    .none {
+      display: flex;
+      align-items: center;
+      gap: var(--baht-space-3);
+    }
+    .none baht-sticker {
+      flex: none;
+      width: 4rem;
     }
   `,
   template: `
@@ -122,7 +133,16 @@ import { CronWizardComponent } from './cron-wizard.component'
         </div>
       } @empty {
         @if (schedules().data) {
-          <p class="muted">{{ t('project.schedules.empty') }}</p>
+          <div class="none">
+            <baht-sticker
+              name="cron"
+              aria-hidden="true"
+              [playOnce]="true"
+              [enter]="0.1"
+              [replayOnHover]="true"
+            ></baht-sticker>
+            <p class="muted">{{ t('project.schedules.empty') }}</p>
+          </div>
         }
       }
     </baht-card>

@@ -1,6 +1,7 @@
 ---
 title: Reaching it from elsewhere
 description: A tunnel, allowed hosts, a public URL for OAuth, and the proxy's address header.
+sticker: tunnel
 ---
 
 kammacron binds `127.0.0.1`. Every browser signs in: `kammacron open` on the same machine, the API token anywhere else.

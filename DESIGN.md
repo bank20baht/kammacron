@@ -49,6 +49,26 @@ validator). A chosen item (a queue card, a board tile, a choice) is the primary,
 colour. The library theme toggle continues to manage `data-baht-theme` and system preference; a
 switch lands in one frame (the toggle holds transitions while it draws the new theme, 0.3.42).
 
+## Stickers
+
+`@20baht/stickers` (animated isometric slabs, coloured from the `--baht-*` tokens, so they follow
+both themes) add life where a page has none of its own, and nowhere else. The illustrated objects
+above stay the page headers' art; a sticker never sits beside one.
+
+| Where                       | Sticker                              | Why there                                           |
+| --------------------------- | ------------------------------------ | --------------------------------------------------- |
+| Sign-in                     | `key`                                | The first screen; nothing else on it                |
+| Welcome, the two step cards | `terminal`, `kanban`                 | Seen once; a small sticker in each card's corner    |
+| Not found                   | `street-sign`                        | In place of the generic error art                   |
+| A project with no cron job  | `cron`                               | The one moving thing on an empty list               |
+| Docs, each guide's title    | one a guide (frontmatter `sticker:`) | Reference pages and Playbooks (its graph) have none |
+
+Each pops in once a beat after the page shows, rests on its still frame, and replays on hover;
+under reduced motion it is the still frame from the start. They are decorative (`aria-hidden`):
+the words beside them say everything. No sticker that paints in the danger red (`hot`) goes beside
+a neutral message, since red means failed. Four or five in the app is the ceiling: a sticker on a
+page people open many times a day stops being delight and starts being noise.
+
 ## Type
 
 Noto Sans Thai (self-hosted variable font, `@fontsource-variable/noto-sans-thai`) for both Thai

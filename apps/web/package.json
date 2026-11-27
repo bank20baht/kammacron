@@ -16,6 +16,7 @@
     "@20baht/angular": "0.3.42",
     "@20baht/formats": "^0.1.1",
     "@20baht/live": "^0.1.2",
+    "@20baht/stickers": "0.1.1",
     "@20baht/ui": "0.3.42",
     "@angular/common": "^22.2.0",
     "@angular/compiler": "^22.2.0",

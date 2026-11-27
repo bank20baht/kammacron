@@ -1,6 +1,7 @@
 ---
 title: How a card is worked
 description: A project's round, the playbook per card, and what happens when a run does not finish.
+sticker: ai-agent
 ---
 
 Every project with its worker on is checked on its **interval** (30 minutes by default). It picks cards tagged `auto-pilot` (or `playbook:<name>`) that are in To do, not a person's, and wait on nothing open. A round with nothing to pick ends there, without calling Claude. Otherwise the worker takes up to **max cards per run** (3 by default), one at a time:

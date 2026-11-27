@@ -13,6 +13,8 @@ export default defineConfig({
         'A Kanban board and a cron-job GUI on your own machine. Schedule Claude or Codex with your own prompt, or any command, and only look when something needs you.',
       logo: { src: './src/assets/app-mark.webp', replacesTitle: false },
       favicon: '/favicon.ico?v=buffalo-1',
+      // a guide's title with its sticker beside it (frontmatter `sticker:`)
+      components: { PageTitle: './src/components/PageTitle.astro' },
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/bank20baht/kammacron' },
       ],

@@ -1,6 +1,7 @@
 ---
 title: Install
 description: What kammacron needs, and three ways to run it.
+sticker: terminal
 ---
 
 kammacron needs [Bun](https://bun.sh) 1.3 or later on the machine that runs it, and whatever your commands use. For Claude steps, also [Claude Code](https://claude.com/claude-code), signed in as the same user.

@@ -1,6 +1,7 @@
 ---
 title: Review
 description: Why a card waits for you, and the three things you can do with it.
+sticker: verified
 ---
 
 A card goes to **Review** when a person should decide:

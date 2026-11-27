@@ -1,12 +1,49 @@
 # Library gaps
 
 Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.42** (with
-`@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on 2026-11-27. No gap is open. The
-nineteen below are resolved, two of them in 0.3.42 (a theme switch that lands at once, a chart
+`@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on 2026-11-27. Two gaps are open,
+both found while cutting the load down: what `<baht-form>` registers, and one stylesheet for
+every element. The
+nineteen below them are resolved, two of them in 0.3.42 (a theme switch that lands at once, a chart
 series' own colour for every series), six in 0.3.41 (a workflow step's own label, a new definition
 that keeps the run, hidden fields, an alert's actions, an app's field type named and framed through
 `@20baht/ui`, segmented-nav items that keep their width), four in 0.3.38 (a `schedule` field type,
 `baht-cron`, the app shell's fold button, `clock` and `bot` icons).
+
+## Open: `<baht-form>` does not register the elements of two built-in field types
+
+Affected: `<baht-form>`, `<baht-workflow>`, `<baht-form-modal>` with a `schedule` or `cron` field;
+owner: `@20baht/ui`.
+
+**What happens.** An app that registers only the elements it uses (`@20baht/ui/components/<name>`,
+not the whole `@20baht/ui`) relies on the form to bring its fields' elements. `baht-form.js` and
+`field-base.js` import the elements of every built-in type but two: `schedule` (`baht-schedule`)
+and `cron` (`baht-cron`). A form with one of them draws an empty unknown `<baht-schedule>`: no
+error, no build failure. In kammacron the cron wizard's step 3 (When) would be blank.
+
+**Wanted.** The form imports `baht-schedule` and `baht-cron` like its other field elements, so a
+schema's built-in types always draw. (Or: the docs say which field elements an app registers
+itself.)
+
+**Workaround.** `apps/web/src/elements.ts` imports `@20baht/ui/components/schedule`;
+`src/elements.spec.ts` fails when a form uses a built-in type whose element neither the form nor
+`elements.ts` registers.
+
+## Open: one stylesheet holds every element's styles
+
+Affected: `@20baht/ui/tokens.css` (`css/tokens.css` + `css/components.css`); owner: `@20baht/ui`.
+
+**What happens.** The elements render in light DOM, so their styles come from a global sheet, and
+`css/components.css` (252 KB raw, about 28 KB with brotli) carries all 95, the ones an app never
+draws included (`baht-tree`, `baht-heatmap`, `baht-otp`, `baht-swipe-row`, `baht-edit-table`…).
+The JavaScript can be cut to the elements in use (`components/<name>`); the CSS cannot, and it is
+render-blocking: kammacron's first load is 362 KB of script and 208 KB of this sheet.
+
+**Wanted.** Per-element sheets (`css/components/<name>.css`, plus the shared base), or each
+element adopting its own rules when it is defined, so an app loads the styles of what it uses.
+
+**Workaround.** None in the app; the server sends the sheet compressed and cached for good (it is
+content-hashed), so it costs the 28 KB once.
 
 ## Resolved: a theme switch fades through both themes
 

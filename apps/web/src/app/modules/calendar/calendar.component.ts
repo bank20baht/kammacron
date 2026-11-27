@@ -10,14 +10,14 @@ import {
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
-import {
-  calendarRange,
-  type CalendarEvent,
-  type CalendarNavigateDetail,
-  type CalendarTone,
-  type CalendarView,
-  type ColumnMap,
+import type {
+  CalendarEvent,
+  CalendarNavigateDetail,
+  CalendarTone,
+  CalendarView,
+  ColumnMap,
 } from '@20baht/ui'
+import { calendarRange } from '@20baht/ui/components/calendar'
 
 import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { dateLocale, I18n, type Translate } from '../../core/i18n/i18n.service'

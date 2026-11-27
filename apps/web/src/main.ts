@@ -3,7 +3,7 @@ import { App } from './app/app'
 import { appConfig } from './app/app.config'
 
 // Registers the <baht-*> custom elements in their own chunk; they upgrade in place once it lands.
-void import('@20baht/ui')
+void import('./elements')
 
 // The service worker makes it installable (a Dock or taskbar app) and says how to start the
 // server when it is down; it caches nothing. Browsers give it only on localhost or https.

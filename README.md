@@ -34,9 +34,9 @@ through MCP and leaves what it did on it.
 | **Calendar**  | What runs on its own and when: each project's worker round, its cron jobs and the daily housekeeping ahead; the runs that happened behind. Day, week, month.                                                                                                                            |
 | **Stats**     | Week by week: runs done, sent to review, failed, and what they cost.                                                                                                                                                                                                                    |
 | **Cron jobs** | Per project, set in the GUI like an alarm clock (a time and the days of the week, every N minutes, every hour, or a custom cron): Claude or Codex with your own prompt, optionally with the board's `auto-pilot` cards; a shell command (when it fails it opens a card); or a playbook. |
-| **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar.                                                                                                              |
+| **MCP**       | The board as tools for Claude Code, Claude Desktop and claude.ai (`/mcp`; OAuth behind a public URL): list, create, move and comment on cards, read runs and the calendar. A tool's list of cards has titles, tags and status, 100 at a time; one card in full is asked for by number.  |
 | **Alerts**    | In the app, as desktop notifications, or to a webhook: a card needs review, a project paused, a round skipped.                                                                                                                                                                          |
-| **Settings**  | The worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), MCP, each project's directory, playbook and limits, and the language.                                                                                                                            |
+| **Settings**  | The worker (pause, concurrency, stale time, PATH), access (allowed hosts, public URL), MCP, each project's directory, playbook and limits, what is kept and for how long (run logs, runs, done and archived cards, alerts), and the language.                                           |
 | **Runs on**   | One process on your machine: a CLI, a background service, PGlite by default or Postgres, light and dark themes, English for now (other languages slot in).                                                                                                                              |
 
 Documentation: **[kammacron.pages.dev](https://kammacron.pages.dev)** (the Starlight site in `apps/docs`: `bun run --filter docs dev`, and `bun run --filter docs deploy` to publish it). The design and its reasons: [`docs/spec.md`](docs/spec.md) (Thai). What the `@20baht/*` libraries
@@ -44,7 +44,7 @@ lacked while building it: [`LIB_GAP.md`](LIB_GAP.md).
 
 ## Install
 
-Needs [Bun](https://bun.sh) 1.3+. Install whatever your commands use; for Claude steps, [Claude Code](https://claude.com/claude-code), signed in.
+Needs [Bun](https://bun.sh) 1.3+, on macOS or Linux. Install whatever your commands use; for Claude steps, [Claude Code](https://claude.com/claude-code), signed in. It idles at about 210 MB of memory; the first start, which creates the database, briefly takes about 1.1 GB.
 
 ```sh
 bunx kammacron start          # try it: http://127.0.0.1:7420
@@ -118,6 +118,7 @@ project's instructions' business. The board shows the directory's git branch, re
 | `token`                                 | the `claude mcp add` command                                    |
 | `install-service` / `uninstall-service` | background service with the shell's PATH                        |
 | `update`                                | the latest version (`install-service` again to restart onto it) |
+| `version`                               | the installed version                                           |
 
 ## Reaching it from elsewhere
 
@@ -132,12 +133,18 @@ registration; the consent page needs your session).
 `files/` (images), `logs/` (server and one `.jsonl` per run), `mcp/`, `runs/` (a run's card file and images, while it goes). Set
 `DATABASE_URL` to use Postgres instead of PGlite.
 
+Once a day it lets go of what Settings → Data says is past its time (by default: run logs after 30
+days, step output after 90, runs after a year; a done card is archived after 14 days and removed
+180 days later; read alerts after 30) and tidies the database. Projects, cron jobs and playbooks
+are removed only by you.
+
 ## Development
 
 ```sh
 bun install
 bun run dev        # server :7420 and ng serve :4200 (proxied to it)
-bun run check      # lint, format, typecheck, madge, deps, knip, dup, build, test (pre-push)
+bun run check      # lint, format, styles, typecheck, madge, deps, knip, dup, build, test (pre-push)
+bun run styles     # after a component imports a new <baht-*> element: rewrites apps/web/src/elements.css
 bun run pack       # dist/package: the npm package
 bun run compile    # dist/bin: the single-file binary
 ```
@@ -148,6 +155,9 @@ apps/web      Angular + @20baht/ui pages
 apps/docs     the documentation site (Astro + Starlight)
 packages/kit  the typed client the web app uses
 ```
+
+A page of the web app imports the `<baht-*>` elements its own template draws, so they arrive with
+the page (`apps/web/src/elements.ts` holds only the shell's); lint fails on one that is missing.
 
 The worker tests use a fake `claude` (`apps/server/test/fixtures/fake-claude.ts`) against real git
 repos with a local bare remote. `TEST_DATABASE_URL=postgres://…` runs the server suite on Postgres.

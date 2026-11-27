@@ -46,22 +46,26 @@ const serverPkg = JSON.parse(await readFile(join(server, 'package.json'), 'utf8'
 const rootPkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as {
   version?: string
 }
-const version = process.env['KAMMACRON_VERSION'] ?? rootPkg.version ?? '0.1.0'
+const version = process.env['KAMMACRON_VERSION'] ?? rootPkg.version ?? '0.0.1'
 const pkg = {
   name: 'kammacron',
   version,
   description:
-    'An easy scheduler with a board, on your own machine; runs any command, and Claude Code if you want it',
+    'A self-hosted Kanban board with cron jobs made in a GUI: they run Claude, Codex or any command, on your own machine',
   type: 'module',
   bin: { kammacron: 'cli.js' },
-  files: ['cli.js', 'drizzle', 'web', 'README.md'],
+  files: ['cli.js', 'drizzle', 'web', 'README.md', 'LICENSE'],
   engines: { bun: '>=1.3.0' },
   license: 'MIT',
   repository: { type: 'git', url: 'git+https://github.com/bank20baht/kammacron.git' },
+  homepage: 'https://kammacron.pages.dev',
+  bugs: { url: 'https://github.com/bank20baht/kammacron/issues' },
+  keywords: ['kanban', 'cron', 'scheduler', 'claude', 'codex', 'mcp', 'agents', 'self-hosted'],
   dependencies: serverPkg.dependencies,
 }
 await writeFile(join(out, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`)
 await cp(join(root, 'README.md'), join(out, 'README.md'))
+await cp(join(root, 'LICENSE'), join(out, 'LICENSE'))
 // the bin needs a shebang Bun reads
 const cli = await readFile(join(out, 'cli.js'), 'utf8')
 if (!cli.startsWith('#!'))

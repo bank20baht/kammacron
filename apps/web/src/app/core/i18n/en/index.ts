@@ -9,6 +9,7 @@ import { project } from './project'
 import { review } from './review'
 import { run } from './run'
 import { runs } from './runs'
+import { sessions } from './sessions'
 import { settings } from './settings'
 import { login, nav, notFound, statusBar, titles } from './shell'
 import { stats } from './stats'
@@ -39,6 +40,7 @@ export const en = {
   kanban,
   runs,
   run,
+  sessions,
   stats,
   calendar,
   settings,

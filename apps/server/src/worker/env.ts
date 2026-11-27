@@ -3,7 +3,12 @@ import type { Db } from '../db'
 import { getSettings } from '../services/settings'
 
 /** What Stop reaches of the step a run is in: `claude -p` or a shell command. */
-export type RunHandle = { stop: () => void; stoppedByUser: boolean }
+export type RunHandle = {
+  stop: () => void
+  stoppedByUser: boolean
+  /** The process of the step going now, so the machine's session list can name its run. */
+  pid?: number | undefined
+}
 
 /** Claude's trouble is Claude's alone: not signed in, or out of quota, holds its steps only. */
 type ClaudeState = {

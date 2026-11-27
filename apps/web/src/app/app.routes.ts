@@ -50,6 +50,12 @@ export const routes: Routes = [
         loadComponent: () => import('./modules/runs/run.component').then((m) => m.RunComponent),
       },
       {
+        path: 'sessions',
+        title: 'titles.sessions' satisfies MessageKey,
+        loadComponent: () =>
+          import('./modules/sessions/sessions.component').then((m) => m.SessionsComponent),
+      },
+      {
         path: 'calendar',
         title: 'titles.calendar' satisfies MessageKey,
         loadComponent: () =>

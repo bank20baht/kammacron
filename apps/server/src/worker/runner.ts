@@ -350,9 +350,9 @@ const track = <T>(ctx: Context, handle: { stop: () => void; result: Promise<T> }
 export const trackRun = async <T>(
   env: WorkerEnv,
   runId: number,
-  handle: { stop: () => void; result: Promise<T> },
+  handle: { stop: () => void; result: Promise<T>; pid?: number },
 ) => {
-  const entry: RunHandle = { stop: handle.stop, stoppedByUser: false }
+  const entry: RunHandle = { stop: handle.stop, stoppedByUser: false, pid: handle.pid }
   env.handles.set(runId, entry)
   const result = await handle.result.finally(() => env.handles.delete(runId))
   // a Claude run says how much of its usage windows is spent: kept for the limits bar

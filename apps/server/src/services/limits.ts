@@ -102,7 +102,7 @@ const findLimits = (v: unknown, depth = 0): unknown => {
 }
 
 /** The last bytes of a file: a session's newest lines are at its end. */
-const tail = async (path: string, bytes = 512 * 1024) => {
+export const tail = async (path: string, bytes = 512 * 1024) => {
   const file = await open(path, 'r')
   try {
     const { size } = await file.stat()
@@ -120,7 +120,7 @@ const newestFirst = async (dir: string) =>
   (await readdir(dir).catch(() => [] as string[])).sort().reverse()
 
 /** The session files of the newest days, newest written first. */
-const recentSessions = async (root: string) => {
+export const recentSessions = async (root: string) => {
   const files: { path: string; mtime: number }[] = []
   for (const year of (await newestFirst(root)).slice(0, 1))
     for (const month of (await newestFirst(join(root, year))).slice(0, 2))

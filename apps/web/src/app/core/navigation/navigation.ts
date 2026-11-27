@@ -12,6 +12,7 @@ const PAGES = [
   { key: 'review', icon: 'file-check', group: 'kanban' },
   { key: 'cron', icon: 'clock', group: 'cron' },
   { key: 'runs', icon: 'play', group: 'cron' },
+  { key: 'sessions', icon: 'activity', group: 'cron' },
   { key: 'calendar', icon: 'calendar', group: 'cron' },
   { key: 'stats', icon: 'chart', group: 'system' },
   { key: 'settings', icon: 'settings', group: 'system' },

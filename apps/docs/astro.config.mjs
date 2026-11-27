@@ -41,6 +41,7 @@ export default defineConfig({
             { slug: 'guides/worker', label: 'How a card is worked' },
             { slug: 'guides/playbook', label: 'Playbooks' },
             { slug: 'guides/review', label: 'Review' },
+            { slug: 'guides/sessions', label: 'Sessions on this machine' },
             { slug: 'guides/permissions', label: 'Permissions and safety' },
             { slug: 'guides/mcp', label: 'Agents and MCP' },
             { slug: 'guides/notifications', label: 'Alerts and notifications' },

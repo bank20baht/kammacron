@@ -10,6 +10,7 @@ import { sameSecret } from './secrets'
 import { adminRoutes } from './routes/admin'
 import { cardRoutes, CARD_RULES } from './routes/cards'
 import { fileApiRoutes, fileRoutes } from './routes/files'
+import { localSessionRoutes } from './routes/local-sessions'
 import { projectRoutes } from './routes/projects'
 import { runRoutes } from './routes/runs'
 import { scheduleRoutes } from './routes/schedules'
@@ -109,6 +110,7 @@ export const buildApp = (ctx: AppContext) => {
         .use(workerRoutes(ctx))
         .use(statusRoutes(ctx))
         .use(scheduleRoutes(ctx))
+        .use(localSessionRoutes(ctx))
         .use(adminRoutes(ctx))
         .use(systemRoutes(ctx)),
     )

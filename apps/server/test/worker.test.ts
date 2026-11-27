@@ -1,11 +1,19 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { eq } from 'drizzle-orm'
 
-import { cards, projects, schedules, settings, type PlaybookStep } from '../src/db/schema'
+import {
+  attachments,
+  cards,
+  projects,
+  runs,
+  schedules,
+  settings,
+  type PlaybookStep,
+} from '../src/db/schema'
 import { listAlerts } from '../src/services/alerts'
 import { getCard, type Card } from '../src/services/cards'
 import { getProject } from '../src/services/projects'
@@ -492,6 +500,104 @@ describe('the scheduler', () => {
     )
     const skips = (await listAlerts(t.ctx.db)).filter((a) => a.message.includes('round skipped'))
     expect(skips).toHaveLength(1)
+  })
+})
+
+describe('when kammacron itself breaks', () => {
+  test('a run that cannot be set up ends as failed saying why; the card goes back, counted', async () => {
+    const card = await newCard()
+    // a file the card lists whose bytes are gone
+    await t.ctx.db.insert(attachments).values({
+      card_id: card.id,
+      sha256: 'f'.repeat(64),
+      mime: 'image/png',
+      size: 1,
+      filename: 'gone.png',
+      uploaded_by: 'user',
+    })
+    const outcome = await run('push', card.id)
+    expect(outcome.run?.status).toBe('failed')
+    expect(outcome.run?.error_kind).toBe('crash')
+    expect(outcome.run?.error).toContain('the run broke')
+    const after = await getCard(t.ctx.db, card.id)
+    expect(after.status).toBe('todo')
+    expect(after.stale_count).toBe(1)
+    expect(t.ctx.worker.runTokens.size).toBe(0)
+  })
+
+  test('a round that throws waits for its next time, and alerts once while it stays so', async () => {
+    // the run logs cannot be made: `logs` is a file
+    await writeFile(join(t.dataDir, 'logs'), 'in the way')
+    await newCard()
+    const scheduler = createScheduler(t.ctx.worker)
+    for (let i = 0; i < 3; i++) {
+      scheduler.runNow(projectId)
+      await scheduler.idle()
+    }
+    const project = await getProject(t.ctx.db, projectId)
+    expect(project.last_check_result).toStartWith('failed: ')
+    expect(must(project.next_run_at).getTime()).toBeGreaterThan(Date.now())
+    const failures = (await listAlerts(t.ctx.db)).filter((a) => a.message.includes('round failed'))
+    expect(failures).toHaveLength(1)
+    // a tick does not start it again before its time
+    await scheduler.tick()
+    await scheduler.idle()
+    expect(
+      (await listAlerts(t.ctx.db)).filter((a) => a.message.includes('round failed')),
+    ).toHaveLength(1)
+  })
+
+  test('on boot, a run the last process left running goes stale and its card back to todo', async () => {
+    const card = await newCard()
+    const [left] = await t.ctx.db
+      .insert(runs)
+      .values({ project_id: projectId, card_id: card.id, status: 'running' })
+      .returning()
+    await t.ctx.db
+      .update(cards)
+      .set({ status: 'doing', claimed_by_run: must(left).id })
+      .where(eq(cards.id, card.id))
+    await t.ctx.db.update(settings).set({ paused: true }).where(eq(settings.id, 1))
+    const scheduler = createScheduler(t.ctx.worker)
+    await scheduler.start()
+    await scheduler.stop()
+    const [gone] = await t.ctx.db
+      .select()
+      .from(runs)
+      .where(eq(runs.id, must(left).id))
+    expect(gone?.status).toBe('stale')
+    expect(gone?.error_kind).toBe('crash')
+    expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
+  })
+
+  test('a round sweeps a card stuck in doing: back to todo, and to review the second time', async () => {
+    await mkdir(join(t.dataDir, 'logs'), { recursive: true })
+    // no auto-pilot tag: the round sweeps it and does not then run it
+    const card = await newCard('stuck', [])
+    const stick = async () => {
+      const [left] = await t.ctx.db
+        .insert(runs)
+        .values({ project_id: projectId, card_id: card.id, status: 'running' })
+        .returning()
+      await t.ctx.db
+        .update(cards)
+        .set({ status: 'doing', claimed_by_run: must(left).id })
+        .where(eq(cards.id, card.id))
+      return must(left).id
+    }
+    const scheduler = createScheduler(t.ctx.worker)
+    const first = await stick()
+    scheduler.runNow(projectId)
+    await scheduler.idle()
+    expect((await getCard(t.ctx.db, card.id)).status).toBe('todo')
+    const [swept] = await t.ctx.db.select().from(runs).where(eq(runs.id, first))
+    expect(swept?.status).toBe('stale')
+    await stick()
+    scheduler.runNow(projectId)
+    await scheduler.idle()
+    const after = await getCard(t.ctx.db, card.id)
+    expect(after.status).toBe('review')
+    expect(after.review_reason).toContain('stuck in doing twice')
   })
 })
 

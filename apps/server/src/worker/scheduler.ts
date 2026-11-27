@@ -284,6 +284,36 @@ export const createScheduler = (env: WorkerEnv) => {
     return created?.id ?? null
   }
 
+  /**
+   * A round that threw. A whole round did not get to set its next time: it is set here, or every
+   * tick would run it again; and while it keeps failing the same way, the person is told once.
+   */
+  const roundFailed = async (projectId: number, full: boolean, error: unknown) => {
+    const message = (error instanceof Error ? error.message : String(error)).slice(0, 500)
+    const result = `failed: ${message}`
+    const [project] = await env.db.select().from(projects).where(eq(projects.id, projectId))
+    if (!full || project?.last_check_result !== result)
+      await addAlert(env.db, {
+        level: 'error',
+        project_id: project ? projectId : null,
+        message: `round failed: ${message}`,
+      })
+    if (full && project)
+      await env.db
+        .update(projects)
+        .set({
+          last_checked_at: new Date(),
+          last_check_result: result,
+          next_run_at: nextRunAt(project),
+        })
+        .where(eq(projects.id, projectId))
+  }
+
+  /** The loop's own trouble (the database away): said on stderr, and the next tick tries again. */
+  const loopError = (what: string) => (error: unknown) => {
+    console.error(`kammacron: ${what} failed:`, error)
+  }
+
   const pump = () => {
     void (async () => {
       const settings = await getSettings(env.db)
@@ -294,21 +324,14 @@ export const createScheduler = (env: WorkerEnv) => {
         if (projectId === undefined) return
         const full = fullRound.delete(projectId)
         const job = (full ? round(projectId) : scheduleRound(projectId))
-          .catch(async (error: unknown) => {
-            const message = error instanceof Error ? error.message : String(error)
-            await addAlert(env.db, {
-              level: 'error',
-              project_id: projectId,
-              message: `round failed: ${message.slice(0, 500)}`,
-            }).catch(() => undefined)
-          })
+          .catch((error: unknown) => roundFailed(projectId, full, error).catch(() => undefined))
           .finally(() => {
             active.delete(projectId)
             pump()
           })
         active.set(projectId, job)
       }
-    })()
+    })().catch(loopError('starting a round'))
   }
 
   /** Projects queued for a whole round; the others in the queue run only their due schedules. */
@@ -378,12 +401,12 @@ export const createScheduler = (env: WorkerEnv) => {
         if (card?.status === 'doing' && card.claimed_by_run === gone.id)
           await moveCard(env.db, card.id, { status: 'todo' })
       }
-      timer = setInterval(() => void tick(), TICK_MS)
+      timer = setInterval(() => void tick().catch(loopError('the tick')), TICK_MS)
       housekeepingTimer = setInterval(
         () => void housekeeping().catch(() => undefined),
         HOUSEKEEPING_MINUTES * 60_000,
       )
-      void tick()
+      void tick().catch(loopError('the tick'))
       void housekeeping().catch(() => undefined)
     },
     stop: async () => {

@@ -24,6 +24,7 @@ import {
   previousRuns,
   skipSteps,
   startStep,
+  stopRunningSteps,
   updateRun,
   type Run,
 } from '../services/runs'
@@ -183,12 +184,14 @@ export const secretsOf = (env: WorkerEnv, runId: number) =>
 
 type Attachment = { filename: string; path: string }
 
+const runDirOf = (env: WorkerEnv, runId: number) => join(env.dataDir, 'runs', String(runId))
+
 /**
  * The run's own folder, outside the project: the card as markdown (for run steps) and its
  * attached files (for Claude). Gone when the run ends; the project directory is never written to.
  */
 const prepareRunDir = async (env: WorkerEnv, runId: number, cardId: number) => {
-  const dir = join(env.dataDir, 'runs', String(runId))
+  const dir = runDirOf(env, runId)
   await mkdir(dir, { recursive: true, mode: 0o700 })
   const full = await getCard(env.db, cardId)
   const rows = await cardAttachments(env.db, cardId)
@@ -597,10 +600,10 @@ export const runCard = async (
   const { run, card } = claimed
   const chosen = playbookOf(project, card)
   if (!chosen) return { run: await noPlaybook(env, project, card, run) }
-  const runDir = await prepareRunDir(env, run.id, card.id)
   const token = newToken()
   env.runTokens.set(token, { runId: run.id, cardId: card.id })
   try {
+    const runDir = await prepareRunDir(env, run.id, card.id)
     return await play({
       env,
       project,
@@ -614,11 +617,29 @@ export const runCard = async (
       staleMinutes: (await getSettings(env.db)).stale_minutes,
       seq: { value: 0 },
     })
+  } catch (error) {
+    return { run: await broke(env, run, card, error) }
   } finally {
     env.runTokens.delete(token)
     await rm(mcpConfigPath(env, project), { force: true })
-    await rm(runDir.dir, { recursive: true, force: true })
+    await rm(runDirOf(env, run.id), { recursive: true, force: true })
   }
+}
+
+/**
+ * kammacron's own failure under a run (an attached file gone, a full disk): the run ends as
+ * failed saying why, and the card goes back counted, instead of both waiting for the stale sweep.
+ */
+const broke = async (env: WorkerEnv, run: Run, card: Card, error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  await stopRunningSteps(env.db, [run.id])
+  await returnCard(env, card.id, true, 'its run broke')
+  return updateRun(env.db, run.id, {
+    status: 'failed',
+    ended_at: new Date(),
+    error: `the run broke: ${message}`.slice(0, 2000),
+    error_kind: 'crash',
+  })
 }
 
 /** Whether the card's playbook has a Claude step. */

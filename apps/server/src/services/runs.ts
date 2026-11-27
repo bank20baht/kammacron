@@ -204,7 +204,7 @@ export const markInterruptedRuns = async (db: Executor) => {
 }
 
 /** Every running step of these runs ends as stopped (the server went away under them). */
-const stopRunningSteps = (db: Executor, runIds: readonly number[]) =>
+export const stopRunningSteps = (db: Executor, runIds: readonly number[]) =>
   runIds.length === 0
     ? Promise.resolve()
     : db

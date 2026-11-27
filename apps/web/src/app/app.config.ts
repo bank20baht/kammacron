@@ -1,6 +1,6 @@
 import type { ApplicationConfig } from '@angular/core'
 import { provideBrowserGlobalErrorListeners } from '@angular/core'
-import { provideHttpClient } from '@angular/common/http'
+import { provideHttpClient, withInterceptors } from '@angular/common/http'
 import {
   provideRouter,
   TitleStrategy,
@@ -9,6 +9,7 @@ import {
 } from '@angular/router'
 
 import { I18nTitle } from './core/i18n/i18n-title'
+import { sessionInterceptor } from './core/session.interceptor'
 import { routes } from './app.routes'
 
 /** The router (its tab titles in the locale's words) and the `HttpClient` the kit's typed API client (`Api`) sends through. */
@@ -21,7 +22,7 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       withRouterConfig({ canceledNavigationResolution: 'computed' }),
     ),
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([sessionInterceptor])),
     { provide: TitleStrategy, useClass: I18nTitle },
   ],
 }

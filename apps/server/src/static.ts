@@ -3,6 +3,11 @@ import { join, normalize, resolve, sep } from 'node:path'
 import { Elysia } from 'elysia'
 
 const RESERVED = /^\/(api|mcp|live|files|openapi)(\/|$)/
+/**
+ * A file the build named by its content (`main-L7F2M64O.js`, `chunk-B-9Iq97L.js`, a font's
+ * `-USE2SQXJ.woff2`): a new build writes a new name, so the browser may keep this one for good.
+ */
+const HASHED = /-[\w-]{8}\.(js|css|woff2?)$/
 
 /**
  * The built Angular app, from `webDir`: a file when one matches, `index.html` for any other path
@@ -25,7 +30,7 @@ export const staticRoutes = (webDir: string | null) => {
         if (await file.exists())
           return new Response(file, {
             headers: {
-              'cache-control': /\.[0-9a-z]{8,}\.(js|css|woff2?)$/i.test(target)
+              'cache-control': HASHED.test(target)
                 ? 'public, max-age=31536000, immutable'
                 : 'no-cache',
             },

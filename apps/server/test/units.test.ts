@@ -214,6 +214,23 @@ describe('static', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  test('files the build named by content are kept for good; the rest are asked again', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kc-web-'))
+    try {
+      const names = ['main-L7F2M64O.js', 'chunk-B-9Iq97L.js', 'font-USE2SQXJ.woff2', 'sw.js']
+      for (const name of [...names, 'index.html']) await Bun.write(join(dir, name), 'x')
+      const app = staticRoutes(dir)
+      const cache = async (path: string) =>
+        (await app.handle(new Request(`http://x/${path}`))).headers.get('cache-control')
+      for (const name of names.slice(0, 3))
+        expect(await cache(name)).toBe('public, max-age=31536000, immutable')
+      expect(await cache('sw.js')).toBe('no-cache')
+      expect(await cache('board')).toBe('no-cache')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('the CLI banner', () => {

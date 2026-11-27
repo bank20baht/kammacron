@@ -252,14 +252,46 @@ const ROWS: Record<EventKind, Row> = {
 
 const isKind = (type: string): type is EventKind => type in ROWS
 
+/**
+ * Rows built before, by the event they came from. A live run's events keep their identity from
+ * one answer to the next, so a new event costs one row, not the whole timeline again; a row is
+ * built anew only when its call's result arrives (its time and tool change).
+ */
+const built = new WeakMap<RunEventRow, TimelineEvent>()
+
 /** The events, newest last, ready to draw. */
 export const timelineEvents = (events: readonly RunEventRow[]): TimelineEvent[] => {
   const pairs = pairCalls(events)
   return events.map((e) => {
+    const ms = pairs.msOf.get(e.seq) ?? null
+    const kept = built.get(e)
+    if (
+      kept?.ms === ms &&
+      (e.type !== 'tool_result' || kept.tool === (pairs.toolOfResult.get(e.seq) ?? null))
+    )
+      return kept
     const kind = isKind(e.type) ? e.type : 'system'
-    const base = { seq: e.seq, kind, at: at(e), ms: pairs.msOf.get(e.seq) ?? null, diff: null }
-    return ROWS[kind](e, dataOf(e), base, pairs)
+    const row = ROWS[kind](e, dataOf(e), { seq: e.seq, kind, at: at(e), ms, diff: null }, pairs)
+    built.set(e, row)
+    return row
   })
+}
+
+/**
+ * Two lists of a run's events as one, oldest first, each seq once: an event already held keeps
+ * its object (and so its built row). The same list back when `more` adds nothing.
+ */
+export const mergeEvents = (
+  held: readonly RunEventRow[],
+  more: readonly RunEventRow[],
+): readonly RunEventRow[] => {
+  const bySeq = new Map(held.map((e) => [e.seq, e]))
+  const added = more.filter((e) => !bySeq.has(e.seq))
+  if (!added.length) return held
+  const last = held.at(-1)?.seq ?? 0
+  // the usual case, a live run's newest events: they go on the end
+  if (added.every((e) => e.seq > last)) return [...held, ...added]
+  return [...held, ...added].sort((a, b) => a.seq - b.seq)
 }
 
 /** Whether an event belongs to a filter's group. */

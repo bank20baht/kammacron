@@ -26,6 +26,7 @@ export const run = {
     fold: 'Show less',
     follow: 'Auto scroll',
     empty: 'No events here yet.',
+    earlier: 'Show earlier',
   },
   noSummary: 'No summary yet.',
   noSteps: 'No steps yet.',

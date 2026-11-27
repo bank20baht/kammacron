@@ -1,4 +1,4 @@
-import { inFilter, timelineEvents, took, type RunEventRow } from './run-events'
+import { inFilter, mergeEvents, timelineEvents, took, type RunEventRow } from './run-events'
 
 const at = (s: number) => new Date(Date.UTC(2026, 10, 27, 2, 40, s)).toISOString()
 let seq = 0
@@ -85,6 +85,29 @@ describe('run events', () => {
     expect(row?.tool).toBe('Write')
     expect(row?.full).toBe('/a.txt')
     expect(row?.ms).toBeNull()
+  })
+
+  it('builds a row once: a new event leaves the rows before it as they were', () => {
+    const call = ev('tool_use', 'Bash ls', { id: 'c', name: 'Bash', input: { command: 'ls' } }, 1)
+    const said = ev('assistant', 'looking', { text: 'looking' }, 2)
+    const first = timelineEvents([said, call])
+    const result = ev('tool_result', 'a b', { tool_use_id: 'c', content: 'a b' }, 4)
+    const next = timelineEvents([said, call, result])
+    expect(next[0]).toBe(first[0])
+    // the call's result arrived: its row is built again, with how long it took
+    expect(next[1]).not.toBe(first[1])
+    expect(next[1]?.ms).toBe(3000)
+    expect(timelineEvents([said, call, result])[1]).toBe(next[1])
+  })
+
+  it('merges pages of events by seq, keeping the events it holds', () => {
+    const [a, b, c, d] = [1, 2, 3, 4].map((n) => ({ ...ev('assistant', 'x', null, n), seq: n }))
+    const held = [b, c].map((e) => e as RunEventRow)
+    expect(mergeEvents(held, [c as RunEventRow])).toBe(held)
+    const newer = mergeEvents(held, [{ ...(c as RunEventRow) }, d as RunEventRow])
+    expect(newer.map((e) => e.seq)).toEqual([2, 3, 4])
+    expect(newer[1]).toBe(c)
+    expect(mergeEvents(newer, [a as RunEventRow]).map((e) => e.seq)).toEqual([1, 2, 3, 4])
   })
 
   it('says how long in ms, seconds or minutes', () => {

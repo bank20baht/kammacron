@@ -254,6 +254,35 @@ describe('runs search', () => {
   })
 })
 
+describe('a run and its events', () => {
+  test('the newest page, earlier pages by `before`, and how many there are', async () => {
+    const [card] = await create([{ project_id: projectId, title: 'long run' }])
+    const { addRunEvent, createRun } = await import('../src/services/runs')
+    const run = await createRun(t.ctx.db, {
+      project_id: projectId,
+      card_id: must(card).id,
+      log_path: null,
+    })
+    for (let seq = 1; seq <= 450; seq++)
+      await addRunEvent(t.ctx.db, run.id, seq, {
+        type: 'assistant',
+        summary: `line ${String(seq)}`,
+        data: null,
+      })
+    type Page = { events: { seq: number }[]; events_total: number }
+    const seqs = (p: Page) => p.events.map((e) => e.seq)
+    const newest = await t.json<Page>('GET', `/api/runs/${String(run.id)}`)
+    expect(newest.events_total).toBe(450)
+    expect(seqs(newest)).toEqual(Array.from({ length: 200 }, (_, i) => 251 + i))
+    const earlier = await t.json<Page>('GET', `/api/runs/${String(run.id)}?before=251`)
+    expect(seqs(earlier)).toEqual(Array.from({ length: 200 }, (_, i) => 51 + i))
+    const first = await t.json<Page>('GET', `/api/runs/${String(run.id)}?before=51`)
+    expect(seqs(first)).toEqual(Array.from({ length: 50 }, (_, i) => 1 + i))
+    const after = await t.json<Page>('GET', `/api/runs/${String(run.id)}?after=440`)
+    expect(seqs(after)).toEqual(Array.from({ length: 10 }, (_, i) => 441 + i))
+  })
+})
+
 describe('calendar', () => {
   test('the cron jobs with why each is off, and the runs in the range', async () => {
     await t.json('PATCH', `/api/projects/${String(projectId)}`, {

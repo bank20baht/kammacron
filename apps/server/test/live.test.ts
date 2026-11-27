@@ -62,6 +62,27 @@ describe('live', () => {
     expect(JSON.stringify(frames.at(-1))).toContain('appears live')
   })
 
+  test("a run's new event arrives as a patch of that event, not the whole run", async () => {
+    const project = await t.json<{ id: number }>('POST', '/api/projects', { slug: 'p', name: 'P' })
+    const { addRunEvent, createRun } = await import('../src/services/runs')
+    const run = await createRun(t.ctx.db, { project_id: project.id, card_id: null, log_path: null })
+    for (let seq = 1; seq <= 30; seq++)
+      await addRunEvent(t.ctx.db, run.id, seq, { type: 'assistant', summary: 'old', data: null })
+    const stream = await t.call('POST', '/live', {
+      subscriptions: [{ id: 'run', method: 'GET', path: `/api/runs/${String(run.id)}` }],
+    })
+    const framesP = readFrames(stream, (frames) => frames.some((f) => f.type === 'patch'))
+    await Bun.sleep(300)
+    await addRunEvent(t.ctx.db, run.id, 31, { type: 'assistant', summary: 'new line', data: null })
+    const frames = await framesP
+    expect(frames[0]?.type).toBe('snapshot')
+    const patch = frames.find((f) => f.type === 'patch')
+    const text = JSON.stringify(patch)
+    expect(text).toContain('new line')
+    expect(text).not.toContain('"old"')
+    expect(text).toContain('"events_total":31')
+  })
+
   test('a stream without the token is refused', async () => {
     const response = await t.app.handle(
       new Request('http://localhost/live', {

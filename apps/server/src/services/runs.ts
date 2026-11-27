@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm'
 
 import { firstRow, type Executor } from '../db'
 import {
@@ -60,16 +60,40 @@ const getRun = async (db: Executor, id: number) => {
   return row
 }
 
-/** A run with its steps and events (after `after`, for a page that already holds the earlier ones). */
-export const getRunWithEvents = async (db: Executor, id: number, after = 0, limit = 500) => {
+/** How many events one answer holds: the page shows the newest, and asks for earlier ones by page. */
+const RUN_EVENTS_PAGE = 200
+
+/**
+ * A run with its steps and a page of its events, oldest first, and how many it has in all:
+ * the newest page by default, the page `before` a seq (the one the page holds is its oldest),
+ * or the events `after` a seq (for a reader that already has the earlier ones).
+ */
+export const getRunWithEvents = async (
+  db: Executor,
+  id: number,
+  page: { after?: number | undefined; before?: number | undefined } = {},
+  limit = RUN_EVENTS_PAGE,
+) => {
   const run = await getRun(db, id)
-  const events = await db
-    .select()
-    .from(runEvents)
-    .where(and(eq(runEvents.run_id, id), gt(runEvents.seq, after)))
-    .orderBy(asc(runEvents.seq))
-    .limit(limit)
-  return { ...run, steps: await runStepsOf(db, id), events }
+  const ofRun = eq(runEvents.run_id, id)
+  const events =
+    page.after === undefined
+      ? (
+          await db
+            .select()
+            .from(runEvents)
+            .where(page.before === undefined ? ofRun : and(ofRun, lt(runEvents.seq, page.before)))
+            .orderBy(desc(runEvents.seq))
+            .limit(limit)
+        ).reverse()
+      : await db
+          .select()
+          .from(runEvents)
+          .where(and(ofRun, gt(runEvents.seq, page.after)))
+          .orderBy(asc(runEvents.seq))
+          .limit(limit)
+  const [total] = await db.select({ n: count() }).from(runEvents).where(ofRun)
+  return { ...run, steps: await runStepsOf(db, id), events, events_total: total?.n ?? 0 }
 }
 
 const runStepsOf = (db: Executor, runId: number) =>

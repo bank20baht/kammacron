@@ -6,6 +6,7 @@ import {
   computed,
   inject,
   input,
+  output,
   signal,
 } from '@angular/core'
 import { BAHT_UI } from '@20baht/angular'
@@ -22,6 +23,8 @@ import {
 } from './run-events'
 
 const FILTERS: readonly EventFilter[] = ['all', 'tools', 'messages', 'errors']
+/** Rows drawn at first, and added by each "Show earlier": a long run stays a short page. */
+const PAGE = 200
 
 /** "02:40:08": the local time of day. */
 const clock = (d: Date) =>
@@ -31,7 +34,8 @@ const clock = (d: Date) =>
  * A run's events as a timeline: the time, an icon on a rail, and a card a row: what happened
  * (a tool call shows its command, an edit its lines added and removed, a result whether it
  * worked or the allowlist refused it) and how long the call took. A row opens to show all of it.
- * While the run goes on, the list follows the newest event unless Auto scroll is off.
+ * While the run goes on, the list follows the newest event unless Auto scroll is off. It draws
+ * the newest 200 rows; "Show earlier" draws more, and asks for earlier events the page lacks.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -234,6 +238,9 @@ const clock = (d: Date) =>
     .empty {
       color: var(--baht-color-text-muted);
     }
+    .earlier {
+      align-self: center;
+    }
     @media (max-width: 40rem) {
       li {
         grid-template-columns: var(--rail) minmax(0, 1fr);
@@ -275,12 +282,18 @@ const clock = (d: Date) =>
       }
     </div>
 
+    @if (hidden() > 0 || earlier()) {
+      <baht-button class="earlier" size="sm" variant="secondary" (click)="showEarlier()">{{
+        t('run.timeline.earlier')
+      }}</baht-button>
+    }
     <ol>
-      @for (e of shown(); track e.seq) {
+      @for (e of drawn(); track e.seq) {
+        @let open = isOpen(e);
         <li [attr.data-kind]="e.kind" [attr.data-status]="e.status" [attr.data-seq]="e.seq">
           <time class="time" [attr.datetime]="e.at.toISOString()">{{ clock(e.at) }}</time>
           <span class="dot"><baht-icon [name]="e.icon"></baht-icon></span>
-          <div class="card" [class.open]="isOpen(e)" [class.folded]="!isOpen(e)">
+          <div class="card" [class.open]="open" [class.folded]="!open">
             <div class="head">
               <span class="title">
                 <span class="kind">{{ e.kind }}</span>
@@ -310,12 +323,12 @@ const clock = (d: Date) =>
                 variant="ghost"
                 icon="chevron-down"
                 icon-only
-                [label]="isOpen(e) ? t('run.timeline.fold') : t('run.timeline.open')"
-                [attr.aria-expanded]="isOpen(e)"
+                [label]="open ? t('run.timeline.fold') : t('run.timeline.open')"
+                [attr.aria-expanded]="open"
                 (click)="toggle(e.seq)"
               ></baht-button>
             </div>
-            @if (isOpen(e) ? e.full : e.preview; as text) {
+            @if (open ? e.full : e.preview; as text) {
               <div class="body">
                 @if (e.look === 'text') {
                   <p>{{ text }}</p>
@@ -338,6 +351,10 @@ export class RunTimelineComponent {
   readonly events = input.required<readonly RunEventRow[]>()
   /** The run goes on: new events come, and the list can follow them. */
   readonly running = input(false)
+  /** The run has events earlier than `events`, which the page can ask for. */
+  readonly earlier = input(false)
+  /** Asked for the page of events before the ones held. */
+  readonly loadEarlier = output()
 
   protected readonly clock = clock
   protected readonly took = took
@@ -352,6 +369,10 @@ export class RunTimelineComponent {
     const filter = this.filter()
     return this.rows().filter((e) => inFilter(e, filter))
   })
+  /** How many of the newest rows are drawn. */
+  private readonly limit = signal(PAGE)
+  protected readonly drawn = computed(() => this.shown().slice(-this.limit()))
+  protected readonly hidden = computed(() => this.shown().length - this.drawn().length)
   protected readonly filterOptions = computed<FieldOption[]>(() =>
     FILTERS.map((key) => ({ key, label: this.t(`run.timeline.filters.${key}`) })),
   )
@@ -362,7 +383,7 @@ export class RunTimelineComponent {
   constructor() {
     // follow the newest event while the run goes on
     afterRenderEffect(() => {
-      const last = this.shown().at(-1)
+      const last = this.drawn().at(-1)
       if (!last || !this.running() || !this.follow()) return
       this.host.nativeElement
         .querySelector(`li[data-seq="${String(last.seq)}"]`)
@@ -384,6 +405,12 @@ export class RunTimelineComponent {
       if (!next.delete(seq)) next.add(seq)
       return next
     })
+  }
+
+  /** Draw a page more; ask for earlier events when the rows held run out. */
+  protected showEarlier(): void {
+    if (this.hidden() < PAGE && this.earlier()) this.loadEarlier.emit()
+    this.limit.update((n) => n + PAGE)
   }
 
   protected toggleAll(): void {

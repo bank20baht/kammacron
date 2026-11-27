@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+} from '@angular/core'
 import { Router, RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
@@ -12,6 +20,7 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { cost, duration, stamp } from '../../shared/format'
 import { RUN_TONE, STEP_TONE } from '../../shared/tones'
+import { mergeEvents, type RunEventRow } from './run-events'
 import { RunTimelineComponent } from './run-timeline.component'
 import { runStatusLabel } from './runs.component'
 
@@ -181,8 +190,10 @@ type StepStatus = 'running' | 'succeeded' | 'failed' | 'stopped' | 'skipped'
         <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="picked.set($any($event).value)">
           <div data-tab="events">
             <web-run-timeline
-              [events]="r.events"
+              [events]="events()"
               [running]="r.status === 'running'"
+              [earlier]="r.events_total > events().length"
+              (loadEarlier)="loadEarlier()"
             ></web-run-timeline>
           </div>
           <div data-tab="steps">
@@ -267,6 +278,18 @@ export class RunComponent {
   protected readonly run = liveSignal(() =>
     this.live.subscribe('GET', '/api/runs/:id', { params: { id: this.id() }, query: {} }),
   )
+  /**
+   * The run's events the page holds: the live answer's newest page, the ones that page has
+   * moved past while the run went on, and earlier pages asked for. A new run starts empty.
+   */
+  protected readonly events = linkedSignal<
+    { id: string; live: readonly RunEventRow[] },
+    readonly RunEventRow[]
+  >({
+    source: () => ({ id: this.id(), live: this.run().data?.events ?? [] }),
+    computation: (now, before) =>
+      mergeEvents(before?.source.id === now.id ? before.value : [], now.live),
+  })
   protected readonly t = inject(I18n).t
   protected agentName(agent: string): string {
     return agent === 'codex' ? this.t('run.agent.codex') : this.t('run.agent.claude')
@@ -280,7 +303,7 @@ export class RunComponent {
   /** The tab picked by hand; until then the timeline when the run has events, else its steps. */
   protected readonly picked = signal<string | null>(null)
   protected readonly tab = computed(
-    () => this.picked() ?? ((this.run().data?.events.length ?? 0) > 0 ? 'events' : 'steps'),
+    () => this.picked() ?? ((this.run().data?.events_total ?? 0) > 0 ? 'events' : 'steps'),
   )
   protected readonly duration = duration
   protected readonly stepTone = STEP_TONE
@@ -305,7 +328,7 @@ export class RunComponent {
   protected readonly tabs = computed<TabItem[]>(() => {
     const r = this.run().data
     return [
-      { key: 'events', label: this.t('run.tab.events'), badge: String(r?.events.length ?? 0) },
+      { key: 'events', label: this.t('run.tab.events'), badge: String(r?.events_total ?? 0) },
       { key: 'steps', label: this.t('run.tab.steps'), badge: String(r?.steps.length ?? 0) },
       { key: 'summary', label: this.t('run.tab.summary') },
     ]
@@ -324,6 +347,24 @@ export class RunComponent {
 
   protected go(url: string | undefined): void {
     if (url) void this.router.navigateByUrl(url)
+  }
+
+  /** The page of events before the oldest held; asked once at a time. */
+  private loading = false
+  protected async loadEarlier(): Promise<void> {
+    const oldest = this.events()[0]?.seq
+    if (this.loading || oldest === undefined) return
+    this.loading = true
+    const id = this.id()
+    try {
+      const page = await firstValueFrom(this.api.runs({ id }).get({ query: { before: oldest } }))
+      // a page for a run the person has left is dropped
+      if (this.id() === id) this.events.update((held) => mergeEvents(page.events, held))
+    } catch (error) {
+      this.error.set(describeError(error))
+    } finally {
+      this.loading = false
+    }
   }
 
   protected async stop(): Promise<void> {

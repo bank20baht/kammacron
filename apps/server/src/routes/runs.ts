@@ -183,22 +183,30 @@ export const runRoutes = (ctx: AppContext) =>
     )
     .get(
       '/runs/:id',
-      ({ params, query }) => getRunWithEvents(ctx.db, Number(params.id), query.after ?? 0),
+      ({ params, query }) =>
+        getRunWithEvents(ctx.db, Number(params.id), { after: query.after, before: query.before }),
       {
         params: idParams('Run id'),
         query: t.Object({
-          after: t.Optional(t.Numeric({ description: 'Only events after this seq' })),
+          after: t.Optional(t.Numeric({ description: 'Only events after this seq, oldest first' })),
+          before: t.Optional(
+            t.Numeric({ description: 'The page of events just before this seq (earlier ones)' }),
+          ),
         }),
+        // keyed by seq: while a run streams, a viewer gets the new events, not the whole run again
         live: liveRoute(ctx.live, {
           topics: ({ params }) => [
             `runs:${params['id'] ?? ''}`,
             `run_events@run_id=${params['id'] ?? ''}`,
             `run_steps@run_id=${params['id'] ?? ''}`,
           ],
+          key: 'seq',
+          rows: 'events',
         }),
         detail: {
           operationId: 'get_run',
-          summary: "A run's summary, error, permission denials and events: why a run failed",
+          summary:
+            "A run's summary, error, permission denials and its newest 200 events (`before` for earlier ones, `events_total` for how many): why a run failed",
           mcp: true,
         },
       },

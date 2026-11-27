@@ -53,7 +53,7 @@ import { ProjectWizardComponent } from '../settings/project-wizard.component'
         <img
           data-slot="art"
           class="app-logo"
-          src="/brand/app-icon.webp?v=transparent-2"
+          src="/brand/app-icon.webp?v=glow-3"
           width="768"
           height="512"
           alt=""

@@ -1,5 +1,23 @@
 # Application icon and favicon
 
+**2026-11-27: the logo is the owner's glowing mark** (the buffalo in ลายฉลุ paper with gear horns,
+the clock and the scarf, an orange and blue glow, no wordmark), supplied as a transparent PNG and
+kept unchanged as `docs/design/app-icon-transparent.png`. The earlier master with the baked
+wordmark and tagline is kept as `docs/design/app-icon-wordmark-2026-11-26.png`. Exports now:
+
+| Export                                                  | From the master                                   | Size      |
+| ------------------------------------------------------- | ------------------------------------------------- | --------- |
+| `brand/app-icon.webp` (web and docs, docs `src/assets`) | the whole canvas                                  | 768 × 512 |
+| `brand/app-mark.webp` (web and docs, docs `src/assets`) | the art's square (x 300–1237, y 23–1000, centred) | 256 × 256 |
+| `apple-touch-icon.png` (web and docs)                   | the square, 92 %                                  | 180 × 180 |
+| `icon-192.png`, `icon-512.png` (PWA)                    | the square, 94 %, transparent                     | 192, 512  |
+| `icon-maskable-512.png` (PWA)                           | the square, 72 % (the safe zone), on `#ebebe8`    | 512       |
+
+Logo links carry `v=glow-3`. The favicons (`favicon*.png`, `.ico`, docs `favicon.svg`) are their
+own source and are unchanged. The notes below describe the earlier exports.
+
+## Earlier exports (2026-11-26)
+
 The user supplied both original images. Originals remain unchanged in `docs/screenshots/icon/`.
 Built-in imagegen removes the white paper background from the primary logo, preserving the
 white artwork inside the buffalo and scarf. The transparent master is

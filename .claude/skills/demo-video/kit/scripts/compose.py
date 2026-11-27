@@ -204,7 +204,7 @@ def graphics(browser):
              ('term-top', paper.terminal_bar(ONE['w'], ONE['bar'], 'shop — bash'), False, (ONE['w'], ONE['bar']))]
     urls = {}
     for key, (clip, kind, color, start, end, speed, caps) in SINGLE.items():
-        items.append((f'back-{key}', paper.backdrop(color, [box(ONE)]), False, None))
+        items.append((f'back-{key}', paper.backdrop(color, [box(ONE)], scene=key), False, None))
         if kind == 'web':
             for _, _, u in url_spans(clip.split('.')[0], start, end):
                 urls.setdefault(('one', u), f'u1-{len(urls)}')
@@ -214,7 +214,7 @@ def graphics(browser):
     for key, cfg in SPLITS.items():
         items.append((f'back-{key}', paper.backdrop(cfg['color'], [box(w) for w in TWO], [
             (TWO[0]['x'] + 120, 12, 'บอร์ด · สด', YELLOW, False),
-            (TWO[1]['x'] + TWO[1]['w'] - 120, 12, 'Runs · สด', PINK, True)]), False, None))
+            (TWO[1]['x'] + TWO[1]['w'] - 120, 12, 'Runs · สด', PINK, True)], scene=key), False, None))
         segs = segments(cfg['mk'], cfg['first'], cfg['later'])
         for side in ('left', 'right'):
             for _, _, u in url_spans(f'{key}_{side}', cfg['mk']['start'], cfg['mk']['end']):

@@ -88,9 +88,32 @@ def piece(x, y, w, h, color, inner='', cls='', delay=0.0, seed=1, extra='', jag=
             f'<div style="position:absolute;inset:0;background:url({NOISE}),{color};clip-path:{torn(w, h, seed, jag)};{extra}">{inner}</div></div>')
 
 
-def doc(body):
+# The owner's landscapes (docs/design/video-backgrounds), one a scene
+BACKGROUNDS = {
+    'hunt_setup': 'hills', 'hunt': 'waterfall', 'fix_setup': 'field', 'fix': 'beach',
+    'git': 'hills', 'factory': 'field', 'end': 'beach',
+}
+
+
+def background_uri(scene):
+    """The scene's landscape as a data URI; None for a scene without one."""
+    name = BACKGROUNDS.get(scene)
+    if not name:
+        return None
+    repo = open(os.path.join(SP, 'repo.txt')).read().strip()
+    path = os.path.join(repo, 'docs/design/video-backgrounds', name + '.png')
+    return 'data:image/png;base64,' + base64.b64encode(open(path, 'rb').read()).decode()
+
+
+def page_style(scene, color=PAPER):
+    """The page behind a scene: its landscape, filling the frame; else paper of a colour."""
+    uri = background_uri(scene)
+    return f'background:url({uri}) center/cover no-repeat' if uri else f'background:url({NOISE}),{color}'
+
+
+def doc(body, scene=None):
     return (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}</style></head>'
-            f'<body><div class="page"></div><div class="stage">{body}</div></body></html>')
+            f'<body><div class="page" style="{page_style(scene)}"></div><div class="stage">{body}</div></body></html>')
 
 
 def icon_uri():
@@ -362,8 +385,8 @@ def capture(name, page_html, seconds, browser):
 BAND_Y = 912  # the caption strip's top: windows end above it
 
 
-def backdrop(color, windows, labels=()):
-    """Construction paper of the scene's colour, window outlines and shadows, a torn caption strip."""
+def backdrop(color, windows, labels=(), scene=None):
+    """The scene's landscape (or paper of its colour), window outlines and shadows, a torn caption strip."""
     body = ''
     for (x, y, w, h) in windows:
         body += (f'<div style="position:absolute;left:{x + 12}px;top:{y + 12}px;width:{w}px;height:{h}px;background:rgba(43,35,64,.35);border-radius:16px"></div>'
@@ -373,7 +396,7 @@ def backdrop(color, windows, labels=()):
         body += f'<div style="position:absolute;{pos};top:{y}px">{tag(text, c, 24, c in (BLUE, PURPLE))}</div>'
     body += piece(-30, BAND_Y, W + 60, H - BAND_Y + 30, CREAM, seed=101, jag=14)
     return (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}</style></head>'
-            f'<body><div class="page" style="background:url({NOISE}),{color}"></div>{body}</body></html>')
+            f'<body><div class="page" style="{page_style(scene, color)}"></div>{body}</body></html>')
 
 
 def tape(windows):
@@ -477,7 +500,7 @@ def belt(x0, x1, y, card_color, text, delay):
 
 
 def factory(stats):
-    body = hills(0)
+    body = ''
     body = body.replace('</div>', '</div>', 1)
     body += piece(480, 50, 960, 116, PURPLE, cls='pop', delay=0.1, seed=301,
                   inner='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:54px;font-weight:800">🏭 โรงงาน AI บนเครื่องของคุณ</div>')
@@ -497,7 +520,7 @@ def factory(stats):
                   for k, (t, c) in enumerate(facts))
     body += f'<div style="position:absolute;left:0;right:0;top:690px;display:flex;justify-content:center;gap:26px">{row}</div>'
     body += f'<div class="slide" style="animation-delay:.2s">{corner_mascot()}</div>'
-    html_doc = doc(body).replace('</style>', FACTORY_CSS + '</style>', 1)
+    html_doc = doc(body, 'factory').replace('</style>', FACTORY_CSS + '</style>', 1)
     return html_doc, 5.0, [0.1, 0.35, 0.55, 0.75] + [1.0 + k * 0.14 for k in range(len(facts))]
 
 
@@ -512,7 +535,7 @@ def topbar(label, label_color, c):
 
 
 def end_card():
-    body = sun(160, 120, 70, 0.1) + cloud(1450, 140, 1.0, 0.25, 81) + hills(0)
+    body = ''
     body += (f'<div class="pop" style="position:absolute;left:810px;top:60px;width:300px;height:300px;animation-delay:.3s">'
              f'<div class="paper" style="inset:0;border-radius:50%;background:url({NOISE}),{CREAM};border:6px solid {INK}"></div>'
              f'<img src="{icon_uri()}" style="position:absolute;left:18px;top:30px;width:264px"></div>')
@@ -524,4 +547,4 @@ def end_card():
              f'<span style="display:inline-block;background:{INK};color:{GREEN};font-family:{MONO};font-size:42px;padding:16px 36px;border-radius:14px;filter:drop-shadow(5px 7px 0 rgba(43,35,64,.25))">$ bunx kammacron start</span></div>')
     body += f'<div class="pop" style="position:absolute;left:800px;top:875px;animation-delay:1.2s">{tag("kammacron.pages.dev", PURPLE, 34, True)}</div>'
     body += f'<div class="slide" style="animation-delay:1.3s">{corner_mascot()}</div>'
-    return doc(body), 4.6, [0.3, 0.5, 0.75, 1.0, 1.2]
+    return doc(body, 'end'), 4.6, [0.3, 0.5, 0.75, 1.0, 1.2]

@@ -30,6 +30,12 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
 - **Thai captions** on the leather caption band *below* the windows — never over the page.
 - **Storybook paper pop-up** graphics: textured paper, torn edges, pieces that stand up off the
   page one after another. Bright, flat colours, **no gradients**.
+- **Backgrounds**: the owner's landscapes (2026-11-27), `docs/design/video-backgrounds/`
+  (`waterfall`, `beach`, `field`, `hills`; blue and orange print style), one a scene by
+  `paper.BACKGROUNDS`: the hunt's setup and the terminal on `hills`, the hunt on `waterfall`, the
+  fix's setup and the factory card on `field`, the fix and the end card on `beach`. They fill the
+  frame (`cover`); the windows, the tape, the torn caption strip and the paper tags stay on top.
+  Never redraw or recolour them.
 - **The mascot** is the owner's own design, `docs/design/mascot.png` (the buffalo in perforated
   ลายฉลุ paper, gear horns, the clock, a ผ้าขาวม้า, a thumb up; transparent PNG): never redraw
   it. **One mascot a frame**, big (`MASCOT_W` 420 px), in the bottom-left corner like a vtuber,

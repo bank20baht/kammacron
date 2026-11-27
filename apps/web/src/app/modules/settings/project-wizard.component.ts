@@ -71,8 +71,8 @@ type Data = Record<string, Record<string, unknown> | undefined>
             [registry]="registry"
             [busy]="busy()"
             [submitLabel]="t('settings.projects.wizard.create')"
-            (bahtDataChange)="changed($any($event).data)"
-            (bahtSubmit)="submit($any($event).data)"
+            (bahtDataChange)="changed($event.data)"
+            (bahtSubmit)="submit($event.data)"
           ></baht-workflow>
         } @else {
           <baht-skeleton variant="text"></baht-skeleton>

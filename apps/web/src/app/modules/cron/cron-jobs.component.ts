@@ -3,7 +3,7 @@ import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { dialog } from '@20baht/ui/overlay'
 import { liveSignal } from '@20baht/angular/live'
-import { Api, describeError } from '@kammacron/kit'
+import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../../core/i18n/i18n.service'
@@ -13,6 +13,7 @@ import { liveFailed } from '../../shared/live-state'
 import type { CronJob } from '../../shared/cron-wizard'
 import { runsWhat } from '../../shared/schedule'
 import { BAHT_STICKERS } from '../../shared/stickers'
+import { attemptWithNotice, type Notice } from '../../shared/attempt'
 import { CronWizardComponent } from './cron-wizard.component'
 
 /**
@@ -183,7 +184,7 @@ export class CronJobsComponent {
     })
   })
   protected readonly schedulesFailed = computed(() => liveFailed(this.schedules()))
-  protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  protected readonly message = signal<Notice | null>(null)
   protected readonly busy = signal(false)
   protected readonly ago = ago
   protected readonly runsWhat = runsWhat
@@ -208,16 +209,10 @@ export class CronJobsComponent {
   }
 
   private async act(work: () => Promise<unknown>, done: string): Promise<void> {
-    this.busy.set(true)
-    this.message.set(null)
-    try {
+    await attemptWithNotice(this.busy, this.message, async () => {
       await work()
-      this.message.set({ tone: 'success', text: done })
-    } catch (error) {
-      this.message.set({ tone: 'danger', text: describeError(error) })
-    } finally {
-      this.busy.set(false)
-    }
+      return done
+    })
   }
 
   protected go(url: string): void {

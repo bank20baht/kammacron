@@ -11,11 +11,13 @@ import {
 } from '@angular/core'
 import { BAHT_UI } from '@20baht/angular'
 import type { BahtForm, TabItem } from '@20baht/ui'
+import type { FormValues } from '@20baht/ui/engine'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../../core/i18n/i18n.service'
 import { claudeStepForm, playbookNameForm, runStepForm } from '../../shared/forms'
+import { countOf, dataOf, trimmed } from '../../shared/form-data'
 
 type ClaudeStep = {
   kind: 'claude'
@@ -38,38 +40,40 @@ export type Playbook = { name: string; steps: PlaybookStep[] }
 const DEFAULT = 'default'
 const NAME = /^[a-z0-9][a-z0-9-]{0,39}$/
 
+type ClaudeData = FormValues<ReturnType<typeof claudeStepForm>>
+type RunData = FormValues<ReturnType<typeof runStepForm>>
+
 /** A step being edited: the form's data as it is, and a key that survives reordering. */
-type Row = { key: number; kind: 'claude' | 'run'; data: Record<string, unknown> }
+type Row =
+  | { key: number; kind: 'claude'; data: Partial<ClaudeData> }
+  | { key: number; kind: 'run'; data: Partial<RunData> }
 
 /** A playbook being edited: its name and its steps. */
 type Book = { key: number; name: string; rows: Row[] }
 
-const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
-const positive = (v: unknown) => {
-  const n = Math.round(Number(v))
-  return Number.isFinite(n) && n > 0 ? n : undefined
-}
-
 /** The form's data back into a step the API takes: empty optional fields left out. */
 const toStep = (row: Row): PlaybookStep => {
-  const d = row.data
   if (row.kind === 'run') {
-    const timeout = positive(d['timeout_minutes'])
+    const d = row.data
+    const timeout = countOf(d.timeout_minutes, undefined)
     return {
       kind: 'run',
-      name: text(d['name']),
-      command: text(d['command']),
+      name: trimmed(d.name),
+      command: trimmed(d.command),
       ...(timeout ? { timeout_minutes: timeout } : {}),
-      ...(d['continue_on_error'] === true ? { continue_on_error: true } : {}),
+      ...(d.continue_on_error === true ? { continue_on_error: true } : {}),
     }
   }
-  const turns = positive(d['max_turns'])
-  const allow = Array.isArray(d['allow']) ? (d['allow'] as string[]).filter(Boolean) : []
+  const d = row.data
+  const turns = countOf(d.max_turns, undefined)
+  const prompt = trimmed(d.prompt)
+  const model = trimmed(d.model)
+  const allow = (d.allow ?? []).filter(Boolean)
   return {
     kind: 'claude',
-    name: text(d['name']),
-    ...(text(d['prompt']) ? { prompt: text(d['prompt']) } : {}),
-    ...(text(d['model']) ? { model: text(d['model']) } : {}),
+    name: trimmed(d.name),
+    ...(prompt ? { prompt } : {}),
+    ...(model ? { model } : {}),
     ...(turns ? { max_turns: turns } : {}),
     ...(allow.length ? { allow } : {}),
   }
@@ -120,7 +124,7 @@ const toStep = (row: Row): PlaybookStep => {
       <baht-tabs
         [tabs]="tabs()"
         [value]="String(currentKey())"
-        (bahtChange)="pick($any($event).value)"
+        (bahtChange)="pick($event.value)"
       ></baht-tabs>
       <div class="row">
         @if (book(); as b) {
@@ -179,7 +183,7 @@ const toStep = (row: Row): PlaybookStep => {
           <baht-form
             [form]="row.kind === 'claude' ? claudeForm() : runForm()"
             [value]="row.data"
-            (bahtChange)="change(row.key, $any($event).data)"
+            (bahtChange)="change(row.key, $event.data)"
           ></baht-form>
         </div>
       } @empty {
@@ -294,7 +298,7 @@ export class PlaybookEditorComponent {
   }
 
   protected addBook(form: BahtForm): void {
-    const name = text(form.getData()['name']).toLowerCase()
+    const name = trimmed(dataOf(this.nameForm(), form).name).toLowerCase()
     if (!NAME.test(name)) {
       this.error.set(this.t('project.playbook.badName'))
       return
@@ -318,7 +322,8 @@ export class PlaybookEditorComponent {
     this.dirty.set(true)
   }
 
-  protected change(key: number, data: Record<string, unknown>): void {
+  protected change(key: number, data: ClaudeData | RunData): void {
+    // the row's own form sent this, so the data is of the row's kind
     this.edit((rows) => rows.map((r) => (r.key === key ? { ...r, data } : r)))
   }
 

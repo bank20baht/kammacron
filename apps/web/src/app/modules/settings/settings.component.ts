@@ -11,7 +11,7 @@ import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import type { BahtForm, ColumnMap, TabItem } from '@20baht/ui'
 import { defineForm } from '@20baht/ui/engine'
-import { Api, describeError } from '@kammacron/kit'
+import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { IllustrationComponent } from '../../shared/illustration/illustration.component'
@@ -19,6 +19,8 @@ import { I18n, type AppLocale, type Translate } from '../../core/i18n/i18n.servi
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { accessForm, workerForm } from '../../shared/forms'
+import { attemptWithNotice, type Notice } from '../../shared/attempt'
+import { dataOf, filled, trimmed } from '../../shared/form-data'
 import { DataSettingsComponent } from './data-settings.component'
 import { ProjectWizardComponent } from './project-wizard.component'
 
@@ -53,8 +55,6 @@ const languageForm = (t: Translate, locales: readonly AppLocale[]) =>
     ],
   })
 
-const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
-
 /** The install: MCP, pause, hosts, notifications, the tools found; and the projects. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,7 +75,7 @@ export class SettingsComponent {
     this.live.subscribe('GET', '/api/projects', { query: {} }),
   )
 
-  protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  protected readonly message = signal<Notice | null>(null)
   protected readonly busy = signal(false)
   protected readonly ago = ago
   protected readonly i18n = inject(I18n)
@@ -134,17 +134,11 @@ export class SettingsComponent {
   })
 
   private async act(work: () => Promise<unknown>, done: string): Promise<void> {
-    this.busy.set(true)
-    this.message.set(null)
-    try {
+    const went = await attemptWithNotice(this.busy, this.message, async () => {
       await work()
-      this.message.set({ tone: 'success', text: done })
-      this.settings.reload()
-    } catch (error) {
-      this.message.set({ tone: 'danger', text: describeError(error) })
-    } finally {
-      this.busy.set(false)
-    }
+      return done
+    })
+    if (went) this.settings.reload()
   }
 
   protected save(patch: Parameters<typeof this.api.settings.patch>[0]): Promise<void> {
@@ -156,21 +150,21 @@ export class SettingsComponent {
 
   protected saveWorker(form: BahtForm): Promise<void> {
     if (!form.validate().valid) return Promise.resolve()
-    const d = form.getData()
+    const d = dataOf(this.forms().worker, form)
     return this.save({
-      stale_minutes: Math.round(Number(d['stale_minutes'])),
-      concurrency: Math.round(Number(d['concurrency'])),
-      worker_path: text(d['worker_path']) || null,
+      stale_minutes: Math.round(d.stale_minutes ?? Number.NaN),
+      concurrency: Math.round(d.concurrency ?? Number.NaN),
+      worker_path: filled(d.worker_path),
     })
   }
 
   protected saveAccess(form: BahtForm): Promise<void> {
-    const d = form.getData()
+    const d = dataOf(this.forms().access, form)
     return this.save({
-      allowed_hosts: Array.isArray(d['allowed_hosts']) ? (d['allowed_hosts'] as string[]) : [],
-      webhook_url: text(d['webhook_url']) || null,
-      desktop_notifications: d['desktop_notifications'] === true,
-      public_url: text(d['public_url']).replace(/\/+$/, '') || null,
+      allowed_hosts: d.allowed_hosts,
+      webhook_url: filled(d.webhook_url),
+      desktop_notifications: d.desktop_notifications,
+      public_url: trimmed(d.public_url).replace(/\/+$/, '') || null,
     })
   }
 
@@ -189,7 +183,8 @@ export class SettingsComponent {
     if (next) this.i18n.setLocale(next)
   }
 
-  protected openProject(id: number): void {
-    void this.router.navigate(['/settings/projects', id])
+  /** `id` is the row's own, which the table hands back untyped: the project's number. */
+  protected openProject(id: unknown): void {
+    if (typeof id === 'number') void this.router.navigate(['/settings/projects', id])
   }
 }

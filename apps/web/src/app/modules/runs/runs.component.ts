@@ -109,14 +109,14 @@ type Query = {
         <baht-search
           [placeholder]="t('runs.searchPlaceholder')"
           [label]="t('runs.searchLabel')"
-          (bahtSearch)="search($any($event).value)"
+          (bahtSearch)="search($event.value)"
         ></baht-search>
         <span class="muted">{{ t('runs.status') }}</span>
         <baht-filter
           [label]="t('runs.status')"
           [options]="statusOptions()"
           [selected]="status()"
-          (bahtChange)="setStatus($any($event).selected)"
+          (bahtChange)="setStatus($event.selected)"
         ></baht-filter>
         @if (projectOptions().length > 1) {
           <span class="muted">{{ t('runs.project') }}</span>
@@ -124,7 +124,7 @@ type Query = {
             [label]="t('runs.project')"
             [options]="projectOptions()"
             [selected]="project()"
-            (bahtChange)="setProject($any($event).selected)"
+            (bahtChange)="setProject($event.selected)"
           ></baht-filter>
         }
       </div>
@@ -139,9 +139,9 @@ type Query = {
         sortable
         clickable
         [emptyMessage]="t('runs.empty')"
-        (bahtRowClick)="open($any($event).row.id)"
-        (bahtSortChange)="sort($any($event))"
-        (bahtPageChange)="go($any($event).page)"
+        (bahtRowClick)="open($event.row['id'])"
+        (bahtSortChange)="sort($event)"
+        (bahtPageChange)="go($event.page)"
       ></baht-table>
     </div>
   `,
@@ -222,7 +222,8 @@ export class RunsComponent {
     this.query.update((q) => ({ ...q, page }))
   }
 
-  protected open(id: number): void {
-    void this.router.navigate(['/runs', id])
+  /** `id` is the row's own, which the table hands back untyped: the run's number. */
+  protected open(id: unknown): void {
+    if (typeof id === 'number') void this.router.navigate(['/runs', id])
   }
 }

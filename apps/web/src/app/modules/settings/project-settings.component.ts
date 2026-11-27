@@ -20,6 +20,8 @@ import type { HasDraft } from '../../core/draft.guard'
 import { I18n } from '../../core/i18n/i18n.service'
 import { ago } from '../../shared/format'
 import { projectForm } from '../../shared/forms'
+import { attemptWithNotice, type Notice } from '../../shared/attempt'
+import { countOf, dataOf, filled, trimmed } from '../../shared/form-data'
 import { CronJobsComponent } from '../cron/cron-jobs.component'
 import { PlaybookEditorComponent } from './playbook-editor.component'
 
@@ -29,13 +31,6 @@ type Check = {
 }
 
 const SECTIONS = ['general', 'playbook', 'worker', 'permissions', 'schedules', 'advanced'] as const
-
-const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
-const count = (v: unknown, fallback: number) => {
-  const n = Math.round(Number(v))
-  return Number.isFinite(n) && n > 0 ? n : fallback
-}
-const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
 
 /** One project's settings, its playbook, the directory check, Run now, and its schedules. */
 @Component({
@@ -93,7 +88,7 @@ export class ProjectSettingsComponent implements HasDraft {
     loader: ({ params }) => firstValueFrom(this.api.projects({ id: params }).get()),
   })
   protected readonly check = signal<Check | null>(null)
-  protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  protected readonly message = signal<Notice | null>(null)
   protected readonly busy = signal(false)
   protected readonly ago = ago
   protected readonly projectForm = computed(() => projectForm(this.t))
@@ -108,16 +103,10 @@ export class ProjectSettingsComponent implements HasDraft {
   })
 
   private async act(work: () => Promise<unknown>, done: string): Promise<void> {
-    this.busy.set(true)
-    this.message.set(null)
-    try {
+    await attemptWithNotice(this.busy, this.message, async () => {
       await work()
-      this.message.set({ tone: 'success', text: done })
-    } catch (error) {
-      this.message.set({ tone: 'danger', text: describeError(error) })
-    } finally {
-      this.busy.set(false)
-    }
+      return done
+    })
   }
 
   protected due(at: string | Date): boolean {
@@ -165,28 +154,28 @@ export class ProjectSettingsComponent implements HasDraft {
 
   protected save(form: BahtForm): Promise<void> {
     if (!form.validate().valid) return Promise.resolve()
-    const d = form.getData()
+    const d = dataOf(this.projectForm(), form)
     return this.act(async () => {
       await firstValueFrom(
         this.api.projects({ id: this.id() }).patch({
-          name: text(d['name']) ?? '',
-          repo_path: text(d['repo_path']),
-          worker_enabled: d['worker_enabled'] === true,
-          mode: d['mode'] === 'watch' ? 'watch' : 'autopilot',
-          interval_minutes: count(d['interval_minutes'], 30),
-          max_cards_per_run: count(d['max_cards_per_run'], 3),
-          max_turns: count(d['max_turns'], 60),
-          model: text(d['model']),
-          allowed_bash: list(d['allowed_bash']),
-          web_tools: d['web_tools'] === true,
-          enabled_mcp_servers: list(d['enabled_mcp_servers']),
-          extra_prompt: typeof d['extra_prompt'] === 'string' ? d['extra_prompt'] : '',
+          name: trimmed(d.name),
+          repo_path: filled(d.repo_path),
+          worker_enabled: d.worker_enabled,
+          mode: d.mode === 'watch' ? 'watch' : 'autopilot',
+          interval_minutes: countOf(d.interval_minutes, 30),
+          max_cards_per_run: countOf(d.max_cards_per_run, 3),
+          max_turns: countOf(d.max_turns, 60),
+          model: filled(d.model),
+          allowed_bash: d.allowed_bash,
+          web_tools: d.web_tools,
+          enabled_mcp_servers: d.enabled_mcp_servers,
+          extra_prompt: d.extra_prompt ?? '',
         }),
       )
       form.markClean()
       this.dirty.set(false)
       this.project.reload()
-      if (text(d['repo_path'])) await this.runCheck()
+      if (filled(d.repo_path)) await this.runCheck()
     }, this.t('project.messages.saved'))
   }
 

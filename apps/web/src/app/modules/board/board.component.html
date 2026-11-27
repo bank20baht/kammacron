@@ -225,7 +225,7 @@
     [value]="newValue()"
     [registry]="registry"
     [error]="createError()"
-    (bahtSubmit)="create($any($event).data)"
+    (bahtSubmit)="create($event.data)"
     (bahtClose)="creating.set(false)"
   ></baht-form-modal>
 }

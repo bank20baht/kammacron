@@ -266,7 +266,7 @@ const clock = (d: Date) =>
         [label]="t('run.timeline.filter')"
         [options]="filterOptions()"
         [selected]="[filter()]"
-        (bahtChange)="filter.set($any($event).selected[0] ?? 'all')"
+        (bahtChange)="pickFilter($event.selected[0])"
       ></baht-filter>
       <span class="grow"></span>
       <baht-button size="sm" variant="ghost" icon="resize" (click)="toggleAll()">{{
@@ -277,7 +277,7 @@ const clock = (d: Date) =>
           [label]="t('run.timeline.follow')"
           [options]="followOptions()"
           [selected]="follow() ? ['follow'] : []"
-          (bahtChange)="follow.set($any($event).selected.length > 0)"
+          (bahtChange)="follow.set($event.selected.length > 0)"
         ></baht-filter>
       }
     </div>
@@ -359,6 +359,10 @@ export class RunTimelineComponent {
   protected readonly clock = clock
   protected readonly took = took
   protected readonly filter = signal<EventFilter>('all')
+  /** The filter's keys come back as plain strings: only one of ours is taken. */
+  protected pickFilter(key: string | undefined): void {
+    this.filter.set(FILTERS.find((f) => f === key) ?? 'all')
+  }
   protected readonly follow = signal(true)
   /** Rows opened (or, with `allOpen`, folded) by hand. */
   private readonly flipped = signal<ReadonlySet<number>>(new Set())

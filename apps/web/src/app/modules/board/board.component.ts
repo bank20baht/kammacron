@@ -12,6 +12,7 @@ import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import { guess } from '@20baht/live/browser'
 import type { BahtForm, FormDefinition, NavItem } from '@20baht/ui'
+import type { FormValues } from '@20baht/ui/engine'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -21,6 +22,7 @@ import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { newCardForm, quickAddForm, REGISTRY } from '../../shared/forms'
 import { statusLabel, type CardStatus } from '../../shared/tones'
+import { dataOf, trimmed } from '../../shared/form-data'
 import {
   KanbanComponent,
   KanbanFooterDirective,
@@ -273,15 +275,18 @@ export class BoardComponent {
     return card
   }
 
-  protected async create(data: Record<string, unknown>): Promise<void> {
+  protected async create(submitted: Record<string, unknown>): Promise<void> {
+    // `newForm` is the new-card form with its project field filled in or left out, so the element
+    // cannot say what it holds: this names it once
+    const data = submitted as Partial<FormValues<ReturnType<typeof newCardForm>>>
     try {
       const card = await this.createOne({
         // no project field when the board knows it: the one the form started with
-        project_id: Number(data['project_id'] ?? this.newValue()['project_id']),
-        title: typeof data['title'] === 'string' ? data['title'].trim() : '',
-        body: typeof data['body'] === 'string' ? data['body'] : '',
-        owner: typeof data['owner'] === 'string' ? data['owner'] : 'autopilot',
-        tags: Array.isArray(data['tags']) ? (data['tags'] as string[]) : [],
+        project_id: Number(data.project_id ?? this.newValue()['project_id']),
+        title: trimmed(data.title),
+        body: data.body ?? '',
+        owner: data.owner ?? 'autopilot',
+        tags: data.tags ?? [],
       })
       this.creating.set(false)
       if (card) this.open(card.id)
@@ -293,11 +298,11 @@ export class BoardComponent {
   /** Quick add in To do: a Claude card in this project, titled and nothing else. */
   protected async quickAdd(form: BahtForm): Promise<void> {
     const project = this.project()
-    const title = form.getData()['title']
-    if (!project || typeof title !== 'string' || !title.trim()) return
+    const title = trimmed(dataOf(this.quickAddForm(), form).title)
+    if (!project || !title) return
     this.busy.set(true)
     try {
-      await this.createOne({ project_id: project.id, title: title.trim(), owner: 'autopilot' })
+      await this.createOne({ project_id: project.id, title, owner: 'autopilot' })
       form.reset()
     } catch (error) {
       this.error.set(describeError(error))

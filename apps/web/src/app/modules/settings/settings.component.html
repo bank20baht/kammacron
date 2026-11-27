@@ -12,7 +12,7 @@
   }
 
   <div class="split">
-    <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="tab.set($any($event).value)">
+    <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="tab.set($event.value)">
       <div data-tab="projects" class="stack">
         <baht-section-header
           [heading]="t('settings.projects.heading')"
@@ -25,7 +25,7 @@
           [total]="projectRows().length"
           clickable
           [emptyMessage]="t('settings.projects.empty')"
-          (bahtRowClick)="openProject($any($event).row.id)"
+          (bahtRowClick)="openProject($event.row['id'])"
         ></baht-table>
         <div class="row">
           <baht-button variant="primary" icon="plus" (click)="addingProject.set(true)">{{

@@ -67,7 +67,7 @@ const OUTCOME = { done: '#1f7a4d', review: '#c98a00', failed: '#c8202f' } as con
           [label]="t('stats.weeksLabel')"
           [tabs]="ranges()"
           [value]="String(weeks())"
-          (bahtChange)="weeks.set(Number($any($event).value))"
+          (bahtChange)="weeks.set(Number($event.value))"
         ></baht-tabs>
       </div>
       @if (stats.error(); as e) {

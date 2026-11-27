@@ -141,7 +141,7 @@ const validDay = (key: string | undefined): key is string =>
           [label]="t('calendar.show')"
           [options]="layers()"
           [selected]="shown()"
-          (bahtChange)="shown.set($any($event).selected)"
+          (bahtChange)="shown.set($event.selected)"
         ></baht-filter>
         @if (projectOptions().length > 1) {
           <span class="muted">{{ t('calendar.project') }}</span>
@@ -149,7 +149,7 @@ const validDay = (key: string | undefined): key is string =>
             [label]="t('calendar.project')"
             [options]="projectOptions()"
             [selected]="project()"
-            (bahtChange)="project.set($any($event).selected.slice(-1))"
+            (bahtChange)="project.set($event.selected.slice(-1))"
           ></baht-filter>
         }
       </div>
@@ -174,7 +174,7 @@ const validDay = (key: string | undefined): key is string =>
           [loading]="!calendar().data"
           clickable
           [emptyMessage]="t('calendar.noJobs')"
-          (bahtRowClick)="open($any($event).row.id)"
+          (bahtRowClick)="openRow($event.row['id'])"
         ></baht-table>
       </baht-card>
     </div>
@@ -357,6 +357,11 @@ export class CalendarComponent {
       queryParams: { view: detail.view, date: detail.date },
       replaceUrl: true,
     })
+  }
+
+  /** `id` is the row's own, which the table hands back untyped: the job's key. */
+  protected openRow(id: unknown): void {
+    if (typeof id === 'string') this.open(id)
   }
 
   protected open(id: string): void {

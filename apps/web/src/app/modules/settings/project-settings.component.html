@@ -69,7 +69,7 @@
       #sectionTabs="bahtTabs"
       [tabs]="sections()"
       [value]="current()"
-      (bahtChange)="pick($any($event).value, sectionTabs.element)"
+      (bahtChange)="pick($event.value, sectionTabs.element)"
     ></baht-tabs>
 
     @if (current() === 'playbook') {
@@ -109,7 +109,7 @@
           [form]="projectForm()"
           [value]="value()"
           [view]="current()"
-          (bahtDirtyChange)="dirty.set($any($event).dirty)"
+          (bahtDirtyChange)="dirty.set($event.dirty)"
         ></baht-form>
       </baht-card>
       <baht-save-bar

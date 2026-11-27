@@ -1,7 +1,12 @@
+import type { FormValues } from '@20baht/ui/engine'
+
+import type { cardForm } from '../../shared/forms'
+
 /** The tag that opens a card to agents (the worker's rounds and agent schedules). */
 export const AUTOPILOT = 'auto-pilot'
 
-const text = (value: unknown) => (typeof value === 'string' ? value : '')
+/** The card form's data, as the form holds it. */
+export type CardFormData = FormValues<ReturnType<typeof cardForm>>
 
 /** What of a card its form shows. */
 type CardFields = {
@@ -46,31 +51,28 @@ const sameList = (a: readonly string[], b: readonly string[]) =>
  */
 export const changesOf = (
   start: CardFormValue,
-  data: Record<string, unknown>,
+  data: Omit<CardFormData, 'status'>,
   tagsNow: readonly string[],
 ): CardPatch => {
   const patch: CardPatch = {}
-  const title = text(data['title'])
+  const title = data.title ?? ''
   if (title !== start.title) patch.title = title
-  const body = text(data['body'])
+  const body = data.body ?? ''
   if (body !== start.body) patch.body = body
-  const priority = Math.round(Number(data['priority']) || 0)
+  const priority = Math.round(data.priority ?? 0)
   if (priority !== start.priority) patch.priority = priority
-  const waits = text(data['waits_on'])
+  const waits = data.waits_on ?? ''
   if (waits !== start.waits_on)
     patch.waits_on = waits
       .split(/[\s,#]+/)
       .filter(Boolean)
       .map(Number)
       .filter((n) => Number.isInteger(n) && n > 0)
-  const owner = text(data['owner'])
-  const listed = Array.isArray(data['tags'])
-    ? (data['tags'] as unknown[]).filter((t): t is string => typeof t === 'string')
-    : []
-  const tagsChanged = !sameList(listed, start.tags)
+  const owner = data.owner ?? 'none'
+  const tagsChanged = !sameList(data.tags, start.tags)
   if (owner !== start.owner) patch.human = owner === 'human'
   if (tagsChanged || owner !== start.owner) {
-    const others = (tagsChanged ? listed : tagsNow).filter((t) => t !== AUTOPILOT)
+    const others = (tagsChanged ? data.tags : tagsNow).filter((t) => t !== AUTOPILOT)
     patch.tags = owner === 'autopilot' ? [AUTOPILOT, ...others] : others
   }
   return patch

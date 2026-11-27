@@ -15,7 +15,7 @@ import { RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import type { BahtForm, ChoiceOption, CommentEntry, MenuItem, PreviewImage } from '@20baht/ui'
-import { Api, describeError } from '@kammacron/kit'
+import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n, type Translate } from '../../core/i18n/i18n.service'
@@ -23,9 +23,9 @@ import { LiveService } from '../../services/live.service'
 import { ago, cost, stamp } from '../../shared/format'
 import { cardForm, REGISTRY, sameOriginImage, sendBackForm } from '../../shared/forms'
 import { RUN_TONE, statusLabel, type CardStatus } from '../../shared/tones'
+import { attempt } from '../../shared/attempt'
+import { dataOf, trimmed } from '../../shared/form-data'
 import { changesOf, formValueOf, type CardFormValue } from './card-changes'
-
-const text = (value: unknown) => (typeof value === 'string' ? value : '')
 
 type CardData = NonNullable<ReturnType<CardDialogComponent['card']>['data']>
 type RunStatus = NonNullable<CardData['last_run']>['status']
@@ -155,26 +155,25 @@ export class CardDialogComponent {
   }
 
   private async act(work: () => Promise<unknown>): Promise<boolean> {
-    this.busy.set(true)
     this.error.set(null)
-    try {
-      await work()
-      return true
-    } catch (error) {
-      this.error.set(describeError(error))
-      return false
-    } finally {
-      this.busy.set(false)
-    }
+    return (
+      (await attempt(
+        this.busy,
+        (message) => {
+          this.error.set(message)
+        },
+        work,
+      )) !== null
+    )
   }
 
   protected async save(form: BahtForm): Promise<void> {
     const card = this.card().data
     const start = this.start()
     if (!card || !start || !form.validate().valid) return
-    const d = form.getData()
+    const d = dataOf(this.cardForm(), form)
     const id = String(card.id)
-    const status = text(d['status'])
+    const status = d.status
     // only what was changed here: the card may have been written to since the form was filled
     const patch = changesOf(start, d, card.tags)
     const ok = await this.act(async () => {
@@ -186,6 +185,11 @@ export class CardDialogComponent {
       form.markClean()
       this.dirty.set(false)
     }
+  }
+
+  /** The choice's key comes back as a plain string: only a decision is taken. */
+  protected decide(key: string): void {
+    if (key === 'send-back' || key === 'approve' || key === 'take') this.decision.set(key)
   }
 
   protected cancel(form: BahtForm): void {
@@ -209,7 +213,7 @@ export class CardDialogComponent {
 
   protected async sendBack(form: BahtForm): Promise<void> {
     if (!form.validate().valid) return
-    const comment = text(form.getData()['comment']).trim()
+    const comment = trimmed(dataOf(this.sendBackForm(), form).comment)
     if (
       await this.act(() =>
         firstValueFrom(

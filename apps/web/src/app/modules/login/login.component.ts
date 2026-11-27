@@ -11,6 +11,7 @@ import {
   StickerBackdropComponent,
 } from '../../shared/sticker-backdrop.component'
 import { BAHT_STICKERS } from '../../shared/stickers'
+import { dataOf, trimmed } from '../../shared/form-data'
 
 /** The API token, once, for the session cookie; or the code `kammacron open` put in the address. */
 @Component({
@@ -135,8 +136,8 @@ export class LoginComponent {
   }
 
   protected async submit(form: BahtForm): Promise<void> {
-    const token = form.getData()['token']
-    if (typeof token === 'string' && (await this.session.login(token.trim()))) {
+    const token = trimmed(dataOf(this.form(), form).token)
+    if (token && (await this.session.login(token))) {
       // the OAuth consent page is the server's, not a route of this app
       if (this.next()?.startsWith('/oauth/')) globalThis.location.assign(this.next() ?? '/')
       else void this.router.navigateByUrl(this.next() ?? '/board')

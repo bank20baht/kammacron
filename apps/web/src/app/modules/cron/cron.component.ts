@@ -57,7 +57,7 @@ import { UsageLimitsComponent } from './limits.component'
                 [label]="t('cron.project')"
                 [tabs]="tabs()"
                 [value]="current()?.slug ?? ''"
-                (bahtChange)="pick($any($event).value)"
+                (bahtChange)="pick($event.value)"
               ></baht-tabs>
             </div>
           }

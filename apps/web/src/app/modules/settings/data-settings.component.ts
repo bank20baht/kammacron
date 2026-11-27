@@ -7,6 +7,7 @@ import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n, type Translate } from '../../core/i18n/i18n.service'
+import { attemptWithNotice, type Notice } from '../../shared/attempt'
 
 const KEYS = [
   'run_log_retention_days',
@@ -114,7 +115,7 @@ const dataForm = (t: Translate, kinds: readonly Kind[]): FormDefinition =>
         <baht-form
           [form]="form()"
           [value]="value()"
-          (bahtChange)="changed($any($event).data)"
+          (bahtChange)="changed($event.data)"
         ></baht-form>
         <div class="row">
           <baht-button variant="primary" [disabled]="busy() || !dirty()" (click)="save()">{{
@@ -146,7 +147,7 @@ export class DataSettingsComponent {
   private readonly api = inject(Api).client.api
   protected readonly t = inject(I18n).t
   protected readonly busy = signal(false)
-  protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  protected readonly message = signal<Notice | null>(null)
   /** What each kind holds, as the chosen (maybe unsaved) lengths would leave it. */
   protected readonly kinds = signal<readonly Kind[]>([])
   /** The lengths as saved: what the form starts from. */
@@ -283,14 +284,6 @@ export class DataSettingsComponent {
   }
 
   private async act(work: () => Promise<string>): Promise<void> {
-    this.busy.set(true)
-    this.message.set(null)
-    try {
-      this.message.set({ tone: 'success', text: await work() })
-    } catch (error) {
-      this.message.set({ tone: 'danger', text: describeError(error) })
-    } finally {
-      this.busy.set(false)
-    }
+    await attemptWithNotice(this.busy, this.message, work)
   }
 }

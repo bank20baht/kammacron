@@ -55,7 +55,8 @@ export const newCardForm = (t: Translate) =>
         key: 'project_id',
         label: t('forms.newCard.project'),
         required: true,
-        options: [],
+        // filled in by the board; typed, or the field's value would read as `null` alone
+        options: [] as { key: string; label: string }[],
       },
       { order: 1, type: 'text', key: 'title', label: t('forms.card.title'), required: true },
       {

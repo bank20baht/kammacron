@@ -187,7 +187,7 @@ type StepStatus = 'running' | 'succeeded' | 'failed' | 'stopped' | 'skipped'
           </baht-card>
         }
 
-        <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="picked.set($any($event).value)">
+        <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="picked.set($event.value)">
           <div data-tab="events">
             <web-run-timeline
               [events]="events()"

@@ -16,7 +16,7 @@
       [label]="t('card.more')"
       [items]="menu()"
       align="end"
-      (bahtSelect)="onMenu($any($event).value)"
+      (bahtSelect)="onMenu($event.value)"
     ></baht-menu>
   </div>
 
@@ -46,7 +46,7 @@
         [label]="t('card.decisionLabel')"
         [options]="decisions()"
         [value]="decision()"
-        (bahtChange)="decision.set($any($event).value)"
+        (bahtChange)="decide($event.value)"
       ></baht-choice-group>
       @switch (decision()) {
         @case ('send-back') {
@@ -83,7 +83,7 @@
       [form]="cardForm()"
       [value]="value"
       [registry]="registry"
-      (bahtDirtyChange)="dirty.set($any($event).dirty)"
+      (bahtDirtyChange)="dirty.set($event.dirty)"
     ></baht-form>
     <div class="actions save">
       <baht-button
@@ -138,7 +138,7 @@
       [placeholder]="t('card.commentPlaceholder')"
       [emptyMessage]="t('card.noComments')"
       [busy]="busy()"
-      (bahtSubmit)="comment($any($event).body)"
+      (bahtSubmit)="comment($event.body)"
     ></baht-comments>
   </section>
 } @else if (card().error) {

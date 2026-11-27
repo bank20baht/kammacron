@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { Router, RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
-import type { AccordionItem, Crumb, TabItem, TimelineItem } from '@20baht/ui'
+import type { AccordionItem, Crumb, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -12,22 +12,15 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { cost, duration, stamp } from '../../shared/format'
 import { RUN_TONE, STEP_TONE } from '../../shared/tones'
+import { RunTimelineComponent } from './run-timeline.component'
 import { runStatusLabel } from './runs.component'
 
 type StepStatus = 'running' | 'succeeded' | 'failed' | 'stopped' | 'skipped'
 
-const EVENT_TONE: Record<string, TimelineItem['tone']> = {
-  assistant: 'primary',
-  tool_use: 'muted',
-  tool_result: 'muted',
-  system: 'muted',
-  result: 'success',
-}
-
 /** One run: what went wrong first, then the facts, Claude's summary and every event (live). */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IllustrationComponent, BAHT_UI, RouterLink],
+  imports: [IllustrationComponent, BAHT_UI, RouterLink, RunTimelineComponent],
   selector: 'web-run',
   styles: `
     .row {
@@ -185,7 +178,13 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
           </baht-card>
         }
 
-        <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="tab.set($any($event).value)">
+        <baht-tabs [tabs]="tabs()" [value]="tab()" (bahtChange)="picked.set($any($event).value)">
+          <div data-tab="events">
+            <web-run-timeline
+              [events]="r.events"
+              [running]="r.status === 'running'"
+            ></web-run-timeline>
+          </div>
           <div data-tab="steps">
             @for (s of r.steps; track s.id) {
               <div class="step">
@@ -234,9 +233,6 @@ const EVENT_TONE: Record<string, TimelineItem['tone']> = {
               <p>{{ t('run.noSummary') }}</p>
             }
           </div>
-          <div data-tab="events">
-            <baht-timeline [items]="timeline()"></baht-timeline>
-          </div>
         </baht-tabs>
 
         <baht-accordion [items]="technical()">
@@ -281,7 +277,11 @@ export class RunComponent {
   protected readonly stamp = stamp
   protected readonly busy = signal(false)
   protected readonly error = signal<string | null>(null)
-  protected readonly tab = signal('steps')
+  /** The tab picked by hand; until then the timeline when the run has events, else its steps. */
+  protected readonly picked = signal<string | null>(null)
+  protected readonly tab = computed(
+    () => this.picked() ?? ((this.run().data?.events.length ?? 0) > 0 ? 'events' : 'steps'),
+  )
   protected readonly duration = duration
   protected readonly stepTone = STEP_TONE
   protected readonly stepLabel = (status: StepStatus) => this.t(`status.step.${status}`)
@@ -305,9 +305,9 @@ export class RunComponent {
   protected readonly tabs = computed<TabItem[]>(() => {
     const r = this.run().data
     return [
+      { key: 'events', label: this.t('run.tab.events'), badge: String(r?.events.length ?? 0) },
       { key: 'steps', label: this.t('run.tab.steps'), badge: String(r?.steps.length ?? 0) },
       { key: 'summary', label: this.t('run.tab.summary') },
-      { key: 'events', label: this.t('run.tab.events'), badge: String(r?.events.length ?? 0) },
     ]
   })
 
@@ -320,15 +320,6 @@ export class RunComponent {
       (this.run().data?.permission_denials as
         { tool_name?: string; tool_input?: { command?: string } }[] | null) ?? []
     ).map((d) => d.tool_input?.command ?? d.tool_name ?? JSON.stringify(d)),
-  )
-
-  protected readonly timeline = computed<TimelineItem[]>(() =>
-    (this.run().data?.events ?? []).map((e) => ({
-      title: e.summary,
-      description: e.type,
-      time: stamp(e.created_at).slice(11),
-      tone: EVENT_TONE[e.type] ?? 'muted',
-    })),
   )
 
   protected go(url: string | undefined): void {

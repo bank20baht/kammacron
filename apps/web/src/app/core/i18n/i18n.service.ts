@@ -1,5 +1,4 @@
 import { computed, effect, Injectable, signal } from '@angular/core'
-import { setLocale as setEngineLocale } from '@20baht/ui/engine'
 
 import { en } from './en'
 import { translate, type KeysOf, type Params, type ShapeOf } from './translate'
@@ -57,7 +56,10 @@ export class I18n {
     effect(() => {
       const now = locale()
       document.documentElement.lang = now
-      setEngineLocale(ENGINE_LOCALE[now])
+      // the engine comes with the elements' chunk, not the first one: it is only for forms
+      void import('@20baht/ui/engine').then((engine) => {
+        engine.setLocale(ENGINE_LOCALE[now])
+      })
     })
   }
 

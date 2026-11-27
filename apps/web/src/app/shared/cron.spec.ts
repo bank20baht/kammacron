@@ -30,6 +30,17 @@ describe('cron', () => {
     expect(occurrences(late, now, at('2027-01-01T00:00:00Z'), now, 5)).toHaveLength(5)
   })
 
+  it('a job every 5 minutes over a month marks every day, a day at a time', () => {
+    const often = { every_minutes: 5, next_at: '2026-11-25T10:00:00Z', off: null }
+    const times = occurrences(often, now, at('2026-12-25T10:00:00Z'), now)
+    // a cap over the whole range stopped after 400 times, about a day and a half
+    expect(daysWith(times).length).toBeGreaterThanOrEqual(30)
+    expect(
+      times.filter((d) => d.toDateString() === at('2026-12-10T12:00:00Z').toDateString()),
+    ).toHaveLength(48)
+    expect(gapMinutes(often, times)).toBe(5)
+  })
+
   it('days and intervals in words', () => {
     expect(
       daysWith([at('2026-11-25T10:00:00'), at('2026-11-25T11:00:00'), at('2026-11-26T01:00:00')]),

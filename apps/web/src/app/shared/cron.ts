@@ -14,14 +14,17 @@ export const FREQUENT_MINUTES = 120
 
 /**
  * When a job runs in `[from, to)`: its next time, then every interval. Nothing for a job that
- * is off or has no next time; at most `cap` times. A next time already past counts from now.
+ * is off or has no next time. At most `perDay` of each local day (then on to the next day) and
+ * `cap` in all: a job every 5 minutes over a month is 8640 times, and the calendar needs each
+ * day's first few (how often, and that the day has runs). A next time already past counts from now.
  */
 export const occurrences = (
   job: CronJobLike,
   from: Date,
   to: Date,
   now: Date = new Date(),
-  cap = 400,
+  cap = 2000,
+  perDay = 48,
 ): Date[] => {
   if (job.off !== null) return []
   if (job.times) {
@@ -33,7 +36,24 @@ export const occurrences = (
   let at = Math.max(new Date(job.next_at).getTime(), now.getTime())
   if (at < from.getTime()) at += Math.ceil((from.getTime() - at) / step) * step
   const out: Date[] = []
-  for (; at < to.getTime() && out.length < cap; at += step) out.push(new Date(at))
+  let day = ''
+  let inDay = 0
+  while (at < to.getTime() && out.length < cap) {
+    const key = dayKey(new Date(at))
+    if (key !== day) {
+      day = key
+      inDay = 0
+    }
+    if (inDay < perDay) {
+      out.push(new Date(at))
+      inDay++
+      at += step
+    } else {
+      const midnight = new Date(at)
+      midnight.setHours(24, 0, 0, 0)
+      at += Math.ceil((midnight.getTime() - at) / step) * step
+    }
+  }
   return out
 }
 

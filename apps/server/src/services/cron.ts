@@ -118,13 +118,37 @@ export const nextCron = (expression: string, from: Date = new Date()): Date | nu
   return null
 }
 
-/** Every time the expression names in `[from, to)`, at most `cap`. */
-export const cronTimes = (expression: string, from: Date, to: Date, cap = 400): Date[] => {
+/**
+ * The times the expression names in `[from, to)`: at most `perDay` of each (local) day, then on
+ * to the next day, and at most `cap` in all. A job every 5 minutes over a month is 8640 times;
+ * a calendar needs each day's first few (to see how often, and that the day has runs), not all.
+ */
+export const cronTimes = (
+  expression: string,
+  from: Date,
+  to: Date,
+  cap = 2000,
+  perDay = 48,
+): Date[] => {
   const out: Date[] = []
+  let day = ''
+  let inDay = 0
   let at = nextCron(expression, new Date(from.getTime() - 60_000))
   while (at && at < to && out.length < cap) {
-    out.push(at)
-    at = nextCron(expression, at)
+    const key = at.toDateString()
+    if (key !== day) {
+      day = key
+      inDay = 0
+    }
+    if (inDay < perDay) {
+      out.push(at)
+      inDay++
+      at = nextCron(expression, at)
+    } else {
+      const midnight = new Date(at)
+      midnight.setHours(24, 0, 0, 0)
+      at = nextCron(expression, new Date(midnight.getTime() - 60_000))
+    }
   }
   return out
 }

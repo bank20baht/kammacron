@@ -181,6 +181,12 @@ describe('cron expressions', () => {
   test('times in a range, and a schedule without cron goes by its interval', () => {
     const times = cronTimes('0 */6 * * *', at('2026-11-26T00:00'), at('2026-11-27T00:00'))
     expect(times.map((d) => d.getHours())).toEqual([0, 6, 12, 18])
+    // every 5 minutes over a month: each day still has its times, a day's first 48
+    const month = cronTimes('*/5 * * * *', at('2026-11-01T00:00'), at('2026-12-01T00:00'))
+    const days = new Set(month.map((d) => d.toDateString()))
+    expect(days.size).toBe(30)
+    expect(month.filter((d) => d.getDate() === 30)).toHaveLength(48)
+    expect((month[1]?.getTime() ?? 0) - (month[0]?.getTime() ?? 0)).toBe(5 * 60_000)
     const from = at('2026-11-26T10:00')
     expect(nextScheduleRun({ cron: null, interval_minutes: 30 }, from)).toEqual(
       at('2026-11-26T10:30'),

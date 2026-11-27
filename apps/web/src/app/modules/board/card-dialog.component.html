@@ -46,13 +46,13 @@
         [label]="t('card.decisionLabel')"
         [options]="decisions()"
         [value]="decision()"
-        (bahtChange)="decide($event.value)"
+        (bahtChange)="decision.set($event.value)"
       ></baht-choice-group>
       @switch (decision()) {
         @case ('send-back') {
           <baht-form #back="bahtForm" [form]="sendBackForm()"></baht-form>
           <div class="actions">
-            <baht-button variant="primary" [loading]="busy()" (click)="sendBack(back.element)">{{
+            <baht-button variant="primary" [loading]="busy()" (click)="sendBack(back)">{{
               t('card.decision.sendBack')
             }}</baht-button>
           </div>
@@ -86,14 +86,10 @@
       (bahtDirtyChange)="dirty.set($event.dirty)"
     ></baht-form>
     <div class="actions save">
-      <baht-button
-        variant="primary"
-        [disabled]="!dirty()"
-        [loading]="busy()"
-        (click)="save(f.element)"
-        >{{ t('common.saveChanges') }}</baht-button
-      >
-      <baht-button variant="ghost" [disabled]="!dirty()" (click)="cancel(f.element)">{{
+      <baht-button variant="primary" [disabled]="!dirty()" [loading]="busy()" (click)="save(f)">{{
+        t('common.saveChanges')
+      }}</baht-button>
+      <baht-button variant="ghost" [disabled]="!dirty()" (click)="cancel(f)">{{
         t('common.cancel')
       }}</baht-button>
     </div>

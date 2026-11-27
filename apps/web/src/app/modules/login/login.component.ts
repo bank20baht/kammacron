@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
-import type { BahtForm } from '@20baht/ui'
 
 import { I18n } from '../../core/i18n/i18n.service'
 import { SessionService } from '../../services/session.service'
@@ -11,7 +10,7 @@ import {
   StickerBackdropComponent,
 } from '../../shared/sticker-backdrop.component'
 import { BAHT_STICKERS } from '../../shared/stickers'
-import { dataOf, trimmed } from '../../shared/form-data'
+import { trimmed, type FormOf } from '../../shared/form-data'
 
 /** The API token, once, for the session cookie; or the code `kammacron open` put in the address. */
 @Component({
@@ -100,9 +99,9 @@ import { dataOf, trimmed } from '../../shared/form-data'
             #f="bahtForm"
             [form]="form()"
             submit-on-enter
-            (bahtSubmit)="submit(f.element)"
+            (bahtSubmit)="submit(f)"
           ></baht-form>
-          <baht-button variant="primary" block (click)="submit(f.element)">{{
+          <baht-button variant="primary" block (click)="submit(f)">{{
             t('login.open')
           }}</baht-button>
         </div>
@@ -135,8 +134,8 @@ export class LoginComponent {
     if (await this.session.loginWithCode(code)) void this.router.navigateByUrl('/board')
   }
 
-  protected async submit(form: BahtForm): Promise<void> {
-    const token = trimmed(dataOf(this.form(), form).token)
+  protected async submit(form: FormOf<typeof loginForm>): Promise<void> {
+    const token = trimmed(form.getData().token)
     if (token && (await this.session.login(token))) {
       // the OAuth consent page is the server's, not a route of this app
       if (this.next()?.startsWith('/oauth/')) globalThis.location.assign(this.next() ?? '/')

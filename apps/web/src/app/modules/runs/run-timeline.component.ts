@@ -266,7 +266,7 @@ const clock = (d: Date) =>
         [label]="t('run.timeline.filter')"
         [options]="filterOptions()"
         [selected]="[filter()]"
-        (bahtChange)="pickFilter($event.selected[0])"
+        (bahtChange)="filter.set($event.selected[0] ?? 'all')"
       ></baht-filter>
       <span class="grow"></span>
       <baht-button size="sm" variant="ghost" icon="resize" (click)="toggleAll()">{{
@@ -359,10 +359,6 @@ export class RunTimelineComponent {
   protected readonly clock = clock
   protected readonly took = took
   protected readonly filter = signal<EventFilter>('all')
-  /** The filter's keys come back as plain strings: only one of ours is taken. */
-  protected pickFilter(key: string | undefined): void {
-    this.filter.set(FILTERS.find((f) => f === key) ?? 'all')
-  }
   protected readonly follow = signal(true)
   /** Rows opened (or, with `allOpen`, folded) by hand. */
   private readonly flipped = signal<ReadonlySet<number>>(new Set())
@@ -377,7 +373,7 @@ export class RunTimelineComponent {
   private readonly limit = signal(PAGE)
   protected readonly drawn = computed(() => this.shown().slice(-this.limit()))
   protected readonly hidden = computed(() => this.shown().length - this.drawn().length)
-  protected readonly filterOptions = computed<FieldOption[]>(() =>
+  protected readonly filterOptions = computed<(FieldOption & { key: EventFilter })[]>(() =>
     FILTERS.map((key) => ({ key, label: this.t(`run.timeline.filters.${key}`) })),
   )
   protected readonly followOptions = computed<FieldOption[]>(() => [

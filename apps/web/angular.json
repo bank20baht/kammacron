@@ -20,7 +20,7 @@
             "assets": [{ "glob": "**/*", "input": "public" }],
             "tsConfig": "tsconfig.app.json",
             "styles": [
-              "node_modules/@20baht/ui/dist/tokens.css",
+              "src/elements.css",
               "node_modules/@fontsource-variable/noto-sans-thai/index.css",
               "src/styles.css"
             ]

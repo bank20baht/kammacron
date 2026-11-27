@@ -10,14 +10,14 @@ import {
   untracked,
 } from '@angular/core'
 import { BAHT_UI } from '@20baht/angular'
-import type { BahtForm, TabItem } from '@20baht/ui'
+import type { TabItem } from '@20baht/ui'
 import type { FormValues } from '@20baht/ui/engine'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../../core/i18n/i18n.service'
 import { claudeStepForm, playbookNameForm, runStepForm } from '../../shared/forms'
-import { countOf, dataOf, trimmed } from '../../shared/form-data'
+import { countOf, trimmed, type FormOf } from '../../shared/form-data'
 
 type ClaudeStep = {
   kind: 'claude'
@@ -204,7 +204,7 @@ const toStep = (row: Row): PlaybookStep => {
       <p class="muted">{{ t('project.playbook.env') }}</p>
       <div class="row">
         <baht-form #nf="bahtForm" class="grow" [form]="nameForm()" [value]="{}"></baht-form>
-        <baht-button size="sm" variant="secondary" icon="plus" (click)="addBook(nf.element)">{{
+        <baht-button size="sm" variant="secondary" icon="plus" (click)="addBook(nf)">{{
           t('project.playbook.addBook')
         }}</baht-button>
       </div>
@@ -297,8 +297,8 @@ export class PlaybookEditorComponent {
     this.currentKey.set(Number(value))
   }
 
-  protected addBook(form: BahtForm): void {
-    const name = trimmed(dataOf(this.nameForm(), form).name).toLowerCase()
+  protected addBook(form: FormOf<typeof playbookNameForm>): void {
+    const name = trimmed(form.getData().name).toLowerCase()
     if (!NAME.test(name)) {
       this.error.set(this.t('project.playbook.badName'))
       return
@@ -312,7 +312,7 @@ export class PlaybookEditorComponent {
     this.currentKey.set(book.key)
     this.dirty.set(true)
     this.error.set(null)
-    form.reset()
+    form.element.reset()
   }
 
   protected removeBook(): void {

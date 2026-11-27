@@ -11,7 +11,7 @@ import {
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { dialog } from '@20baht/ui/overlay'
-import type { BahtForm, BahtTabs, Crumb, TabItem } from '@20baht/ui'
+import type { BahtTabs, Crumb, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -21,7 +21,7 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { ago } from '../../shared/format'
 import { projectForm } from '../../shared/forms'
 import { attemptWithNotice, type Notice } from '../../shared/attempt'
-import { countOf, dataOf, filled, trimmed } from '../../shared/form-data'
+import { countOf, filled, trimmed, type FormOf } from '../../shared/form-data'
 import { CronJobsComponent } from '../cron/cron-jobs.component'
 import { PlaybookEditorComponent } from './playbook-editor.component'
 
@@ -147,14 +147,14 @@ export class ProjectSettingsComponent implements HasDraft {
     void this.router.navigateByUrl(url)
   }
 
-  protected discard(form: BahtForm): void {
-    form.reset()
+  protected discard(form: FormOf<typeof projectForm>): void {
+    form.element.reset()
     this.dirty.set(false)
   }
 
-  protected save(form: BahtForm): Promise<void> {
+  protected save(form: FormOf<typeof projectForm>): Promise<void> {
     if (!form.validate().valid) return Promise.resolve()
-    const d = dataOf(this.projectForm(), form)
+    const d = form.getData()
     return this.act(async () => {
       await firstValueFrom(
         this.api.projects({ id: this.id() }).patch({
@@ -172,7 +172,7 @@ export class ProjectSettingsComponent implements HasDraft {
           extra_prompt: d.extra_prompt ?? '',
         }),
       )
-      form.markClean()
+      form.element.markClean()
       this.dirty.set(false)
       this.project.reload()
       if (filled(d.repo_path)) await this.runCheck()

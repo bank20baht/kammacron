@@ -14,7 +14,7 @@ import {
 import { RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
-import type { BahtForm, ChoiceOption, CommentEntry, MenuItem, PreviewImage } from '@20baht/ui'
+import type { ChoiceOption, CommentEntry, MenuItem, PreviewImage } from '@20baht/ui'
 import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -24,7 +24,7 @@ import { ago, cost, stamp } from '../../shared/format'
 import { cardForm, REGISTRY, sameOriginImage, sendBackForm } from '../../shared/forms'
 import { RUN_TONE, statusLabel, type CardStatus } from '../../shared/tones'
 import { attempt } from '../../shared/attempt'
-import { dataOf, trimmed } from '../../shared/form-data'
+import { trimmed, type FormOf } from '../../shared/form-data'
 import { changesOf, formValueOf, type CardFormValue } from './card-changes'
 
 type CardData = NonNullable<ReturnType<CardDialogComponent['card']>['data']>
@@ -32,7 +32,8 @@ type RunStatus = NonNullable<CardData['last_run']>['status']
 
 type Decision = 'send-back' | 'approve' | 'take'
 
-const decisions = (t: Translate): ChoiceOption[] => [
+/** Typed by key, so the choice answers a `Decision`, not a string. */
+const decisions = (t: Translate): (ChoiceOption & { key: Decision })[] => [
   {
     key: 'send-back',
     label: t('card.decision.sendBack'),
@@ -81,7 +82,7 @@ export class CardDialogComponent {
     computation: () => 'send-back',
   })
   /** The Send back note: emptied when another card comes in, so a note is never sent to the wrong card. */
-  private readonly backForm = viewChild<{ element: BahtForm }>('back')
+  private readonly backForm = viewChild<FormOf<typeof sendBackForm>>('back')
   /**
    * The form's clean data: the card as loaded, and as it changes after while nothing is being
    * edited. An edit in progress is never wiped by a live frame.
@@ -167,11 +168,11 @@ export class CardDialogComponent {
     )
   }
 
-  protected async save(form: BahtForm): Promise<void> {
+  protected async save(form: FormOf<typeof cardForm>): Promise<void> {
     const card = this.card().data
     const start = this.start()
     if (!card || !start || !form.validate().valid) return
-    const d = dataOf(this.cardForm(), form)
+    const d = form.getData()
     const id = String(card.id)
     const status = d.status
     // only what was changed here: the card may have been written to since the form was filled
@@ -182,18 +183,13 @@ export class CardDialogComponent {
         await firstValueFrom(this.api.cards({ id }).move.post({ status }))
     })
     if (ok) {
-      form.markClean()
+      form.element.markClean()
       this.dirty.set(false)
     }
   }
 
-  /** The choice's key comes back as a plain string: only a decision is taken. */
-  protected decide(key: string): void {
-    if (key === 'send-back' || key === 'approve' || key === 'take') this.decision.set(key)
-  }
-
-  protected cancel(form: BahtForm): void {
-    form.reset()
+  protected cancel(form: FormOf<typeof cardForm>): void {
+    form.element.reset()
     this.dirty.set(false)
     const card = this.card().data
     if (card) this.follow(card)
@@ -211,9 +207,9 @@ export class CardDialogComponent {
     )
   }
 
-  protected async sendBack(form: BahtForm): Promise<void> {
+  protected async sendBack(form: FormOf<typeof sendBackForm>): Promise<void> {
     if (!form.validate().valid) return
-    const comment = trimmed(dataOf(this.sendBackForm(), form).comment)
+    const comment = trimmed(form.getData().comment)
     if (
       await this.act(() =>
         firstValueFrom(
@@ -221,7 +217,7 @@ export class CardDialogComponent {
         ),
       )
     )
-      form.reset()
+      form.element.reset()
   }
 
   protected take(): Promise<boolean> {

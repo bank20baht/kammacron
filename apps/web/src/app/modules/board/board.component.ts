@@ -11,7 +11,7 @@ import { Router, RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
 import { guess } from '@20baht/live/browser'
-import type { BahtForm, NavItem } from '@20baht/ui'
+import type { NavItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -21,7 +21,7 @@ import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { quickAddForm } from '../../shared/forms'
 import { statusLabel, type CardStatus } from '../../shared/tones'
-import { dataOf, trimmed } from '../../shared/form-data'
+import { trimmed, type FormOf } from '../../shared/form-data'
 import {
   KanbanComponent,
   KanbanFooterDirective,
@@ -222,9 +222,9 @@ export class BoardComponent {
   )
 
   /** Quick add in To do: a Claude card in this project, titled and nothing else. */
-  protected async quickAdd(form: BahtForm): Promise<void> {
+  protected async quickAdd(form: FormOf<typeof quickAddForm>): Promise<void> {
     const project = this.project()
-    const title = trimmed(dataOf(this.quickAddForm(), form).title)
+    const title = trimmed(form.getData().title)
     if (!project || !title) return
     this.busy.set(true)
     try {
@@ -233,7 +233,7 @@ export class BoardComponent {
           cards: [newCardBody({ project_id: project.id, title, owner: 'autopilot' })],
         }),
       )
-      form.reset()
+      form.element.reset()
     } catch (error) {
       this.error.set(describeError(error))
     } finally {

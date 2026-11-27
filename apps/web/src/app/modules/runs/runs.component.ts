@@ -139,7 +139,7 @@ type Query = {
         sortable
         clickable
         [emptyMessage]="t('runs.empty')"
-        (bahtRowClick)="open($event.row['id'])"
+        (bahtRowClick)="open($event.id)"
         (bahtSortChange)="sort($event)"
         (bahtPageChange)="go($event.page)"
       ></baht-table>
@@ -222,8 +222,7 @@ export class RunsComponent {
     this.query.update((q) => ({ ...q, page }))
   }
 
-  /** `id` is the row's own, which the table hands back untyped: the run's number. */
-  protected open(id: unknown): void {
-    if (typeof id === 'number') void this.router.navigate(['/runs', id])
+  protected open(id: number | undefined): void {
+    if (id !== undefined) void this.router.navigate(['/runs', id])
   }
 }

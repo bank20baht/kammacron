@@ -19,13 +19,17 @@ type CardFields = {
   waits_on: readonly { id: number }[]
 }
 
+/** The statuses the form's radio offers (review is the worker's and the person's decision). */
+const FORM_STATUSES = ['todo', 'doing', 'done'] as const
+
 /** The card as the form holds it. */
 export type CardFormValue = ReturnType<typeof formValueOf>
 
 export const formValueOf = (card: CardFields) => ({
   title: card.title,
   body: card.body,
-  status: card.status,
+  // a card in review has no radio of its own: the form shows none picked
+  status: FORM_STATUSES.find((s) => s === card.status) ?? null,
   owner: card.human ? 'human' : card.tags.includes(AUTOPILOT) ? 'autopilot' : 'none',
   priority: card.priority,
   tags: card.tags.filter((t) => t !== AUTOPILOT),
@@ -51,7 +55,7 @@ const sameList = (a: readonly string[], b: readonly string[]) =>
  */
 export const changesOf = (
   start: CardFormValue,
-  data: Omit<CardFormData, 'status'>,
+  data: CardFormData,
   tagsNow: readonly string[],
 ): CardPatch => {
   const patch: CardPatch = {}

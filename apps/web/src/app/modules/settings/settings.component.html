@@ -25,7 +25,7 @@
           [total]="projectRows().length"
           clickable
           [emptyMessage]="t('settings.projects.empty')"
-          (bahtRowClick)="openProject($event.row['id'])"
+          (bahtRowClick)="openProject($event.id)"
         ></baht-table>
         <div class="row">
           <baht-button variant="primary" icon="plus" (click)="addingProject.set(true)">{{
@@ -66,7 +66,7 @@
               </baht-button>
             </div>
             <baht-form #wf="bahtForm" [form]="forms().worker" [value]="workerValue()"></baht-form>
-            <baht-button variant="primary" [disabled]="busy()" (click)="saveWorker(wf.element)">{{
+            <baht-button variant="primary" [disabled]="busy()" (click)="saveWorker(wf)">{{
               t('common.save')
             }}</baht-button>
           </baht-card>
@@ -77,7 +77,7 @@
         @if (settings.value()) {
           <baht-card [heading]="t('settings.access.heading')">
             <baht-form #af="bahtForm" [form]="forms().access" [value]="accessValue()"></baht-form>
-            <baht-button variant="primary" [disabled]="busy()" (click)="saveAccess(af.element)">{{
+            <baht-button variant="primary" [disabled]="busy()" (click)="saveAccess(af)">{{
               t('common.save')
             }}</baht-button>
           </baht-card>

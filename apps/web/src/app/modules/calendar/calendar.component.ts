@@ -174,7 +174,7 @@ const validDay = (key: string | undefined): key is string =>
           [loading]="!calendar().data"
           clickable
           [emptyMessage]="t('calendar.noJobs')"
-          (bahtRowClick)="openRow($event.row['id'])"
+          (bahtRowClick)="open($event.id)"
         ></baht-table>
       </baht-card>
     </div>
@@ -359,12 +359,8 @@ export class CalendarComponent {
     })
   }
 
-  /** `id` is the row's own, which the table hands back untyped: the job's key. */
-  protected openRow(id: unknown): void {
-    if (typeof id === 'string') this.open(id)
-  }
-
-  protected open(id: string): void {
+  protected open(id: string | undefined): void {
+    if (id === undefined) return
     const job = this.jobs().find((j) => j.key === id)
     const target =
       this.drawn().find((d) => d.event.id === id)?.target ?? (job && this.targetOf(job))

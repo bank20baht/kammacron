@@ -1,11 +1,12 @@
 import '@20baht/ui/components/card'
 import '@20baht/ui/components/app-shell'
 import '@20baht/ui/components/button'
+import '@20baht/ui/components/table'
 
 import { Component, signal } from '@angular/core'
 import { TestBed, type ComponentFixture } from '@angular/core/testing'
 import { BAHT_UI } from '@20baht/angular'
-import type { BahtAppShell, BahtCard } from '@20baht/ui'
+import type { BahtAppShell, BahtCard, BahtTable } from '@20baht/ui'
 
 @Component({
   imports: [BAHT_UI],
@@ -21,6 +22,7 @@ import type { BahtAppShell, BahtCard } from '@20baht/ui'
         <section class="editor">second</section>
       }
     </baht-card>
+    <baht-table clickable [items]="rows" (bahtRowClick)="clicked.set($event.id)"></baht-table>
     <baht-app-shell brand="kammacron" brand-href="/board">
       <img data-slot="brand-art" src="/brand/app-mark.webp" alt="" />
       <main>Workspace</main>
@@ -30,6 +32,12 @@ import type { BahtAppShell, BahtCard } from '@20baht/ui'
 class LibraryHost {
   readonly schedules = signal(['daily'])
   readonly editing = signal<'first' | 'second'>('first')
+  readonly rows = [
+    { id: 7, name: 'seven' },
+    { id: 9, name: 'nine' },
+  ]
+  /** `$event.id` is a number here, typed from the rows: no cast in the template. */
+  readonly clicked = signal<number | undefined>(undefined)
 }
 
 /** Flush Angular, Lit, and the library's child-projection observer. */
@@ -89,6 +97,15 @@ describe('published @20baht/ui library gap fixes', () => {
     })
     link?.click()
     expect(destination).toBe('/board')
+    fixture.destroy()
+  })
+
+  it("hands a clicked row's own id back, typed, with no row-key set", async () => {
+    const fixture = TestBed.createComponent(LibraryHost)
+    const root = await settle(fixture)
+    await root.querySelector<BahtTable>('baht-table')?.updateComplete
+    root.querySelectorAll<HTMLElement>('.baht-table-row')[1]?.click()
+    expect(fixture.componentInstance.clicked()).toBe(9)
     fixture.destroy()
   })
 })

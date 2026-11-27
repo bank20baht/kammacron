@@ -9,7 +9,7 @@ import {
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
-import type { BahtForm, ColumnMap, TabItem } from '@20baht/ui'
+import type { ColumnMap, TabItem } from '@20baht/ui'
 import { defineForm } from '@20baht/ui/engine'
 import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
@@ -20,7 +20,7 @@ import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { accessForm, workerForm } from '../../shared/forms'
 import { attemptWithNotice, type Notice } from '../../shared/attempt'
-import { dataOf, filled, trimmed } from '../../shared/form-data'
+import { filled, trimmed, type FormOf } from '../../shared/form-data'
 import { DataSettingsComponent } from './data-settings.component'
 import { ProjectWizardComponent } from './project-wizard.component'
 
@@ -148,9 +148,9 @@ export class SettingsComponent {
     )
   }
 
-  protected saveWorker(form: BahtForm): Promise<void> {
+  protected saveWorker(form: FormOf<typeof workerForm>): Promise<void> {
     if (!form.validate().valid) return Promise.resolve()
-    const d = dataOf(this.forms().worker, form)
+    const d = form.getData()
     return this.save({
       stale_minutes: Math.round(d.stale_minutes ?? Number.NaN),
       concurrency: Math.round(d.concurrency ?? Number.NaN),
@@ -158,8 +158,8 @@ export class SettingsComponent {
     })
   }
 
-  protected saveAccess(form: BahtForm): Promise<void> {
-    const d = dataOf(this.forms().access, form)
+  protected saveAccess(form: FormOf<typeof accessForm>): Promise<void> {
+    const d = form.getData()
     return this.save({
       allowed_hosts: d.allowed_hosts,
       webhook_url: filled(d.webhook_url),
@@ -183,8 +183,7 @@ export class SettingsComponent {
     if (next) this.i18n.setLocale(next)
   }
 
-  /** `id` is the row's own, which the table hands back untyped: the project's number. */
-  protected openProject(id: unknown): void {
-    if (typeof id === 'number') void this.router.navigate(['/settings/projects', id])
+  protected openProject(id: number | undefined): void {
+    if (id !== undefined) void this.router.navigate(['/settings/projects', id])
   }
 }

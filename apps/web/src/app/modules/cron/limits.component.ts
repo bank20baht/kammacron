@@ -70,7 +70,8 @@ const REFRESH_MS = 60_000
   `,
   template: `
     @for (a of agents(); track a.key) {
-      <baht-card>
+      <!-- fill: side by side, the cards share the taller one's height, numbers or not -->
+      <baht-card fill>
         <div class="top">
           <baht-icon [name]="a.key === 'claude' ? 'sparkles' : 'code'"></baht-icon>
           <span class="name">{{ a.name }}</span>

@@ -41,6 +41,8 @@ export type CardQuery = {
   archived?: boolean | undefined
   /** Each card's body left empty: the board draws tiles, and a card opened is fetched whole. */
   lean?: boolean | undefined
+  /** At most this many, in the list's order (by column, then place in it); all when omitted. */
+  limit?: number | undefined
 }
 
 export const listCards = (db: Executor, query: CardQuery = {}) => {
@@ -53,13 +55,14 @@ export const listCards = (db: Executor, query: CardQuery = {}) => {
     const text = or(ilike(cards.title, like), ilike(cards.body, like))
     if (text) where.push(text)
   }
-  return db
+  const found = db
     .select(
       query.lean ? { ...getTableColumns(cards), body: sql<string>`''` } : getTableColumns(cards),
     )
     .from(cards)
     .where(and(...where))
     .orderBy(asc(cards.status), asc(cards.position), asc(cards.id))
+  return query.limit === undefined ? found : found.limit(query.limit)
 }
 
 const cardRow = async (db: Executor, id: number): Promise<Card> => {

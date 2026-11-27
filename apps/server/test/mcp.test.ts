@@ -59,6 +59,34 @@ describe('mcp', () => {
     expect(status).toBe(401)
   })
 
+  test('list_cards answers a tool with titles, and a bounded number of them; the web app gets what it asks for', async () => {
+    const project = await t.json<{ id: number }>('POST', '/api/projects', { slug: 'p', name: 'P' })
+    for (let batch = 0; batch < 3; batch++)
+      await t.json('POST', '/api/cards/batch', {
+        cards: Array.from({ length: 40 }, (_, i) => ({
+          project_id: project.id,
+          title: `card ${String(batch * 40 + i)}`,
+          body: 'a long description '.repeat(50),
+        })),
+      })
+    type Row = { title: string; body: string }
+    const cardsOf = (answer: { body: RpcBody }) =>
+      JSON.parse(must(answer.body.result?.content?.[0]).text) as Row[]
+    const listed = cardsOf(await rpc('tools/call', { name: 'list_cards', arguments: {} }))
+    expect(listed).toHaveLength(100)
+    expect(listed.every((card) => card.body === '')).toBe(true)
+    // it can ask for the bodies, and for fewer or more
+    const asked = cardsOf(
+      await rpc('tools/call', { name: 'list_cards', arguments: { lean: 'false', limit: 2 } }),
+    )
+    expect(asked).toHaveLength(2)
+    expect(asked[0]?.body).toContain('a long description')
+    // the board, not a tool: every card, as before
+    const board = await t.json<Row[]>('GET', '/api/cards')
+    expect(board).toHaveLength(120)
+    expect(board[0]?.body).toContain('a long description')
+  })
+
   test("a tool call runs the route; a comment from the worker's run is marked as the worker's", async () => {
     const project = await t.json<{ id: number }>('POST', '/api/projects', { slug: 'p', name: 'P' })
     const created = await rpc('tools/call', {

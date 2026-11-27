@@ -1,7 +1,7 @@
 import { readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { and, count, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, lt, or, sql, type SQL } from 'drizzle-orm'
 
 import type { Executor } from '../db'
 import { purgeOrphans } from './attachments'
@@ -83,7 +83,7 @@ export const retentionOf = async (db: Executor): Promise<Retention> => {
   return Object.fromEntries(RETENTION_KEYS.map((k) => [k, row?.[k] ?? null])) as Retention
 }
 
-const n = async (query: Promise<{ n: number }[]>) => (await query)[0]?.n ?? 0
+const countOf = async (query: Promise<{ n: number }[]>) => (await query)[0]?.n ?? 0
 
 /** Done cards the archive length has passed. */
 const doneDue = (days: number) =>
@@ -107,17 +107,32 @@ export const dataSummary = async (
   r: Retention,
 ): Promise<DataKind[]> => {
   const files = await logFiles(dataDir)
-  const never = sql`false`
+  /** How many rows `all` holds, and how many of them `due` lets go: one pass over the table. */
+  const counts = async (
+    table: typeof runSteps | typeof runs | typeof cards | typeof alerts,
+    all: SQL | undefined,
+    due: SQL | undefined,
+  ) => {
+    const [row] = await db
+      .select({
+        total: all ? sql<number>`count(*) filter (where ${all})::int` : sql<number>`count(*)::int`,
+        due: due ? sql<number>`count(*) filter (where ${due})::int` : sql<number>`0`,
+      })
+      .from(table)
+    return { total: row?.total ?? 0, due: row?.due ?? 0 }
+  }
   const kinds: DataKind[] = [
     {
       key: 'run_log_retention_days',
-      total: await n(db.select({ n: count() }).from(runEvents)),
+      // the largest table by far, and the one case where two questions beat one pass: each is
+      // answered from an index alone (once the daily vacuum has run), not by reading every event
+      total: await countOf(db.select({ n: sql<number>`count(*)::int` }).from(runEvents)),
       due:
         r.run_log_retention_days === null
           ? 0
-          : await n(
+          : await countOf(
               db
-                .select({ n: count() })
+                .select({ n: sql<number>`count(*)::int` })
                 .from(runEvents)
                 .where(older(runEvents.created_at, r.run_log_retention_days)),
             ),
@@ -125,77 +140,56 @@ export const dataSummary = async (
     },
     {
       key: 'step_output_retention_days',
-      total: await n(db.select({ n: count() }).from(runSteps).where(isNotNull(runSteps.output))),
-      due: await n(
-        db
-          .select({ n: count() })
-          .from(runSteps)
-          .where(
-            r.step_output_retention_days === null
-              ? never
-              : and(
-                  isNotNull(runSteps.output),
-                  older(runSteps.created_at, r.step_output_retention_days),
-                ),
-          ),
-      ),
+      ...(await counts(
+        runSteps,
+        isNotNull(runSteps.output),
+        r.step_output_retention_days === null
+          ? undefined
+          : and(
+              isNotNull(runSteps.output),
+              older(runSteps.created_at, r.step_output_retention_days),
+            ),
+      )),
       bytes: null,
     },
     {
       key: 'run_retention_days',
-      total: await n(db.select({ n: count() }).from(runs)),
-      due: await n(
-        db
-          .select({ n: count() })
-          .from(runs)
-          .where(r.run_retention_days === null ? never : runDue(r.run_retention_days)),
-      ),
+      ...(await counts(
+        runs,
+        undefined,
+        r.run_retention_days === null ? undefined : runDue(r.run_retention_days),
+      )),
       bytes: null,
     },
     {
       key: 'done_card_archive_days',
-      total: await n(
-        db
-          .select({ n: count() })
-          .from(cards)
-          .where(and(eq(cards.status, 'done'), eq(cards.archived, false))),
-      ),
-      due: await n(
-        db
-          .select({ n: count() })
-          .from(cards)
-          .where(r.done_card_archive_days === null ? never : doneDue(r.done_card_archive_days)),
-      ),
+      ...(await counts(
+        cards,
+        and(eq(cards.status, 'done'), eq(cards.archived, false)),
+        r.done_card_archive_days === null ? undefined : doneDue(r.done_card_archive_days),
+      )),
       bytes: null,
     },
     {
       key: 'archived_card_retention_days',
-      total: await n(db.select({ n: count() }).from(cards).where(eq(cards.archived, true))),
-      due: await n(
-        db
-          .select({ n: count() })
-          .from(cards)
-          .where(
-            r.archived_card_retention_days === null
-              ? never
-              : archivedDue(r.archived_card_retention_days),
-          ),
-      ),
+      ...(await counts(
+        cards,
+        eq(cards.archived, true),
+        r.archived_card_retention_days === null
+          ? undefined
+          : archivedDue(r.archived_card_retention_days),
+      )),
       bytes: null,
     },
     {
       key: 'alert_retention_days',
-      total: await n(db.select({ n: count() }).from(alerts).where(eq(alerts.read, true))),
-      due: await n(
-        db
-          .select({ n: count() })
-          .from(alerts)
-          .where(
-            r.alert_retention_days === null
-              ? never
-              : and(eq(alerts.read, true), older(alerts.created_at, r.alert_retention_days)),
-          ),
-      ),
+      ...(await counts(
+        alerts,
+        eq(alerts.read, true),
+        r.alert_retention_days === null
+          ? undefined
+          : and(eq(alerts.read, true), older(alerts.created_at, r.alert_retention_days)),
+      )),
       bytes: null,
     },
   ]

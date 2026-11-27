@@ -34,6 +34,9 @@ A card tagged "playbook:<name>" runs that playbook of its project instead of the
 Work that touches security, data or migrations, release or deploy, a breaking API, money, or a product decision is for a person: set human=true.
 When a task is mostly a person's, split what an agent can do alone into small "${AUTOPILOT_TAG}" cards and make the big card wait on them (waits_on).`
 
+/** How many cards a tool call gets from list_cards when it names no limit. */
+const TOOL_CARDS = 100
+
 const Status = oneOf(CARD_STATUSES, { description: 'todo, doing, review or done' })
 const Id = idParams('Card number, as in #12')
 const IdempotencyHeader = t.Object({
@@ -131,29 +134,54 @@ export const cardRoutes = (ctx: AppContext) => {
         }),
       )
       .use(liveMacro(ctx.live))
-      .get('/cards', ({ query }) => listCards(ctx.db, query), {
-        query: t.Object({
-          project_id: t.Optional(
-            t.Numeric({ description: 'Only this project (list_projects for ids)' }),
-          ),
-          status: t.Optional(Status),
-          tag: t.Optional(t.String({ description: 'Only cards with this tag' })),
-          q: t.Optional(t.String({ description: 'Text in the title or body' })),
-          archived: t.Optional(t.BooleanString({ description: 'true: archived cards instead' })),
-          lean: t.Optional(
-            t.BooleanString({ description: "true: each card's body left empty (a board's tiles)" }),
-          ),
-        }),
-        live: liveRoute(ctx.live, {
-          topics: () => ['cards', 'card_waits_on', 'runs@status=running'],
-          key: 'id',
-        }),
-        detail: {
-          operationId: 'list_cards',
-          summary: 'Find cards by project, status, tag or text',
-          mcp: true,
+      .get(
+        '/cards',
+        ({ query, request }) => {
+          // A tool call's answer is read by a model, word by word: the bodies of a whole board
+          // are megabytes of it. A tool gets titles, and at most TOOL_CARDS of them, unless it
+          // asks for more; get_card has one card in full.
+          const tool = isToolCall(request)
+          return listCards(ctx.db, {
+            ...query,
+            lean: query.lean ?? tool,
+            limit: query.limit ?? (tool ? TOOL_CARDS : undefined),
+          })
         },
-      })
+        {
+          query: t.Object({
+            project_id: t.Optional(
+              t.Numeric({ description: 'Only this project (list_projects for ids)' }),
+            ),
+            status: t.Optional(Status),
+            tag: t.Optional(t.String({ description: 'Only cards with this tag' })),
+            q: t.Optional(t.String({ description: 'Text in the title or body' })),
+            archived: t.Optional(t.BooleanString({ description: 'true: archived cards instead' })),
+            lean: t.Optional(
+              t.BooleanString({
+                description:
+                  "false: with each card's body (long; get_card has one card in full). Bodies are left out by default",
+              }),
+            ),
+            limit: t.Optional(
+              t.Numeric({
+                minimum: 1,
+                maximum: 1000,
+                description: `At most this many cards (default ${String(TOOL_CARDS)}); narrow by project, status, tag or q instead of raising it`,
+              }),
+            ),
+          }),
+          live: liveRoute(ctx.live, {
+            topics: () => ['cards', 'card_waits_on', 'runs@status=running'],
+            key: 'id',
+          }),
+          detail: {
+            operationId: 'list_cards',
+            summary:
+              'Find cards by project, status, tag or text: their titles, tags and status, without bodies (get_card for one in full)',
+            mcp: true,
+          },
+        },
+      )
       .get('/cards/:id', ({ params }) => getCard(ctx.db, Number(params.id)), {
         params: Id,
         live: liveRoute(ctx.live, {

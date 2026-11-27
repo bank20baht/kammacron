@@ -1,12 +1,27 @@
 ---
 name: demo-video
-description: Make (or remake) kammacron's "AI factory" demo video from the real app and a real terminal — a bug-hunting cron job files cards, a second cron job fixes them one a minute, shown side by side — in the storybook paper style with the owner's ลายฉลุ buffalo mascot, Thai captions and light music. Use when the user asks for a demo, intro or promo video of kammacron, or to update it after a new feature.
+description: Make (or remake) kammacron's "AI factory" demo video from the real app and a real terminal — a bug-hunting cron job files cards, a second cron job fixes them one a minute, shown side by side — in the approved look: the owner's Thai landscapes behind paper windows and captions, the owner's ลายฉลุ buffalo mascot as a jointed หนังตะลุง puppet in the corner like a vtuber, Thai captions and light music. Use when the user asks for a demo, intro or promo video of kammacron, or to update it after a new feature.
 ---
 
 # kammacron demo video ("AI factory")
 
-The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-agents.mp4`, 1:38,
-1920x1080). Remake it with this kit when the app changes; change the story only when asked.
+The look the owner approved on 2026-11-27 ("ยอดเยี่ยม … ให้คงสไตล์แบบนี้ไว้"):
+`docs/screenshots/kammacron-cron-agents-landscape.mp4` (1:49, 1920x1080, kit commit `6479dd3`).
+**Keep this style in every remake**: the owner's landscapes as backgrounds, paper windows, tape,
+torn caption strip and tags on top, one jointed mascot bottom-left. Remake it with this kit when the
+app changes; change the story or the look only when asked.
+
+## The approved look, at a glance
+
+| Piece | How it is |
+| --- | --- |
+| Background | the owner's landscape for the scene (`paper.BACKGROUNDS`), full frame |
+| Windows | real browser / terminal recordings, dark outline, shadow, washi tape on the top corners, a real URL bar |
+| Captions | a torn cream paper strip along the bottom, a coloured paper tag over Thai text, centred right of the mascot |
+| Top strip (split scenes) | paper tags: which run, 🐞 / 🔧 / ✅ / 👀 counts from the real board |
+| Mascot | `docs/design/mascot.png`, one a frame, 420 px, bottom-left, bobbing; arm and jaw move on their pins |
+| Cards | factory and end card: paper pieces popping up over a landscape, the mascot in the same corner |
+| Sound | the synthesised bright track, a paper pop as pieces stand up, about −20 LUFS |
 
 ## The story (hard sell: an AI factory on your machine)
 
@@ -20,16 +35,16 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
    Done. The first run at about 1.3x, later ones sped up ("โหมดโรงงาน ×N"), waits fast-forwarded.
    A top strip counts 🐞 cards / 🔧 doing / ✅ Done / 👀 review, from the real board.
 5. **Terminal**: `git log --oneline` and `git diff --stat` of the shop: the agent's real commits.
-6. **Paper conveyor card** (machines "Cron หาบัค" → belt → "Cron แก้บัค" → Done, the buffalo
-   walking in the corner) with the real numbers, then the **end card** (`bunx kammacron start`, kammacron.pages.dev).
+6. **Paper conveyor card** (machines "Cron หาบัค" → belt → "Cron แก้บัค" → Done, the mascot
+   in its corner) with the real numbers, then the **end card** (`bunx kammacron start`, kammacron.pages.dev).
 
 ## What the owner asked for (keep it so)
 
 - **Real everything**: the real web app and a real terminal, real Claude runs. Never fake a
   result; captions say what *this* recording's agent did (a card in Review, a card left to a person).
-- **Thai captions** on the leather caption band *below* the windows — never over the page.
-- **Storybook paper pop-up** graphics: textured paper, torn edges, pieces that stand up off the
-  page one after another. Bright, flat colours, **no gradients**.
+- **Thai captions** on the torn paper strip *below* the windows — never over the page.
+- **Storybook paper pop-up** pieces over the landscapes: textured paper, torn edges, pieces that
+  stand up one after another. Bright, flat colours, **no gradients** of our own.
 - **Backgrounds**: the owner's landscapes (2026-11-27), `docs/design/video-backgrounds/`
   (`waterfall`, `beach`, `field`, `hills`; blue and orange print style), one a scene by
   `paper.BACKGROUNDS`: the hunt's setup and the terminal on `hills`, the hunt on `waterfall`, the
@@ -48,8 +63,10 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
   arm waves and the jaw talks in a 3.2 s loop (`MASCOT_LOOP`), rendered once to a transparent
   `mascot-loop.mov` that compose loops in every scene; the cards animate the same pieces in CSS.
   A cut that leaves a sliver of outline behind when the piece turns needs its polygon widened
-  outward (the outside is transparent). (Tried and set aside on 2026-11-27: a full shadow-puppet look, commit
-  `e7602dd`, and an SVG buffalo drawn before the owner's mascot existed, commit `16dc63d`.)
+  outward (the outside is transparent). - **Not the look** (tried on 2026-11-27 and set aside, do not bring back unasked): plain
+  construction-paper backgrounds, a full shadow-puppet theme (commit `e7602dd`), an SVG buffalo
+  of our own (`16dc63d`), a mascot in both margins (`071d5d1`). The earlier cuts stay in
+  `docs/screenshots/` under their own names.
 - The browser windows show an **address bar with the real URL** of that moment; terminal windows
   have a title bar; washi tape on the corners.
 - **Light, bright background music** (synthesised in `music.py`, no licence issues) and a soft
@@ -141,7 +158,7 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
 kit/setup.sh            work dir: scripts, bin/kammacron, tapes, the shop repo
 kit/make.sh             one clean recording (copied into the work dir)
 kit/scripts/record.py   the web scenes (Playwright), marks, URL and card-count timelines
-kit/scripts/compose.py  the cut: windows on the screen, captions, speeds, cards, music, mux
+kit/scripts/compose.py  the cut: windows on the landscapes, captions, the corner mascot, speeds, cards, music, mux
 kit/scripts/paper.py    paper style: cards (factory, end, …), backdrops, tape, captions, bars, and
                         where the mascot (docs/design/mascot.png) stands
 kit/scripts/music.py    the synthesised track and the pop

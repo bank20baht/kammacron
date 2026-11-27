@@ -84,6 +84,12 @@
         }
       </div>
 
+      <div data-tab="data" class="stack">
+        @if (tab() === 'data') {
+          <web-data-settings></web-data-settings>
+        }
+      </div>
+
       <div data-tab="machine" class="stack">
         @if (system.value(); as sys) {
           <baht-card [heading]="t('settings.machine.heading')" [subtitle]="sys.data_dir">

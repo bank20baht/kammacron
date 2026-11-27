@@ -9,6 +9,7 @@ import {
 } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
+import { dialog } from '@20baht/ui/overlay'
 import type { BahtForm, Crumb, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
@@ -175,5 +176,27 @@ export class ProjectSettingsComponent {
       await firstValueFrom(this.api.projects({ id: this.id() }).resume.post())
       this.project.reload()
     }, this.t('project.messages.resumed'))
+  }
+
+  /** A person's to do: they type its name, then it goes with everything in it. */
+  protected async remove(p: { id: number; name: string; slug: string }): Promise<void> {
+    const typed = await dialog.prompt(this.t('project.danger.prompt', { name: p.name }), {
+      tone: 'danger',
+      title: this.t('project.danger.heading'),
+      confirmText: this.t('project.danger.remove'),
+      placeholder: p.name,
+    })
+    if (typed === null || (typed.trim() !== p.name && typed.trim() !== p.slug)) return
+    this.busy.set(true)
+    try {
+      await firstValueFrom(
+        this.api.projects({ id: String(p.id) }).delete({}, { query: { confirm: typed.trim() } }),
+      )
+      void this.router.navigate(['/settings'])
+    } catch (error) {
+      this.message.set({ tone: 'danger', text: describeError(error) })
+    } finally {
+      this.busy.set(false)
+    }
   }
 }

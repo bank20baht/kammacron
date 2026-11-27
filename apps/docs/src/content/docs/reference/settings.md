@@ -14,4 +14,4 @@ description: Settings that apply to the whole install.
 | Access & notifications | Public URL (a tunnel)    | none          | The tunnel's `https://` address; turns OAuth on for `/mcp` (read at start) |
 | This machine           | Language                 | English       | The web app's language, kept per browser                                   |
 
-Run events are kept for 30 days (`run_log_retention_days`).
+**Data** sets how long run logs, step output, runs, done and archived cards, and read alerts are kept: see [data on disk](/reference/data/#how-long-it-is-kept).

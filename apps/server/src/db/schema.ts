@@ -27,7 +27,22 @@ export const settings = pgTable('settings', {
   api_token_hash: text('api_token_hash').notNull(),
   paused: boolean('paused').notNull().default(false),
   stale_minutes: integer('stale_minutes').notNull().default(60),
-  run_log_retention_days: integer('run_log_retention_days').notNull().default(30),
+  /*
+   * How long kept data stays (days; null: kept until a person removes it). The daily
+   * housekeeping applies them: services/retention.ts.
+   */
+  /** A run's events (its timeline) and its raw log file. */
+  run_log_retention_days: integer('run_log_retention_days').default(30),
+  /** The end of each step's output. */
+  step_output_retention_days: integer('step_output_retention_days').default(90),
+  /** A run itself (status, times, cost, summary): what Stats counts. */
+  run_retention_days: integer('run_retention_days').default(365),
+  /** A done card is archived (off the board, still there) after this long. */
+  done_card_archive_days: integer('done_card_archive_days').default(14),
+  /** An archived card is removed, with its comments and attachments, after this long. */
+  archived_card_retention_days: integer('archived_card_retention_days').default(180),
+  /** An alert that was read. */
+  alert_retention_days: integer('alert_retention_days').default(30),
   allowed_hosts: text('allowed_hosts').array().notNull().default([]),
   /** PATH for `claude`, `git` and hooks: the shell's, saved when the service was installed. */
   worker_path: text('worker_path'),
@@ -138,6 +153,10 @@ export const cards = pgTable(
     stale_count: integer('stale_count').notNull().default(0),
     claimed_by_run: integer('claimed_by_run'),
     archived: boolean('archived').notNull().default(false),
+    /** When it last moved to done; null otherwise (and for cards from before it was kept). */
+    done_at: timestamp('done_at', { withTimezone: true }),
+    /** When it was archived; null while it is not (and for cards from before it was kept). */
+    archived_at: timestamp('archived_at', { withTimezone: true }),
     ...timestamps,
   },
   (t) => [index('cards_project_status').on(t.project_id, t.status)],

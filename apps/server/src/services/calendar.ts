@@ -109,7 +109,7 @@ const scheduleJob = (
   off,
 })
 
-const housekeepingJob = (status: LoopStatus, retentionDays: number): CronJob => {
+const housekeepingJob = (status: LoopStatus): CronJob => {
   const last = status?.housekeeping_at ? new Date(status.housekeeping_at) : null
   return {
     key: 'housekeeping',
@@ -124,9 +124,7 @@ const housekeepingJob = (status: LoopStatus, retentionDays: number): CronJob => 
     times: null,
     next_at: last ? new Date(last.getTime() + HOUSEKEEPING_MINUTES * 60_000).toISOString() : null,
     last_at: iso(last),
-    last_result: last
-      ? `old run events (over ${String(retentionDays)} days) and orphan files removed`
-      : null,
+    last_result: last ? 'data past its retention (Settings → Data) and orphan files removed' : null,
     off: status === null ? 'worker not running in this process' : null,
   }
 }
@@ -163,11 +161,7 @@ export const listCronJobs = async (
       return [scheduleJob(s, p, off, range)]
     },
   )
-  return [
-    ...live.map((p) => workerJob(p, offOf(p))),
-    ...scheduleJobs,
-    housekeepingJob(status, settings.run_log_retention_days),
-  ]
+  return [...live.map((p) => workerJob(p, offOf(p))), ...scheduleJobs, housekeepingJob(status)]
 }
 
 /** The runs that started between two instants (from included, to excluded), oldest first. */

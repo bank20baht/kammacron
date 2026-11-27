@@ -4,7 +4,13 @@ import { identityProof, isOwner, newLoginCode, sessionCookie, useLoginCode } fro
 import type { AppContext } from '../context'
 import { sameSecret } from '../secrets'
 import { disconnectOAuth } from '../services/oauth-storage'
+import { RETENTION_KEYS, cleanUp, dataSummary, retentionOf } from '../services/retention'
 import { getSettings, rotateToken, updateSettings } from '../services/settings'
+
+/** A retention length: days, or null to keep until a person removes it. */
+const Days = t.Nullable(t.Integer({ minimum: 1, maximum: 3650 }))
+/** A length being chosen, to see what it would let go: days, or `never`. */
+const Length = t.Union([t.Literal('never'), t.String({ pattern: '^[1-9][0-9]{0,3}$' })])
 
 /** Behind an https tunnel the cookie must never travel in the clear. */
 const isHttps = (request: Request) => request.headers.get('origin')?.startsWith('https://') ?? false
@@ -64,7 +70,7 @@ export const systemRoutes = (ctx: AppContext) =>
         return {
           paused: row.paused,
           stale_minutes: row.stale_minutes,
-          run_log_retention_days: row.run_log_retention_days,
+          ...Object.fromEntries(RETENTION_KEYS.map((k) => [k, row[k]])),
           allowed_hosts: row.allowed_hosts,
           worker_path: row.worker_path,
           concurrency: row.concurrency,
@@ -88,7 +94,12 @@ export const systemRoutes = (ctx: AppContext) =>
           t.Object({
             paused: t.Boolean(),
             stale_minutes: t.Integer({ minimum: 5, maximum: 24 * 60 }),
-            run_log_retention_days: t.Integer({ minimum: 1, maximum: 3650 }),
+            run_log_retention_days: Days,
+            step_output_retention_days: Days,
+            run_retention_days: Days,
+            done_card_archive_days: Days,
+            archived_card_retention_days: Days,
+            alert_retention_days: Days,
             allowed_hosts: t.Array(t.String({ pattern: '^[a-z0-9.-]+$' })),
             worker_path: t.Nullable(t.String()),
             concurrency: t.Integer({ minimum: 1, maximum: 8 }),
@@ -100,6 +111,41 @@ export const systemRoutes = (ctx: AppContext) =>
         detail: { operationId: 'update_settings', summary: 'Pause, timeouts, allowed hosts' },
       },
     )
+    // what is kept, for how long, and letting go of it now: the person's, never an agent's
+    .get(
+      '/data',
+      async ({ query }) => {
+        const r = await retentionOf(ctx.db)
+        // a length being chosen (not saved yet): what it would let go
+        for (const k of RETENTION_KEYS) {
+          const v = query[k]
+          if (v !== undefined) r[k] = v === 'never' ? null : Number(v)
+        }
+        return { retention: r, kinds: await dataSummary(ctx.db, ctx.worker.dataDir, r) }
+      },
+      {
+        query: t.Partial(
+          t.Object({
+            run_log_retention_days: Length,
+            step_output_retention_days: Length,
+            run_retention_days: Length,
+            done_card_archive_days: Length,
+            archived_card_retention_days: Length,
+            alert_retention_days: Length,
+          }),
+        ),
+        detail: {
+          operationId: 'data_summary',
+          summary: 'How much is kept of each kind, and how much the retention lets go now',
+        },
+      },
+    )
+    .post('/data/clean', () => cleanUp(ctx.db, ctx.worker.dataDir), {
+      detail: {
+        operationId: 'clean_data',
+        summary: 'Let go now of what the retention lengths have passed (the daily housekeeping)',
+      },
+    })
     .post(
       '/token/rotate',
       async ({ request, set }) => {

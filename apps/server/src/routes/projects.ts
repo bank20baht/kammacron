@@ -3,7 +3,12 @@ import { Elysia, t } from 'elysia'
 
 import type { AppContext } from '../context'
 import { idParams, oneOf } from './params'
+import { and, eq } from 'drizzle-orm'
+
+import { runs } from '../db/schema'
+import { conflict, invalid } from '../services/errors'
 import { createProject, getProject, listProjects, updateProject } from '../services/projects'
+import { removeProject } from '../services/retention'
 import { childEnv } from '../worker/env'
 import { approveMcpServers } from '../worker/mcp-approvals'
 import { gitIn, localGit } from '../worker/git'
@@ -144,6 +149,32 @@ export const projectRoutes = (ctx: AppContext) => {
           params: Id,
           body: t.Partial(t.Object({ slug: t.String(), archived: t.Boolean(), ...ProjectFields })),
           detail: { operationId: 'update_project', summary: 'Change a project' },
+        },
+      )
+      // a person's to do, never an agent's (not an MCP tool), and only when they name it
+      .delete(
+        '/projects/:id',
+        async ({ params, query }) => {
+          const project = await getProject(ctx.db, Number(params.id))
+          if (query.confirm !== project.name && query.confirm !== project.slug)
+            throw invalid('CONFIRM_NAME', "type the project's name to remove it")
+          const [running] = await ctx.db
+            .select({ id: runs.id })
+            .from(runs)
+            .where(and(eq(runs.project_id, project.id), eq(runs.status, 'running')))
+          if (running)
+            throw conflict('RUN_GOING', `run ${String(running.id)} is going: stop it first`)
+          await removeProject(ctx.db, ctx.worker.dataDir, project.id)
+          return { ok: true as const }
+        },
+        {
+          params: Id,
+          query: t.Object({ confirm: t.String() }),
+          detail: {
+            operationId: 'delete_project',
+            summary:
+              'Remove a project with its cards, runs and cron jobs; `confirm` is its name or slug',
+          },
         },
       )
   )

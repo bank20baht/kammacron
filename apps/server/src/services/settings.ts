@@ -1,3 +1,4 @@
+import type { RetentionKey } from './retention'
 import { eq } from 'drizzle-orm'
 
 import { firstRow, type Executor } from '../db'
@@ -52,7 +53,7 @@ export const updateSettings = async (
       Settings,
       | 'paused'
       | 'stale_minutes'
-      | 'run_log_retention_days'
+      | RetentionKey
       | 'allowed_hosts'
       | 'worker_path'
       | 'concurrency'

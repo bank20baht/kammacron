@@ -11,6 +11,7 @@ import { claudeLimits, codexLimits } from '../services/limits'
 import { listCronJobs, runsBetween } from '../services/calendar'
 import { getCard, moveCard, updateCard } from '../services/cards'
 import { conflict, invalid, notFound } from '../services/errors'
+import { removeSchedule } from '../services/retention'
 import { getProject, updateProject, type Project } from '../services/projects'
 import { nextCron } from '../services/cron'
 import { getRunWithEvents, listRuns, runLabels, withLabels } from '../services/runs'
@@ -480,6 +481,22 @@ export const runRoutes = (ctx: AppContext) =>
         params: Id,
         body: t.Partial(t.Object(scheduleFields)),
         detail: { operationId: 'update_schedule', summary: 'Change or turn off a schedule' },
+      },
+    )
+    // a person's to do, never an agent's: not an MCP tool
+    .delete(
+      '/schedules/:id',
+      async ({ params }) => {
+        const gone = await removeSchedule(ctx.db, Number(params.id))
+        if (!gone) throw notFound('schedule', params.id)
+        return gone
+      },
+      {
+        params: Id,
+        detail: {
+          operationId: 'delete_schedule',
+          summary: 'Remove a cron job (its runs stay); turning it off keeps it',
+        },
       },
     )
     .post(

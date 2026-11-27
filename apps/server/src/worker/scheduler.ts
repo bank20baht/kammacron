@@ -1,5 +1,3 @@
-import { join } from 'node:path'
-
 import { and, eq, isNotNull, isNull, lte, or } from 'drizzle-orm'
 
 import { cards, PLAYBOOK_TAG, projects, runs, schedules } from '../db/schema'
@@ -8,11 +6,10 @@ type Schedule = typeof schedules.$inferSelect
 import { addAlert } from '../services/alerts'
 import { HOUSEKEEPING_MINUTES } from '../services/calendar'
 import { nextScheduleRun } from '../services/cron'
-import { purgeOrphans } from '../services/attachments'
-import { purgeOAuth } from '../services/oauth-storage'
 import { addComment, createCards, moveCard, pickableCards } from '../services/cards'
 import { getProject, type Project } from '../services/projects'
-import { markInterruptedRuns, pruneRunEvents } from '../services/runs'
+import { markInterruptedRuns } from '../services/runs'
+import { cleanUp } from '../services/retention'
 import { getSettings } from '../services/settings'
 import { redact } from './redact'
 import { childEnv, claudeHeld, passedSecrets, type WorkerEnv } from './env'
@@ -361,14 +358,11 @@ export const createScheduler = (env: WorkerEnv) => {
     }
   }
 
-  /** Once a day: old run events and orphan files go. */
+  /** Once a day: what the retention lengths have passed goes, and orphan files. */
   let housekept: Date | null = null
   const housekeeping = async () => {
     housekept = new Date()
-    const settings = await getSettings(env.db)
-    await pruneRunEvents(env.db, settings.run_log_retention_days)
-    await purgeOrphans(env.db, join(env.dataDir, 'files'))
-    await purgeOAuth(env.db)
+    await cleanUp(env.db, env.dataDir)
   }
   let housekeepingTimer: ReturnType<typeof setInterval> | undefined
 

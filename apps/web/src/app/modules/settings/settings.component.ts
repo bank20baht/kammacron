@@ -19,6 +19,7 @@ import { I18n, type AppLocale, type Translate } from '../../core/i18n/i18n.servi
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
 import { accessForm, workerForm } from '../../shared/forms'
+import { DataSettingsComponent } from './data-settings.component'
 import { ProjectWizardComponent } from './project-wizard.component'
 
 const projectColumns = (t: Translate): ColumnMap => ({
@@ -34,7 +35,7 @@ const projectColumns = (t: Translate): ColumnMap => ({
   checked: t('settings.projects.columns.checked'),
 })
 
-const TABS = ['projects', 'mcp', 'worker', 'access', 'machine'] as const
+const TABS = ['projects', 'mcp', 'worker', 'access', 'data', 'machine'] as const
 
 /** The language of this browser's pages: one option per locale the app speaks. */
 const languageForm = (t: Translate, locales: readonly AppLocale[]) =>
@@ -57,7 +58,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 /** The install: MCP, pause, hosts, notifications, the tools found; and the projects. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IllustrationComponent, BAHT_UI, ProjectWizardComponent],
+  imports: [IllustrationComponent, BAHT_UI, DataSettingsComponent, ProjectWizardComponent],
   selector: 'web-settings',
   styleUrl: './settings.component.css',
   templateUrl: './settings.component.html',

@@ -7,6 +7,7 @@ export const settings = {
     mcp: 'MCP',
     worker: 'Worker',
     access: 'Access & notifications',
+    data: 'Data',
     machine: 'This machine',
   },
   projects: {
@@ -61,6 +62,44 @@ export const settings = {
     workerOn: 'Worker on',
     pausedHint: 'No new runs start until you resume.',
     onHint: 'Ready for the next pickable card.',
+  },
+  data: {
+    heading: 'How long data is kept',
+    description:
+      'The daily housekeeping lets go of what is past its length. Projects, cron jobs, playbooks and settings are never removed on their own: only you remove them.',
+    kinds: {
+      run_log_retention_days: {
+        label: 'Run logs',
+        help: 'Each run’s timeline and its raw log file',
+      },
+      step_output_retention_days: {
+        label: 'Step output',
+        help: 'The end of what each step printed',
+      },
+      run_retention_days: {
+        label: 'Runs',
+        help: 'The runs themselves: status, time, cost and summary (what Stats counts)',
+      },
+      done_card_archive_days: {
+        label: 'Archive done cards after',
+        help: 'Off the board; still there, and can be brought back',
+      },
+      archived_card_retention_days: {
+        label: 'Remove archived cards after',
+        help: 'With their comments and attachments; their runs stay',
+      },
+      alert_retention_days: { label: 'Read alerts', help: 'Alerts you have read' },
+    },
+    days: '{n} days',
+    year: '1 year',
+    never: 'Keep until I remove it',
+    count: '{n} now',
+    size: '{n} now · {size} on disk',
+    due: '{n} would go at the next housekeeping',
+    save: 'Save',
+    clean: 'Clean now',
+    cleaned: 'Cleaned: {list}',
+    nothing: 'Nothing was past its length',
   },
   messages: {
     saved: 'Saved',

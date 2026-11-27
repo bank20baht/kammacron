@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lt, sql, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm'
 
 import { firstRow, type Executor } from '../db'
 import {
@@ -188,7 +188,3 @@ const stopRunningSteps = (db: Executor, runIds: readonly number[]) =>
         .set({ status: 'stopped', ended_at: new Date() })
         .where(and(inArray(runSteps.run_id, [...runIds]), eq(runSteps.status, 'running')))
         .then(() => undefined)
-
-/** Keeps `days` of run events (the summary row stays). */
-export const pruneRunEvents = (db: Executor, days: number) =>
-  db.delete(runEvents).where(lt(runEvents.created_at, sql`now() - make_interval(days => ${days})`))

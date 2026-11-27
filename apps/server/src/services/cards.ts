@@ -248,6 +248,9 @@ export const moveCard = (db: Executor, id: number, move: Move) =>
           position,
           review_reason: move.status === 'review' ? reason : null,
           ...(move.status === 'doing' ? {} : { claimed_by_run: null }),
+          // the retention clock: from when it reached done, not from its last edit
+          done_at:
+            move.status !== 'done' ? null : card.status === 'done' ? card.done_at : new Date(),
         })
         .where(eq(cards.id, id))
         .returning(),
@@ -256,7 +259,13 @@ export const moveCard = (db: Executor, id: number, move: Move) =>
 
 export const archiveCard = async (db: Executor, id: number, archived = true) => {
   await cardRow(db, id)
-  return firstRow(await db.update(cards).set({ archived }).where(eq(cards.id, id)).returning())
+  return firstRow(
+    await db
+      .update(cards)
+      .set({ archived, archived_at: archived ? new Date() : null })
+      .where(eq(cards.id, id))
+      .returning(),
+  )
 }
 
 export const addComment = async (

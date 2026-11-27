@@ -44,6 +44,9 @@ export const project = {
     turnOn: 'Turn on',
     empty: 'No cron job yet.',
     add: 'Add cron job',
+    remove: 'Remove',
+    removeConfirm: 'Remove the cron job “{name}”? Its runs stay. To only stop it, turn it off.',
+    removed: 'Cron job removed',
   },
   playbook: {
     heading: 'Playbook',
@@ -77,6 +80,14 @@ export const project = {
   },
   loadError: 'This project did not load',
   id: 'Project {id}',
+  danger: {
+    heading: 'Remove this project',
+    description:
+      'Its cards, runs, cron jobs and log files go with it, for good. To only stop it, turn its worker and cron jobs off.',
+    remove: 'Remove project',
+    prompt: 'Type “{name}” to remove it and everything in it.',
+    removed: 'Project “{name}” removed',
+  },
   messages: {
     saved: 'Saved',
     queued: 'A round is queued: watch the board and Runs',

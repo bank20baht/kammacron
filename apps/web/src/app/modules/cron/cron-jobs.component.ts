@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
+import { dialog } from '@20baht/ui/overlay'
 import { liveSignal } from '@20baht/angular/live'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
@@ -90,6 +91,9 @@ import { CronWizardComponent } from './cron-wizard.component'
           <baht-button size="sm" variant="ghost" (click)="toggle(s.id, !s.enabled)">{{
             s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
           }}</baht-button>
+          <baht-button size="sm" variant="ghost" (click)="remove(s.id, s.name)">{{
+            t('project.schedules.remove')
+          }}</baht-button>
         </div>
       } @empty {
         <p class="muted">{{ t('project.schedules.empty') }}</p>
@@ -155,6 +159,19 @@ export class CronJobsComponent {
     return this.act(
       () => firstValueFrom(this.api.schedules({ id: String(id) }).patch({ enabled })),
       enabled ? this.t('project.messages.on') : this.t('project.messages.off'),
+    )
+  }
+
+  /** Removing is a person's choice, asked once more; turning off keeps the job. */
+  protected async remove(id: number, name: string): Promise<void> {
+    const sure = await dialog.confirm(this.t('project.schedules.removeConfirm', { name }), {
+      tone: 'danger',
+      confirmText: this.t('project.schedules.remove'),
+    })
+    if (!sure) return
+    await this.act(
+      () => firstValueFrom(this.api.schedules({ id: String(id) }).delete()),
+      this.t('project.schedules.removed'),
     )
   }
 

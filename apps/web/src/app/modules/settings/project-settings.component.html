@@ -121,6 +121,18 @@
       ></baht-save-bar>
     </div>
 
+    @if (current() === 'advanced') {
+      <baht-card
+        accent="danger"
+        [heading]="t('project.danger.heading')"
+        [subtitle]="t('project.danger.description')"
+      >
+        <baht-button variant="danger" icon="trash" [loading]="busy()" (click)="remove(p)">{{
+          t('project.danger.remove')
+        }}</baht-button>
+      </baht-card>
+    }
+
     @if (current() === 'schedules') {
       <web-cron-jobs [projectId]="id()" [playbooks]="p.playbooks"></web-cron-jobs>
     }

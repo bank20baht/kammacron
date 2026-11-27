@@ -79,4 +79,4 @@ Neither agent documents these numbers; when a new version writes them otherwise,
 
 Day, week and month views; filter by layer or project. A click opens the run, the board or the project's schedules. Below, a table lists every job with its interval or cron expression, next and last run, last result, and why it is off when it is (`schedule off`, `paused: …`, `all work paused`).
 
-Housekeeping removes run events older than the retention (30 days by default) and files no card uses any more.
+Housekeeping lets go of what is past its length under **Settings → Data** (run logs after 30 days, done cards archived after 14, and so on: see [how long it is kept](/reference/data/#how-long-it-is-kept)) and of files no card uses any more.

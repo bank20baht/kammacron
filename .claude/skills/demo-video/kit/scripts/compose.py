@@ -201,7 +201,8 @@ def png(name):
 def graphics(browser):
     items = [('one-tape', paper.tape([box(ONE)]), True, None),
              ('two-tape', paper.tape([box(w) for w in TWO]), True, None),
-             ('term-top', paper.terminal_bar(ONE['w'], ONE['bar'], 'shop — bash'), False, (ONE['w'], ONE['bar']))]
+             ('term-top', paper.terminal_bar(ONE['w'], ONE['bar'], 'shop — bash'), False, (ONE['w'], ONE['bar'])),
+             ('mascot', paper.mascot_layer(), True, (paper.MASCOT_W, paper.MASCOT_H))]
     urls = {}
     for key, (clip, kind, color, start, end, speed, caps) in SINGLE.items():
         items.append((f'back-{key}', paper.backdrop(color, [box(ONE)]), False, None))
@@ -242,6 +243,13 @@ def overlay_chain(chain, inputs, base, layers, first):
     return cur
 
 
+def mascot(chain, inputs, base, index, out_label):
+    """The corner mascot over a part, on top of everything, bobbing gently in the part's own time."""
+    inputs += ['-loop', '1', '-i', png('mascot')]
+    chain.append(f"[{base}][{index}:v]overlay=x={paper.MASCOT_X}:y='{paper.MASCOT_Y}+7*sin(2*PI*t/1.9)':"
+                 f"eval=frame:shortest=1[{out_label}]")
+
+
 def single(key, urls, out):
     clip, kind, color, start, end, speed, caps = SINGLE[key]
     length = (end - start) / speed
@@ -261,7 +269,8 @@ def single(key, urls, out):
     for j, (a, b, _, _) in enumerate(caps):
         layers.append((png(f'cap-{key}-{j}'), 0, 0, at(max(a, start)), min(length, at(b))))
     last = overlay_chain(chain, inputs, 'v0', layers, 2)
-    chain.append(f'[{last}]fade=in:st=0:d={FADE},fade=out:st={length - FADE:.2f}:d={FADE}[out]')
+    mascot(chain, inputs, last, 2 + len(layers), 'm')
+    chain.append(f'[m]fade=in:st=0:d={FADE},fade=out:st={length - FADE:.2f}:d={FADE}[out]')
     ffmpeg(*inputs, '-filter_complex', ';'.join(chain), '-map', '[out]', *ENCODE, out)
     return length
 
@@ -296,8 +305,10 @@ def split(key, urls, bars, out):
     for k, (a, b, speed, _, _) in enumerate(segs):
         chain.append(f'[p{k}]trim=start={rel(a):.3f}:end={rel(b):.3f},setpts=(PTS-STARTPTS)/{speed:.4f},fps=30[q{k}]')
         total += (rel(b) - rel(a)) / speed
-    chain.append(''.join(f'[q{k}]' for k in range(len(segs))) + f'concat=n={len(segs)}:v=1:a=0,'
-                 f'fade=in:st=0:d={FADE},fade=out:st={total - FADE:.2f}:d={FADE}[out]')
+    chain.append(''.join(f'[q{k}]' for k in range(len(segs))) + f'concat=n={len(segs)}:v=1:a=0[cc]')
+    # after the speed changes, so it bobs at one pace through the fast-forwards
+    mascot(chain, inputs, 'cc', 3 + len(layers), 'm')
+    chain.append(f'[m]fade=in:st=0:d={FADE},fade=out:st={total - FADE:.2f}:d={FADE}[out]')
     ffmpeg(*inputs, '-filter_complex', ';'.join(chain), '-map', '[out]', *ENCODE, out)
     # where each run starts in this part's output, for a little sound
     starts, t_out = [], 0.0

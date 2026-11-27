@@ -104,6 +104,12 @@ def mascot_uri():
 
 
 MASCOT_RATIO = 1086 / 1448  # its height over its width
+# one mascot a frame, big, in the bottom-left corner like a vtuber; it runs a little off the bottom
+MASCOT_W = 420
+MASCOT_H = round(MASCOT_W * MASCOT_RATIO)
+MASCOT_X, MASCOT_Y = -14, H - MASCOT_H + 26
+# captions keep clear of it: they centre in what is left of the width
+CAPTION_LEFT = MASCOT_X + MASCOT_W - 20
 
 
 def buffalo(width, live=True, flip=False):
@@ -118,6 +124,17 @@ def buffalo(width, live=True, flip=False):
     if not live:
         return img
     return f'<div class="m-live" style="transform-origin:50% 100%">{img}</div>'
+
+
+def corner_mascot(live=True):
+    """The one mascot of a frame, in the bottom-left corner."""
+    return f'<div style="position:absolute;left:{MASCOT_X}px;top:{MASCOT_Y}px">{buffalo(MASCOT_W, live)}</div>'
+
+
+def mascot_layer():
+    """The corner mascot alone, for compose to lay over a scene (it bobs it there)."""
+    return (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}html,body{{background:transparent}}</style></head>'
+            f'<body>{buffalo(MASCOT_W, live=False)}</body></html>')
 
 
 ICONS = {
@@ -284,11 +301,6 @@ def backdrop(color, windows, labels=()):
     for (x, y, text, c, right) in labels:
         pos = f'right:{W - x}px' if right else f'left:{x}px'
         body += f'<div style="position:absolute;{pos};top:{y}px">{tag(text, c, 24, c in (BLUE, PURPLE))}</div>'
-    left = min(x for x, _, _, _ in windows)
-    if left >= 300:
-        # a wide margin each side: the mascot, both facing the window
-        body += f'<div style="position:absolute;left:14px;top:560px">{buffalo(292, live=False)}</div>'
-        body += f'<div style="position:absolute;right:14px;top:560px">{buffalo(292, live=False, flip=True)}</div>'
     body += piece(-30, BAND_Y, W + 60, H - BAND_Y + 30, CREAM, seed=101, jag=14)
     return (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}</style></head>'
             f'<body><div class="page" style="background:url({NOISE}),{color}"></div>{body}</body></html>')
@@ -308,9 +320,9 @@ def tape(windows):
 
 def caption(tag_text, text, color):
     """The caption's words on the torn strip (the strip itself is in the backdrop)."""
-    body = (f'<div style="position:absolute;left:0;right:0;top:{BAND_Y + 18}px;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">'
+    body = (f'<div style="position:absolute;left:{CAPTION_LEFT}px;right:20px;top:{BAND_Y + 18}px;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">'
             f'{tag(tag_text, color, 22, color in (BLUE, PURPLE))}'
-            f'<div style="font-size:36px;font-weight:700;text-align:center;max-width:1720px;line-height:1.3">{html.escape(text)}</div></div>')
+            f'<div style="font-size:34px;font-weight:700;text-align:center;max-width:{W - CAPTION_LEFT - 40}px;line-height:1.3">{html.escape(text)}</div></div>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}html,body{{background:transparent}}</style></head>'
             f'<body>{body}</body></html>')
 
@@ -414,8 +426,7 @@ def factory(stats):
     row = ''.join(f'<div class="pop" style="animation-delay:{1.0 + k * 0.14:.2f}s;white-space:nowrap">{tag(t, c, 34, c in (BLUE, PURPLE, CORAL))}</div>'
                   for k, (t, c) in enumerate(facts))
     body += f'<div style="position:absolute;left:0;right:0;top:690px;display:flex;justify-content:center;gap:26px">{row}</div>'
-    # the mascot in the top corner, giving the factory its thumb up
-    body += f'<div class="slide" style="position:absolute;left:90px;top:30px;animation-delay:.2s">{buffalo(290)}</div>'
+    body += f'<div class="slide" style="animation-delay:.2s">{corner_mascot()}</div>'
     html_doc = doc(body).replace('</style>', FACTORY_CSS + '</style>', 1)
     return html_doc, 5.0, [0.1, 0.35, 0.55, 0.75] + [1.0 + k * 0.14 for k in range(len(facts))]
 
@@ -442,6 +453,5 @@ def end_card():
     body += (f'<div class="pop" style="position:absolute;left:660px;top:740px;animation-delay:1.0s">'
              f'<span style="display:inline-block;background:{INK};color:{GREEN};font-family:{MONO};font-size:42px;padding:16px 36px;border-radius:14px;filter:drop-shadow(5px 7px 0 rgba(43,35,64,.25))">$ bunx kammacron start</span></div>')
     body += f'<div class="pop" style="position:absolute;left:800px;top:875px;animation-delay:1.2s">{tag("kammacron.pages.dev", PURPLE, 34, True)}</div>'
-    body += f'<div class="slide" style="position:absolute;left:80px;top:700px;animation-delay:1.3s">{buffalo(320)}</div>'
-    body += f'<div class="slide" style="position:absolute;left:1500px;top:700px;animation-delay:1.4s">{buffalo(320, flip=True)}</div>'
+    body += f'<div class="slide" style="animation-delay:1.3s">{corner_mascot()}</div>'
     return doc(body), 4.6, [0.3, 0.5, 0.75, 1.0, 1.2]

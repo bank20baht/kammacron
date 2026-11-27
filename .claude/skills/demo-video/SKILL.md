@@ -32,9 +32,11 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
   page one after another. Bright, flat colours, **no gradients**.
 - **The mascot** is the owner's own design, `docs/design/mascot.png` (the buffalo in perforated
   ลายฉลุ paper, gear horns, the clock, a ผ้าขาวม้า, a thumb up; transparent PNG): never redraw
-  it. `paper.buffalo` places it: both wide margins of single-window scenes (the right one
-  mirrored, both facing the window), the factory card's top corner and the end card's hills,
-  where it rocks gently. (Tried and set aside on 2026-11-27: a full shadow-puppet look, commit
+  it. **One mascot a frame**, big (`MASCOT_W` 420 px), in the bottom-left corner like a vtuber,
+  running a little off the bottom: compose lays it over every scene, on top of everything, bobbing
+  gently (after the speed changes, so it keeps one pace through fast-forwards); the factory and end
+  cards have it in the same corner, rocking. Captions centre in the width right of it
+  (`CAPTION_LEFT`). (Tried and set aside on 2026-11-27: a full shadow-puppet look, commit
   `e7602dd`, and an SVG buffalo drawn before the owner's mascot existed, commit `16dc63d`.)
 - The browser windows show an **address bar with the real URL** of that moment; terminal windows
   have a title bar; washi tape on the corners.

@@ -27,7 +27,7 @@ export default defineConfig([
   ...bahtui({
     files: WEB,
     tokenFiles: ['apps/web/src/styles.css'],
-    elements: ['apps/web/src/elements.ts'],
+    elements: ['apps/web/src/elements.ts', 'apps/web/src/elements-later.ts'],
   }),
   // the web app's service worker: plain JS served as is, with a worker's globals
   {

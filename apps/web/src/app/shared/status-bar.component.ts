@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
 import { RouterLink } from '@angular/router'
-import {
-  BahtBadgeDirective,
-  BahtButtonDirective,
-  BahtNotificationBellDirective,
-} from '@20baht/angular'
+// by module (see app.ts): the band is in the first script
+import { BahtBadgeDirective } from '@20baht/angular/elements/badge'
+import { BahtButtonDirective } from '@20baht/angular/elements/button'
+import { BahtNotificationBellDirective } from '@20baht/angular/elements/notification-bell'
 import { liveSignal } from '@20baht/angular/live'
 import type { NotificationItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'

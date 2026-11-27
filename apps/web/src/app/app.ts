@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router'
-import {
-  BahtAppShellDirective,
-  BahtThemeToggleDirective,
-  BahtToastDirective,
-} from '@20baht/angular'
+// by module, not from the package's index: the index reaches every directive, and what any page
+// uses of it would be put in the first script with these
+import { BahtAppShellDirective } from '@20baht/angular/elements/app-shell'
+import { BahtThemeToggleDirective } from '@20baht/angular/elements/theme-toggle'
+import { BahtToastDirective } from '@20baht/angular/elements/toast'
 import { filter, map } from 'rxjs'
 import { liveSignal } from '@20baht/angular/live'
 

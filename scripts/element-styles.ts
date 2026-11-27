@@ -1,6 +1,6 @@
 /**
  * Writes `apps/web/src/elements.css`: the stylesheets of the <baht-*> elements `elements.ts`
- * registers, and no others, in the order `@20baht/ui` says to link them. Run it after adding an
+ * and `elements-later.ts` register, and no others, in the order `@20baht/ui` says to link them. Run it after adding an
  * element there (`bun run styles`); `bun run styles:check` (in `check:fast`) fails when the file
  * is behind.
  */
@@ -16,10 +16,12 @@ const index = (await Bun.file(
   Bun.resolveSync('@20baht/ui/css/components/index.json', web),
 ).json()) as Index
 
+// both files register on every page; they differ only in when their code arrives
+const sources = await Promise.all(
+  ['elements.ts', 'elements-later.ts'].map((name) => readFile(join(web, 'src', name), 'utf8')),
+)
 const registered = [
-  ...(await readFile(join(web, 'src', 'elements.ts'), 'utf8')).matchAll(
-    /^import '@20baht\/ui\/components\/([\w-]+)'/gm,
-  ),
+  ...sources.join('\n').matchAll(/^import '@20baht\/ui\/components\/([\w-]+)'/gm),
 ].flatMap((match) => match[1] ?? [])
 
 const unknown = registered.filter((name) => !(name in index.elements))

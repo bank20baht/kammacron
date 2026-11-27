@@ -8,10 +8,14 @@ wordmark and tagline is kept as `docs/design/app-icon-wordmark-2026-11-26.png`. 
 | Export                                                  | From the master                                   | Size      |
 | ------------------------------------------------------- | ------------------------------------------------- | --------- |
 | `brand/app-icon.webp` (web and docs, docs `src/assets`) | the whole canvas                                  | 768 × 512 |
-| `brand/app-mark.webp` (web and docs, docs `src/assets`) | the art's square (x 300–1237, y 23–1000, centred) | 256 × 256 |
+| `brand/app-mark.webp` (docs, docs `src/assets`)         | the art's square (x 300–1237, y 23–1000, centred) | 256 × 256 |
+| `brand/app-mark.webp` (web: the shell draws it at 40px) | the docs export, scaled down                      | 96 × 96   |
 | `apple-touch-icon.png` (web and docs)                   | the square, 92 %                                  | 180 × 180 |
 | `icon-192.png`, `icon-512.png` (PWA)                    | the square, 94 %, transparent                     | 192, 512  |
 | `icon-maskable-512.png` (PWA)                           | the square, 72 % (the safe zone), on `#ebebe8`    | 512       |
+
+The web app's PNG icons are saved with a 256-colour palette (the art is two inks and a glow): 139 KB
+for the four, from 690 KB. The docs keep the full-colour exports.
 
 Logo links carry `v=glow-3`. The favicons (`favicon*.png`, `.ico`, docs `favicon.svg`) are their
 own source and are unchanged. The notes below describe the earlier exports.

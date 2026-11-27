@@ -1,11 +1,13 @@
 # Library gaps
 
 Verified against the published `@20baht/ui`, `@20baht/angular`, `@20baht/engine` and
-`@20baht/strict` **0.3.44** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
-2026-11-27. One gap is open: the Angular adapter's directives all load with the first script. The
-twenty-nine below it are resolved, six of them in 0.3.44: the
-per-element stylesheets, and five in the types the Angular adapter and the engine give (found by
-taking every `$any($event)` out of the templates and reading each form's data as `FormValues`).
+`@20baht/strict` **0.3.45** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
+2026-11-27. Two gaps are open, both found while cutting what the first screen loads: `<baht-form>`
+brings the element of every field type, and `bahtui/registered-element` cannot check elements
+registered page by page. The thirty below them are resolved: one in 0.3.45 (a directive of the
+Angular adapter is a module of its own), six in 0.3.44 (the per-element stylesheets, and five in
+the types the Angular adapter and the engine give, found by taking every `$any($event)` out of
+the templates and reading each form's data as `FormValues`).
 Four were resolved in 0.3.43, all found while registering only the elements the app draws
 (`<baht-form>` brings `schedule` and `cron`; `@20baht/strict` flags the whole library imported,
 reads its field elements from the engine, and fails on a drawn element nothing registers), two in
@@ -15,23 +17,54 @@ actions, an app's field type named and framed through `@20baht/ui`, segmented-na
 their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold button,
 `clock` and `bot` icons).
 
-## Open (`@20baht/angular`): one directive imported brings all 98
+## Open (`@20baht/ui`): `<baht-form>` brings the element of every field type
+
+Affected: `@20baht/ui/components/form` (and `workflow`, `form-modal`); owner: `@20baht/ui`.
+
+**What happens.** The form's module imports every built-in field's element, whatever the forms
+an app draws. kammacron's forms use text, textarea, markdown, password, number, toggle, dropdown,
+radio, tags, schedule and cron; the chunk its first screen waits for also carries
+`baht-reference-dialog` (14 KB), `baht-reference-picker` (10 KB), `baht-repeater` (10 KB),
+`baht-column-picker` (8 KB), `baht-datepicker` (8 KB), `baht-file` (6 KB) and
+`baht-filter-builder` (5 KB): about 60 KB of a 386 KB chunk, measured with the build's stats on
+0.3.45. (flatpickr itself is already loaded only when a date field is drawn.)
+
+**Wanted.** The form loading a field's element when a form with that type is given to it (a
+dynamic import per type, as the date field does for flatpickr), or a `form-core` entry that brings
+no field elements and leaves them to the app's own imports.
+
+**Workaround.** None.
+
+## Open (`@20baht/strict`): `registered-element` cannot check elements registered page by page
+
+Affected: `bahtui/registered-element`; owner: `@20baht/strict`.
+
+**What happens.** The rule takes a list of files and passes a tag that any of them registers. An
+app that wants each lazy page to import the elements it draws (so a page's elements arrive with
+the page) cannot have that checked: a page that forgets an import passes as long as another page
+has it, and draws an empty unknown element whenever it is opened first.
+
+**Wanted.** A mode that checks a template against what its own component file imports (plus
+files named as "always loaded", for the shell's), so registration can follow the routes.
+
+**Workaround.** Every element stays registered on every page, in two files loaded one after the
+other: `apps/web/src/elements.ts` (what the shell and the board draw, which the first screen waits
+for) and `elements-later.ts` (charts, the calendar, the workflow, the table's extras: 100 KB),
+both given to the rule.
+
+## Resolved (`@20baht/angular`): one directive imported brings all 98
 
 Affected: `@20baht/angular` (`dist/elements.js`); owner: `@20baht/angular`.
 
-**What happens.** Every directive is in one module, each with `static { this.ɵdir = … }` blocks,
-and the bundler keeps the whole module when any of it is imported: kammacron's shell draws six
-elements (`app-shell`, `theme-toggle`, `toast`, `badge`, `button`, `notification-bell`), imports
-those six directives by name, and its first script still carries all of `elements.js`: 49 KB of
-its 363 KB (measured with the build's stats, 0.3.44). `BAHT_UI` and the named imports give the
-same bytes. `"sideEffects": false` is set and does not help.
+**Was.** Every directive was in one module the bundler kept whole: kammacron's shell draws six
+elements, and its first script carried all 98 directives (49 KB of 363 KB).
 
-**Wanted.** Directives the bundler can drop: one module per directive (`@20baht/angular/button`,
-as `@20baht/ui/components/<name>` does for the elements), or definitions written so the class is
-free of side effects (`static ɵdir = /* @__PURE__ */ …`).
-
-**Workaround.** None. The shell and the status band import their directives by name
-(`app.ts`, `status-bar.component.ts`), so they shed the rest the day the library allows it.
+**Published fix.** 0.3.45: each directive is a module of its own, also at
+`@20baht/angular/elements/<name>`. `app.ts` and `status-bar.component.ts` import their six from
+there, and the first script is 331 KB (8 KB of the adapter). They import by module, not from the
+package's index, for the bundler's reason and not the library's: a file the first script reaches
+through the index is kept there when any lazy page uses it, so named imports from
+`@20baht/angular` left 42 directives in the first script. The lazy pages keep `BAHT_UI`.
 
 ## Resolved (`@20baht/ui`): one stylesheet holds every element's styles
 

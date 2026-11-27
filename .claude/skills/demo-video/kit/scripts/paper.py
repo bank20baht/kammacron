@@ -56,8 +56,12 @@ html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;font-family:{FONT};
 @keyframes grow{{from{{transform:scale(0)}}to{{transform:scale(1)}}}}
 @keyframes spin{{from{{transform:rotate(0)}}to{{transform:rotate(40deg)}}}}
 @keyframes bob{{from{{transform:translateY(0)}}to{{transform:translateY(-10px)}}}}
-@keyframes rock{{0%,100%{{transform:rotate(-3deg) translateY(0)}}50%{{transform:rotate(3deg) translateY(-8px)}}}}
-.m-live{{animation:rock 1.6s ease-in-out infinite both}}
+@keyframes rock{{0%,100%{{transform:rotate(-2deg) translateY(0)}}50%{{transform:rotate(2deg) translateY(-6px)}}}}
+@keyframes wave{{0%,100%{{transform:rotate(0)}}25%{{transform:rotate(-11deg)}}50%{{transform:rotate(3deg)}}75%{{transform:rotate(-8deg)}}}}
+@keyframes talk{{0%,30%,100%{{transform:rotate(0)}}8%{{transform:rotate(9deg)}}16%{{transform:rotate(2deg)}}23%{{transform:rotate(7deg)}}55%{{transform:rotate(0)}}62%{{transform:rotate(10deg)}}70%{{transform:rotate(1deg)}}78%{{transform:rotate(6deg)}}86%{{transform:rotate(0)}}}}
+.m-live{{animation:rock 3.2s ease-in-out infinite both}}
+.m-live .m-arm{{animation:wave 1.6s ease-in-out infinite both}}
+.m-live .m-jaw{{animation:talk 1.6s linear infinite both}}
 .label{{background:url({NOISE}),{CREAM}}}
 """
 
@@ -97,13 +101,8 @@ def icon_uri():
 
 # ---- the mascot: the owner's buffalo, cut-paper ลายฉลุ (docs/design/mascot.png) ----
 
-def mascot_uri():
-    repo = open(os.path.join(SP, 'repo.txt')).read().strip()
-    path = os.path.join(repo, 'docs/design/mascot.png')
-    return 'data:image/png;base64,' + base64.b64encode(open(path, 'rb').read()).decode()
-
-
-MASCOT_RATIO = 1086 / 1448  # its height over its width
+MASCOT_SIZE = (1448, 1086)  # the source image
+MASCOT_RATIO = MASCOT_SIZE[1] / MASCOT_SIZE[0]
 # one mascot a frame, big, in the bottom-left corner like a vtuber; it runs a little off the bottom
 MASCOT_W = 420
 MASCOT_H = round(MASCOT_W * MASCOT_RATIO)
@@ -111,19 +110,72 @@ MASCOT_X, MASCOT_Y = -14, H - MASCOT_H + 26
 # captions keep clear of it: they centre in what is left of the width
 CAPTION_LEFT = MASCOT_X + MASCOT_W - 20
 
+# The mascot as a หนังตะลุง puppet: pieces cut from the one image, each turning on its pin
+# (source pixels). The forearm with its thumb up turns on the elbow's rivet; the lower jaw on the
+# corner of the mouth, opening onto a dark mouth as a puppet's cut does.
+JOINTS = {
+    'arm': {'pivot': (988, 858), 'poly': [(950, 820), (995, 785), (1035, 745), (1030, 700), (1040, 540), (1080, 518),
+                                           (1142, 522), (1168, 584), (1228, 616), (1250, 690), (1236, 764), (1178, 808),
+                                           (1142, 834), (1094, 886), (1078, 934), (1010, 938), (950, 898)]},
+    'jaw': {'pivot': (845, 520), 'poly': [(838, 525), (860, 505), (885, 505), (950, 488), (1000, 478), (1025, 482),
+                                           (1028, 505), (1015, 540), (995, 562), (945, 572), (895, 572), (850, 558)]},
+}
+MOUTH = (10, 30, 92, 255)
+
+
+def _source():
+    repo = open(os.path.join(SP, 'repo.txt')).read().strip()
+    return os.path.join(repo, 'docs/design/mascot.png')
+
+
+def _uri(path):
+    return 'data:image/png;base64,' + base64.b64encode(open(path, 'rb').read()).decode()
+
+
+def cut_mascot():
+    """The mascot's pieces as PNGs the size of the source: the body (pieces cut out, the mouth dark
+    behind the jaw), each moving piece, and the elbow's rivet to lay back on top of the arm."""
+    from PIL import Image, ImageDraw
+    os.makedirs(OUT, exist_ok=True)
+    paths = {k: os.path.join(OUT, f'mascot-{k}.png') for k in ('body', 'arm', 'jaw', 'pin')}
+    if all(os.path.exists(p) for p in paths.values()):
+        return paths
+    src = Image.open(_source()).convert('RGBA')
+    body = src.copy()
+    for name, j in JOINTS.items():
+        mask = Image.new('L', src.size, 0)
+        ImageDraw.Draw(mask).polygon(j['poly'], fill=255)
+        piece = Image.new('RGBA', src.size, (0, 0, 0, 0))
+        piece.paste(src, (0, 0), mask)
+        piece.save(paths[name])
+        # what the piece leaves: nothing for the arm (the screen shows), the mouth for the jaw
+        hole = Image.new('RGBA', src.size, MOUTH if name == 'jaw' else (0, 0, 0, 0))
+        body.paste(hole, (0, 0), mask)
+    pin = Image.new('L', src.size, 0)
+    x, y = JOINTS['arm']['pivot']
+    ImageDraw.Draw(pin).ellipse((x - 32, y - 32, x + 32, y + 32), fill=255)
+    rivet = Image.new('RGBA', src.size, (0, 0, 0, 0))
+    rivet.paste(src, (0, 0), pin)
+    rivet.save(paths['pin'])
+    body.save(paths['body'])
+    return paths
+
 
 def buffalo(width, live=True, flip=False):
     """
     The mascot (the owner's design: the buffalo in perforated paper, gear horns, the clock, a
-    ผ้าขาวม้า, a thumb up), facing right (`flip`: left). `live` rocks it gently on its feet (the
-    cards); otherwise it stands still (the scenes' margins).
+    ผ้าขาวม้า, a thumb up), facing right (`flip`: left), as a jointed puppet: `live` waves the
+    forearm on its elbow, works the jaw as if it talked, and rocks it gently; otherwise it stands.
     """
+    parts = {k: _uri(v) for k, v in cut_mascot().items()}
+    w, h = MASCOT_SIZE
+    origin = lambda k: f'{JOINTS[k]["pivot"][0] / w * 100:.2f}% {JOINTS[k]["pivot"][1] / h * 100:.2f}%'
+    layer = lambda k, cls='': (f'<img class="{cls}" src="{parts[k]}" style="position:absolute;inset:0;width:100%;height:100%;'
+                              f'transform-origin:{origin(k) if k in JOINTS else "50% 50%"}">')
     flip_t = 'transform:scaleX(-1);' if flip else ''
-    img = (f'<img src="{mascot_uri()}" width="{width:.0f}" height="{width * MASCOT_RATIO:.0f}" '
-           f'style="display:block;filter:drop-shadow(5px 7px 0 rgba(43,35,64,.22));{flip_t}">')
-    if not live:
-        return img
-    return f'<div class="m-live" style="transform-origin:50% 100%">{img}</div>'
+    return (f'<div class="{"m-live" if live else ""}" style="position:relative;width:{width:.0f}px;height:{width * MASCOT_RATIO:.0f}px;'
+            f'transform-origin:50% 100%;filter:drop-shadow(5px 7px 0 rgba(43,35,64,.22));{flip_t}">'
+            f'{layer("body")}{layer("jaw", "m-jaw")}{layer("arm", "m-arm")}{layer("pin")}</div>')
 
 
 def corner_mascot(live=True):
@@ -131,10 +183,28 @@ def corner_mascot(live=True):
     return f'<div style="position:absolute;left:{MASCOT_X}px;top:{MASCOT_Y}px">{buffalo(MASCOT_W, live)}</div>'
 
 
-def mascot_layer():
-    """The corner mascot alone, for compose to lay over a scene (it bobs it there)."""
-    return (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}html,body{{background:transparent}}</style></head>'
-            f'<body>{buffalo(MASCOT_W, live=False)}</body></html>')
+MASCOT_PAD = 40  # room round the corner mascot for the arm to swing out
+MASCOT_LOOP = 3.2  # seconds: the rock, two waves and two bursts of talk come round together
+
+
+def mascot_loop(browser):
+    """The corner mascot moving (arm, jaw), its rock left to compose: a transparent loop (PNG in MOV)."""
+    out = os.path.join(OUT, 'mascot-loop.mov')
+    frames = os.path.join(OUT, 'mascot-frames')
+    shutil.rmtree(frames, ignore_errors=True)
+    os.makedirs(frames)
+    page = browser.new_page(viewport={'width': MASCOT_W + 2 * MASCOT_PAD, 'height': MASCOT_H + 2 * MASCOT_PAD})
+    page.set_content(f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}html,body{{background:transparent}}'
+                     f'.m-live{{animation:none}}</style></head><body><div style="position:absolute;left:{MASCOT_PAD}px;top:{MASCOT_PAD}px">'
+                     f'{buffalo(MASCOT_W, live=True)}</div></body></html>')
+    page.wait_for_timeout(300)
+    for f in range(int(MASCOT_LOOP * FPS)):
+        page.evaluate(f'document.getAnimations().forEach(a => {{ a.pause(); a.currentTime = {f * 1000 / FPS:.1f} }})')
+        page.screenshot(path=os.path.join(frames, f'{f:04d}.png'), omit_background=True)
+    page.close()
+    subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-framerate', str(FPS),
+                    '-i', os.path.join(frames, '%04d.png'), '-c:v', 'png', '-pix_fmt', 'rgba', out], check=True)
+    return out
 
 
 ICONS = {

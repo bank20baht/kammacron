@@ -33,10 +33,16 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
 - **The mascot** is the owner's own design, `docs/design/mascot.png` (the buffalo in perforated
   ลายฉลุ paper, gear horns, the clock, a ผ้าขาวม้า, a thumb up; transparent PNG): never redraw
   it. **One mascot a frame**, big (`MASCOT_W` 420 px), in the bottom-left corner like a vtuber,
-  running a little off the bottom: compose lays it over every scene, on top of everything, bobbing
-  gently (after the speed changes, so it keeps one pace through fast-forwards); the factory and end
-  cards have it in the same corner, rocking. Captions centre in the width right of it
-  (`CAPTION_LEFT`). (Tried and set aside on 2026-11-27: a full shadow-puppet look, commit
+  running a little off the bottom, on top of everything, bobbing gently (laid on after the speed
+  changes, so it keeps one pace through fast-forwards). Captions centre in the width right of it
+  (`CAPTION_LEFT`).
+- **It moves as a หนังตะลุง puppet does**: `paper.cut_mascot` cuts the one image into pieces on
+  pins (`JOINTS`, source pixels): the forearm with its thumb up turns on the elbow's rivet (the
+  rivet laid back on top), the lower jaw on the corner of the mouth, opening onto a dark mouth. The
+  arm waves and the jaw talks in a 3.2 s loop (`MASCOT_LOOP`), rendered once to a transparent
+  `mascot-loop.mov` that compose loops in every scene; the cards animate the same pieces in CSS.
+  A cut that leaves a sliver of outline behind when the piece turns needs its polygon widened
+  outward (the outside is transparent). (Tried and set aside on 2026-11-27: a full shadow-puppet look, commit
   `e7602dd`, and an SVG buffalo drawn before the owner's mascot existed, commit `16dc63d`.)
 - The browser windows show an **address bar with the real URL** of that moment; terminal windows
   have a title bar; washi tape on the corners.

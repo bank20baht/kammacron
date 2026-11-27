@@ -201,8 +201,7 @@ def png(name):
 def graphics(browser):
     items = [('one-tape', paper.tape([box(ONE)]), True, None),
              ('two-tape', paper.tape([box(w) for w in TWO]), True, None),
-             ('term-top', paper.terminal_bar(ONE['w'], ONE['bar'], 'shop — bash'), False, (ONE['w'], ONE['bar'])),
-             ('mascot', paper.mascot_layer(), True, (paper.MASCOT_W, paper.MASCOT_H))]
+             ('term-top', paper.terminal_bar(ONE['w'], ONE['bar'], 'shop — bash'), False, (ONE['w'], ONE['bar']))]
     urls = {}
     for key, (clip, kind, color, start, end, speed, caps) in SINGLE.items():
         items.append((f'back-{key}', paper.backdrop(color, [box(ONE)]), False, None))
@@ -231,6 +230,7 @@ def graphics(browser):
         win = ONE if kind == 'one' else TWO[0]
         items.append((name, paper.browser_bar(u, win['w'], win['bar']), False, (win['w'], win['bar'])))
     paper.render_static(items, browser)
+    paper.mascot_loop(browser)
     return urls, bars
 
 
@@ -244,10 +244,10 @@ def overlay_chain(chain, inputs, base, layers, first):
 
 
 def mascot(chain, inputs, base, index, out_label):
-    """The corner mascot over a part, on top of everything, bobbing gently in the part's own time."""
-    inputs += ['-loop', '1', '-i', png('mascot')]
-    chain.append(f"[{base}][{index}:v]overlay=x={paper.MASCOT_X}:y='{paper.MASCOT_Y}+7*sin(2*PI*t/1.9)':"
-                 f"eval=frame:shortest=1[{out_label}]")
+    """The corner mascot over a part, on top of everything: its puppet loop (arm, jaw), bobbing gently."""
+    inputs += ['-stream_loop', '-1', '-i', os.path.join(P, 'mascot-loop.mov')]
+    x, y = paper.MASCOT_X - paper.MASCOT_PAD, paper.MASCOT_Y - paper.MASCOT_PAD
+    chain.append(f"[{base}][{index}:v]overlay=x={x}:y='{y}+7*sin(2*PI*t/1.9)':eval=frame:shortest=1[{out_label}]")
 
 
 def single(key, urls, out):

@@ -1,6 +1,6 @@
 ---
 name: demo-video
-description: Make (or remake) kammacron's "AI factory" demo video from the real app and a real terminal — a bug-hunting cron job files cards, a second cron job fixes them one a minute, shown side by side — in the storybook paper style with a perforated (ลายฉลุ) buffalo mascot, Thai captions and light music. Use when the user asks for a demo, intro or promo video of kammacron, or to update it after a new feature.
+description: Make (or remake) kammacron's "AI factory" demo video from the real app and a real terminal — a bug-hunting cron job files cards, a second cron job fixes them one a minute, shown side by side — in the storybook paper style with the owner's ลายฉลุ buffalo mascot, Thai captions and light music. Use when the user asks for a demo, intro or promo video of kammacron, or to update it after a new feature.
 ---
 
 # kammacron demo video ("AI factory")
@@ -30,13 +30,12 @@ The video the owner approved on 2026-11-26 (`docs/screenshots/kammacron-cron-age
 - **Thai captions** on the leather caption band *below* the windows — never over the page.
 - **Storybook paper pop-up** graphics: textured paper, torn edges, pieces that stand up off the
   page one after another. Bright, flat colours, **no gradients**.
-- **The mascot** (the owner's ask on 2026-11-27): the app's buffalo (gear horns, the clock over its
-  head, a ผ้าขาวม้า) cut from dark card with perforations (ลายฉลุ) and coloured inlays, like a
-  หนังตะลุง puppet but in the paper's colours (`paper.buffalo`): head, legs and tail on pins. It
-  stands in both wide margins of single-window scenes, facing the window, and walks on the
-  factory and end cards. An original design from the logo, not a copy of a traditional
-  character. (A full shadow-puppet look was tried and set aside: commit `e7602dd`, video
-  `kammacron-cron-agents.mp4` of 12:08 on 2026-11-27.)
+- **The mascot** is the owner's own design, `docs/design/mascot.png` (the buffalo in perforated
+  ลายฉลุ paper, gear horns, the clock, a ผ้าขาวม้า, a thumb up; transparent PNG): never redraw
+  it. `paper.buffalo` places it: both wide margins of single-window scenes (the right one
+  mirrored, both facing the window), the factory card's top corner and the end card's hills,
+  where it rocks gently. (Tried and set aside on 2026-11-27: a full shadow-puppet look, commit
+  `e7602dd`, and an SVG buffalo drawn before the owner's mascot existed, commit `16dc63d`.)
 - The browser windows show an **address bar with the real URL** of that moment; terminal windows
   have a title bar; washi tape on the corners.
 - **Light, bright background music** (synthesised in `music.py`, no licence issues) and a soft
@@ -88,7 +87,7 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
   records the URL timeline), then an entry in `SINGLE` (one window) or `SPLITS` (two) in
   `compose.py` with its captions `(from, to, tag, text)` on the clip's own timeline.
 - A new card: a function in `paper.py` returning `(html, seconds, pop times)` (build it from
-  `piece`, `tag`, `buffalo`, wrapped in `doc`); capture it with `paper.capture` like
+  `piece`, `tag`, `buffalo` (the mascot), wrapped in `doc`); capture it with `paper.capture` like
   `factory()`; add it to `main()` in `compose.py`.
 - Keep the total under two minutes: speed up typing (`speed` per scene), fast-forward waits.
 
@@ -117,8 +116,7 @@ python3 "$SCRATCH/video/scripts/compose.py"                 # -> out/kammacron-c
   alone garbles ำ). Never `git show` in a tape: it prints the author's name and email.
 - Thai text in images: render with Chromium (Pillow misplaces Thai marks).
 - `clip-path` cuts a `drop-shadow` off: shadow on a wrapper. A pop-up starts at
-  `rotateX(-86deg)`, not past 90°. The buffalo's jointed SVG parts rotate with
-  `transform-box:view-box` and a `transform-origin` in the viewBox's units (the pin).
+  `rotateX(-86deg)`, not past 90°.
 - Python 3.9 here: no backslashes inside f-string expressions.
 - Scripts derive every path from the work dir; `repo.txt` (written by `setup.sh`) points at
   this repo.
@@ -131,7 +129,7 @@ kit/make.sh             one clean recording (copied into the work dir)
 kit/scripts/record.py   the web scenes (Playwright), marks, URL and card-count timelines
 kit/scripts/compose.py  the cut: windows on the screen, captions, speeds, cards, music, mux
 kit/scripts/paper.py    paper style: cards (factory, end, …), backdrops, tape, captions, bars, and
-                        the perforated buffalo
+                        where the mascot (docs/design/mascot.png) stands
 kit/scripts/music.py    the synthesised track and the pop
 kit/scripts/common.py   work dir, API, sign-in, visible cursor
 kit/tapes/              vhs: shell setup (template) and the git scene

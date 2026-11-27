@@ -4,11 +4,11 @@ off the page one after another. Cards are CSS animations captured frame by frame
 seeks every animation to its time), so the motion is exact and the frames crisp.
 
 Also the static pieces the scenes use: a construction-paper backdrop with a torn caption strip,
-washi tape for the windows' corners, caption text, and paper tags. The mascot is the app's buffalo
-cut from dark card with perforations (ลายฉลุ) like a หนังตะลุง puppet, in the paper's colours: it
-stands in the wide margins of single-window scenes and walks on the cards.
+washi tape for the windows' corners, caption text, and paper tags. The mascot is the owner's buffalo
+in perforated paper (ลายฉลุ, docs/design/mascot.png): it stands in the wide margins of
+single-window scenes and rocks on the cards.
 """
-import base64, html, math, os, random, shutil, subprocess
+import base64, html, os, random, shutil, subprocess
 
 from playwright.sync_api import sync_playwright
 
@@ -56,21 +56,8 @@ html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;font-family:{FONT};
 @keyframes grow{{from{{transform:scale(0)}}to{{transform:scale(1)}}}}
 @keyframes spin{{from{{transform:rotate(0)}}to{{transform:rotate(40deg)}}}}
 @keyframes bob{{from{{transform:translateY(0)}}to{{transform:translateY(-10px)}}}}
-@keyframes nod{{0%,100%{{transform:rotate(-4deg)}}50%{{transform:rotate(6deg)}}}}
-@keyframes tick{{0%,100%{{transform:rotate(-8deg)}}50%{{transform:rotate(8deg)}}}}
-@keyframes step{{0%,100%{{transform:rotate(-14deg)}}50%{{transform:rotate(14deg)}}}}
-@keyframes stepb{{0%,100%{{transform:rotate(12deg)}}50%{{transform:rotate(-12deg)}}}}
-@keyframes wag{{0%,100%{{transform:rotate(-10deg)}}50%{{transform:rotate(16deg)}}}}
-@keyframes sway{{0%,100%{{transform:translateY(0) rotate(-1deg)}}50%{{transform:translateY(-8px) rotate(1deg)}}}}
-@keyframes turn{{to{{transform:rotate(360deg)}}}}
-.b-live .b-head{{animation:nod 1.6s ease-in-out infinite both}}
-.b-live .b-legf{{animation:step 1.6s ease-in-out infinite both}}
-.b-live .b-legb{{animation:stepb 1.6s ease-in-out infinite both}}
-.b-live .b-tail{{animation:wag 1.1s ease-in-out infinite both}}
-.b-live .b-gear{{animation:tick 1.6s ease-in-out infinite both}}
-.b-live .b-hand{{animation:turn 3s linear infinite both}}
-.b-live .b-body{{animation:sway 1.6s ease-in-out infinite both}}
-svg *{{transform-box:view-box}}
+@keyframes rock{{0%,100%{{transform:rotate(-3deg) translateY(0)}}50%{{transform:rotate(3deg) translateY(-8px)}}}}
+.m-live{{animation:rock 1.6s ease-in-out infinite both}}
 .label{{background:url({NOISE}),{CREAM}}}
 """
 
@@ -108,88 +95,29 @@ def icon_uri():
     return 'data:image/webp;base64,' + base64.b64encode(open(path, 'rb').read()).decode()
 
 
-# ---- the mascot: the buffalo cut from dark card, perforated like a หนังตะลุง puppet ----
+# ---- the mascot: the owner's buffalo, cut-paper ลายฉลุ (docs/design/mascot.png) ----
 
-def _dots(points, r, color=CREAM):
-    return ''.join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{color}"/>' for x, y in points)
-
-
-def _pin(x, y, r=8):
-    return (f'<circle cx="{x}" cy="{y}" r="{r}" fill="{YELLOW}" stroke="{INK}" stroke-width="3"/>'
-            f'<circle cx="{x - r * .3:.1f}" cy="{y - r * .3:.1f}" r="{r * .28:.1f}" fill="{CREAM}"/>')
+def mascot_uri():
+    repo = open(os.path.join(SP, 'repo.txt')).read().strip()
+    path = os.path.join(repo, 'docs/design/mascot.png')
+    return 'data:image/png;base64,' + base64.b64encode(open(path, 'rb').read()).decode()
 
 
-def horn_path(cx, cy, r0, r1, a0, a1, teeth=7):
-    """A gear-toothed crescent: the arc of a gear between angles a0 and a1 (degrees)."""
-    out, inner = [], []
-    n = teeth * 4
-    for i in range(n + 1):
-        a = math.radians(a0 + (a1 - a0) * i / n)
-        rr = r1 + (r1 - r0) * .45 if i % 4 in (1, 2) else r1
-        out.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
-    for i in range(n, -1, -1):
-        a = math.radians(a0 + (a1 - a0) * i / n)
-        inner.append((cx + r0 * math.cos(a), cy + r0 * math.sin(a)))
-    return 'M' + ' L'.join(f'{x:.1f} {y:.1f}' for x, y in out + inner) + 'Z'
+MASCOT_RATIO = 1086 / 1448  # its height over its width
 
 
 def buffalo(width, live=True, flip=False):
     """
-    The logo's buffalo, side on, facing right (`flip`: left): a dark card cut-out with perforations
-    and coloured inlays, gear horns, the clock over its head, a checked ผ้าขาวม้า. Head, legs and
-    tail are pieces on pins: `live` makes it walk and nod (the cards); otherwise it stands still.
+    The mascot (the owner's design: the buffalo in perforated paper, gear horns, the clock, a
+    ผ้าขาวม้า, a thumb up), facing right (`flip`: left). `live` rocks it gently on its feet (the
+    cards); otherwise it stands still (the scenes' margins).
     """
-    o = lambda x, y: f'transform-origin:{x}px {y}px'
-    check = (f'<pattern id="pk" width="20" height="20" patternUnits="userSpaceOnUse">'
-             f'<rect width="20" height="20" fill="{CREAM}"/><rect width="10" height="10" fill="{CORAL}"/>'
-             f'<rect x="10" y="10" width="10" height="10" fill="{CORAL}" opacity=".7"/>'
-             f'<rect x="10" width="10" height="10" fill="{BLUE}" opacity=".55"/></pattern>')
-
-    def leg(x, top, cls, origin, far=False):
-        cut = '' if far else f' stroke="{CREAM}" stroke-width="3"'
-        return (f'<g class="{cls}" style="{origin}"><path d="M{x} {top} l50 0 q4 70 -6 130 l4 30 h-48 l2 -30 q-10 -60 -2 -130z" '
-                f'fill="{"#4A3F63" if far else INK}"{cut}/>'
-                + _dots([(x + 24, top + 40), (x + 22, top + 80), (x + 20, top + 118)], 5) + '</g>')
-
-    body = (f'<path d="M96 250 q-4 -86 100 -104 q70 -10 150 -4 q60 -40 120 -8 q50 26 50 96 '
-            f'q4 92 -60 112 q-150 30 -300 0 q-60 -16 -60 -92z" fill="{INK}"/>'
-            f'<path d="M170 176 q140 -26 270 -4 l-4 30 q-130 -22 -262 2z" fill="{CREAM}"/>'
-            f'<path d="M182 182 q130 -22 246 -2 l-2 14 q-120 -18 -240 2z" fill="{INK}"/>'
-            + ''.join(f'<path d="M{x} 189 l8 -8 l8 8 l-8 8z" fill="{[CORAL, TEAL, YELLOW, BLUE][i % 4]}"/>' for i, x in enumerate(range(196, 420, 28)))
-            + _dots([(x, 250) for x in range(150, 470, 28)], 7)
-            + _dots([(x, 282) for x in range(164, 456, 28)], 5)
-            + ''.join(f'<path d="M{x} 314 q10 -14 20 0 q-10 8 -20 0z" fill="{CREAM}"/>' for x in range(170, 440, 44)))
-    tail = (f'<g class="b-tail" style="{o(100, 212)}"><path d="M104 206 q-46 20 -56 120 l-12 30 l26 -6 l12 -24 '
-            f'q4 -74 40 -104z" fill="{INK}"/></g>')
-    horn = (f'<path d="{horn_path(520, 150, 54, 74, 150, 330, 8)}" fill="{CORAL}" stroke="{INK}" stroke-width="6"/>'
-            + _dots([(520 + 64 * math.cos(math.radians(a)), 150 + 64 * math.sin(math.radians(a))) for a in range(170, 330, 30)], 4, INK))
-    far_horn = f'<path d="{horn_path(500, 146, 50, 68, 170, 320, 7)}" fill="{BLUE}" stroke="{INK}" stroke-width="6"/>'
-    clock = (f'<line x1="520" y1="88" x2="520" y2="36" stroke="{INK}" stroke-width="6"/>'
-             f'<circle cx="520" cy="10" r="30" fill="{CREAM}" stroke="{INK}" stroke-width="9"/>'
-             f'<line x1="520" y1="10" x2="520" y2="-8" stroke="{BLUE}" stroke-width="6" stroke-linecap="round"/>'
-             f'<g class="b-hand" style="{o(520, 10)}"><line x1="520" y1="10" x2="537" y2="10" stroke="{CORAL}" stroke-width="6" stroke-linecap="round"/></g>'
-             f'<circle cx="520" cy="10" r="5" fill="{YELLOW}"/>')
-    head = (f'<g class="b-head" style="{o(480, 200)}">'
-            f'<g class="b-gear" style="{o(500, 146)}">{far_horn}</g>'
-            f'<g class="b-gear" style="{o(520, 150)}">{horn}</g>{clock}'
-            f'<path d="M462 168 q40 -42 98 -20 q34 14 44 58 l18 70 q8 36 -22 44 q-34 8 -60 -10 q-30 -22 -52 -56 '
-            f'q-30 -44 -26 -86z" fill="{INK}" stroke="{CREAM}" stroke-width="4"/>'
-            f'<path d="M470 176 q-62 -8 -84 26 q46 14 86 -8z" fill="{INK}" stroke="{CREAM}" stroke-width="4"/>'
-            f'<path d="M462 186 q-36 -2 -54 14" stroke="{PINK}" stroke-width="5" fill="none" stroke-linecap="round"/>'
-            f'<path d="M518 184 q14 12 28 0" stroke="{CREAM}" stroke-width="6" fill="none" stroke-linecap="round"/>'
-            f'<ellipse cx="612" cy="270" rx="9" ry="6" fill="{CREAM}" transform="rotate(30 612 270)"/>'
-            f'<path d="M576 300 q20 10 36 -4" stroke="{CREAM}" stroke-width="5" fill="none" stroke-linecap="round"/>'
-            + _dots([(540, 222), (556, 246), (532, 250)], 5) + '</g>')
-    scarf = (f'<path d="M444 176 q46 -6 72 46 l-24 22 q-24 -44 -62 -40z" fill="url(#pk)" stroke="{INK}" stroke-width="5"/>'
-             f'<path d="M478 236 l-10 78 l26 4 l10 -70z" fill="url(#pk)" stroke="{INK}" stroke-width="5"/>')
-    pins = ''.join(_pin(x, y) for x, y in [(480, 200), (162, 300), (440, 300), (100, 212), (520, 150)])
-    puppet = (f'<defs>{check}</defs><g class="b-body" style="{o(290, 260)}">'
-              f'{leg(186, 296, "b-legb", o(211, 300), True)}{leg(462, 296, "b-legf", o(487, 300), True)}'
-              f'{tail}{body}{leg(138, 296, "b-legf", o(163, 300))}{leg(414, 296, "b-legb", o(439, 300))}'
-              f'{head}{scarf}{pins}</g>')
     flip_t = 'transform:scaleX(-1);' if flip else ''
-    return (f'<svg class="{"b-live" if live else ""}" width="{width:.0f}" height="{width * 560 / 660:.0f}" '
-            f'viewBox="0 -60 660 560" style="overflow:visible;filter:drop-shadow(5px 7px 0 rgba(43,35,64,.22));{flip_t}">{puppet}</svg>')
+    img = (f'<img src="{mascot_uri()}" width="{width:.0f}" height="{width * MASCOT_RATIO:.0f}" '
+           f'style="display:block;filter:drop-shadow(5px 7px 0 rgba(43,35,64,.22));{flip_t}">')
+    if not live:
+        return img
+    return f'<div class="m-live" style="transform-origin:50% 100%">{img}</div>'
 
 
 ICONS = {
@@ -358,9 +286,9 @@ def backdrop(color, windows, labels=()):
         body += f'<div style="position:absolute;{pos};top:{y}px">{tag(text, c, 24, c in (BLUE, PURPLE))}</div>'
     left = min(x for x, _, _, _ in windows)
     if left >= 300:
-        # a wide margin each side: the perforated buffalo, both facing the window
-        body += f'<div style="position:absolute;left:22px;top:520px">{buffalo(270, live=False)}</div>'
-        body += f'<div style="position:absolute;right:22px;top:520px">{buffalo(270, live=False, flip=True)}</div>'
+        # a wide margin each side: the mascot, both facing the window
+        body += f'<div style="position:absolute;left:14px;top:560px">{buffalo(292, live=False)}</div>'
+        body += f'<div style="position:absolute;right:14px;top:560px">{buffalo(292, live=False, flip=True)}</div>'
     body += piece(-30, BAND_Y, W + 60, H - BAND_Y + 30, CREAM, seed=101, jag=14)
     return (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}</style></head>'
             f'<body><div class="page" style="background:url({NOISE}),{color}"></div>{body}</body></html>')
@@ -486,8 +414,8 @@ def factory(stats):
     row = ''.join(f'<div class="pop" style="animation-delay:{1.0 + k * 0.14:.2f}s;white-space:nowrap">{tag(t, c, 34, c in (BLUE, PURPLE, CORAL))}</div>'
                   for k, (t, c) in enumerate(facts))
     body += f'<div style="position:absolute;left:0;right:0;top:690px;display:flex;justify-content:center;gap:26px">{row}</div>'
-    # the buffalo walks along the top corner, as if it ran the factory
-    body += f'<div class="slide" style="position:absolute;left:90px;top:40px;animation-delay:.2s">{buffalo(250)}</div>'
+    # the mascot in the top corner, giving the factory its thumb up
+    body += f'<div class="slide" style="position:absolute;left:90px;top:30px;animation-delay:.2s">{buffalo(290)}</div>'
     html_doc = doc(body).replace('</style>', FACTORY_CSS + '</style>', 1)
     return html_doc, 5.0, [0.1, 0.35, 0.55, 0.75] + [1.0 + k * 0.14 for k in range(len(facts))]
 
@@ -514,6 +442,6 @@ def end_card():
     body += (f'<div class="pop" style="position:absolute;left:660px;top:740px;animation-delay:1.0s">'
              f'<span style="display:inline-block;background:{INK};color:{GREEN};font-family:{MONO};font-size:42px;padding:16px 36px;border-radius:14px;filter:drop-shadow(5px 7px 0 rgba(43,35,64,.25))">$ bunx kammacron start</span></div>')
     body += f'<div class="pop" style="position:absolute;left:800px;top:875px;animation-delay:1.2s">{tag("kammacron.pages.dev", PURPLE, 34, True)}</div>'
-    body += f'<div class="slide" style="position:absolute;left:110px;top:720px;animation-delay:1.3s">{buffalo(300)}</div>'
-    body += f'<div class="slide" style="position:absolute;left:1500px;top:720px;animation-delay:1.4s">{buffalo(300, flip=True)}</div>'
+    body += f'<div class="slide" style="position:absolute;left:80px;top:700px;animation-delay:1.3s">{buffalo(320)}</div>'
+    body += f'<div class="slide" style="position:absolute;left:1500px;top:700px;animation-delay:1.4s">{buffalo(320, flip=True)}</div>'
     return doc(body), 4.6, [0.3, 0.5, 0.75, 1.0, 1.2]

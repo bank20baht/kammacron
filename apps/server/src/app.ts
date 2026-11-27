@@ -12,7 +12,10 @@ import { cardRoutes, CARD_RULES } from './routes/cards'
 import { fileApiRoutes, fileRoutes } from './routes/files'
 import { projectRoutes } from './routes/projects'
 import { runRoutes } from './routes/runs'
+import { scheduleRoutes } from './routes/schedules'
+import { statusRoutes } from './routes/status'
 import { systemRoutes } from './routes/system'
+import { workerRoutes } from './routes/worker'
 import { staticRoutes } from './static'
 import { ServiceError } from './services/errors'
 
@@ -103,6 +106,9 @@ export const buildApp = (ctx: AppContext) => {
         .use(cardRoutes(ctx))
         .use(fileApiRoutes(ctx))
         .use(runRoutes(ctx))
+        .use(workerRoutes(ctx))
+        .use(statusRoutes(ctx))
+        .use(scheduleRoutes(ctx))
         .use(adminRoutes(ctx))
         .use(systemRoutes(ctx)),
     )

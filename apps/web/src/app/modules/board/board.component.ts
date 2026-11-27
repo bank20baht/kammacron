@@ -29,11 +29,10 @@ import {
   type KanbanMove,
 } from '../../shared/kanban/kanban.component'
 import { CronWizardComponent } from '../cron/cron-wizard.component'
+import { AUTOPILOT } from './card-changes'
 import { CardDialogComponent } from './card-dialog.component'
 
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
-/** The tag that opens a card to agents (the worker's rounds and agent schedules). */
-const AUTOPILOT = 'auto-pilot'
 /** Tags a tile shows before the rest become "+N" (the card itself shows them all). */
 const TILE_TAGS = 4
 const ACCENT: Record<CardStatus, string> = {

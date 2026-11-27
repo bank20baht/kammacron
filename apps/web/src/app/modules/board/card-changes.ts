@@ -1,3 +1,4 @@
+/** The tag that opens a card to agents (the worker's rounds and agent schedules). */
 export const AUTOPILOT = 'auto-pilot'
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '')

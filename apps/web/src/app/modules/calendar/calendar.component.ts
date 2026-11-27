@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
@@ -24,6 +32,7 @@ import {
   type CronJobLike,
 } from '../../shared/cron'
 import { ago } from '../../shared/format'
+import { narrowScreen } from '../../shared/narrow'
 import { runLabel } from '../../shared/schedule'
 import { runStatusLabel } from '../runs/runs.component'
 
@@ -101,10 +110,29 @@ const validDay = (key: string | undefined): key is string =>
       color: var(--baht-color-text-muted);
       font-size: var(--baht-text-sm);
     }
+    /* a phone: the calendar comes up close under a short header, the art small beside the title */
+    @media (width < 600px) {
+      .app-page {
+        gap: var(--baht-space-3);
+        padding: var(--baht-space-3);
+      }
+      baht-page-header {
+        --baht-page-header-art-size: 2.5rem;
+      }
+      .tools {
+        gap: var(--baht-space-2);
+      }
+      .tools .muted {
+        display: none;
+      }
+    }
   `,
   template: `
     <div class="app-page">
-      <baht-page-header [heading]="t('calendar.heading')" [description]="t('calendar.description')">
+      <baht-page-header
+        [heading]="t('calendar.heading')"
+        [description]="narrow() ? '' : t('calendar.description')"
+      >
         <app-illustration data-slot="art" art="calendar" />
       </baht-page-header>
       <div class="tools">
@@ -170,10 +198,16 @@ export class CalendarComponent {
   protected readonly shown = signal<string[]>([...LAYERS])
   protected readonly project = signal<string[]>([])
   private readonly picked = signal<{ view: CalendarView; date: string } | null>(null)
+  protected readonly narrow = narrowScreen()
+  /**
+   * The view when none is asked for: a phone opens on today's day (a week does not fit across it),
+   * a wider window on the week. Read once: turning or resizing the window never swaps the view.
+   */
+  private readonly firstView: CalendarView = untracked(this.narrow) ? 'day' : 'week'
 
   protected readonly view = computed<CalendarView>(() => {
     const wanted = this.picked()?.view ?? this.viewParam()
-    return VIEWS.find((v) => v === wanted) ?? 'week'
+    return VIEWS.find((v) => v === wanted) ?? this.firstView
   })
   protected readonly date = computed(() => {
     const wanted = this.picked()?.date ?? this.dateParam()

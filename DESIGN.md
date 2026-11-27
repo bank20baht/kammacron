@@ -120,6 +120,28 @@ The [asset manifest](apps/web/public/illustrations/MANIFEST.md) records subjects
 consumers, theme treatment and generation prompts. Generation used the built-in imagegen tool;
 PNG outputs were resized and encoded to transparent WebP, without altering artwork content.
 
+## Interaction rules (UX review, 2026-11-27)
+
+- **Drafts are never lost silently.** `<baht-save-bar warn-on-leave>` covers reload and closing the
+  tab only; in-app navigation goes through `draftGuard` (`core/draft.guard.ts`), which asks the page
+  (`canLeave()`) and shows the library `dialog.confirm` (Stay / Discard and leave). The router uses
+  `canceledNavigationResolution: 'computed'` so a stopped Back keeps the history in place. Project
+  settings also asks before the Playbook tab closes over an unsaved playbook.
+- **Destructive actions go by saved values.** Settings → Data shuts Clean now while a changed length
+  is unsaved (Save or Discard first), then confirms with the summary of the saved lengths, removed
+  apart from archived.
+- **Every loader has four states.** Loading (skeleton), failed (`<baht-error-state>` with Try again:
+  `resource.reload()`, or a fresh live subscription), empty (`<baht-empty-state>`), loaded. Read a
+  `resource` through `hasValue()`; `value()` throws while it has failed. `liveFailed()` in
+  `shared/live-state.ts` says when a live answer never came.
+- **Cron jobs are edited in the wizard that adds them.** Edit opens the same three steps on the job;
+  Save sends only what changed (`PATCH /schedules/:id`), so an every-N-minutes job keeps its interval
+  unless a time is picked. The project is named in the list heading and above the steps.
+- **Narrow screens take turns.** Under 900px Review shows the queue or the card, with Back to the
+  queue and Next card; a decision moves on to the card after it. The queue is a listbox with one
+  Tab stop (↑/↓, Home/End, Enter/Space). Under 600px Calendar opens on today's Day (a link's
+  `?view=` always wins; resizing never swaps the view) under a header without description.
+
 ## Validation
 
 Repository lint, format check, typecheck, production build and existing coverage test commands

@@ -66,9 +66,10 @@
     }
 
     <baht-tabs
+      #sectionTabs="bahtTabs"
       [tabs]="sections()"
       [value]="current()"
-      (bahtChange)="picked.set($any($event).value)"
+      (bahtChange)="pick($any($event).value, sectionTabs.element)"
     ></baht-tabs>
 
     @if (current() === 'playbook') {
@@ -134,7 +135,11 @@
     }
 
     @if (current() === 'schedules') {
-      <web-cron-jobs [projectId]="id()" [playbooks]="p.playbooks"></web-cron-jobs>
+      <web-cron-jobs
+        [projectId]="id()"
+        [projectName]="p.name"
+        [playbooks]="p.playbooks"
+      ></web-cron-jobs>
     }
   } @else if (project.error()) {
     <baht-error-state

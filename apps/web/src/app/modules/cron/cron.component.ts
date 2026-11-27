@@ -7,6 +7,7 @@ import type { TabItem } from '@20baht/ui'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { IllustrationComponent } from '../../shared/illustration/illustration.component'
+import { liveFailed } from '../../shared/live-state'
 import { CronJobsComponent } from './cron-jobs.component'
 import { ProjectWizardComponent } from '../settings/project-wizard.component'
 import { UsageLimitsComponent } from './limits.component'
@@ -61,9 +62,20 @@ import { UsageLimitsComponent } from './limits.component'
             </div>
           }
           @if (current(); as p) {
-            <web-cron-jobs [projectId]="'' + p.id" [playbooks]="p.playbooks"></web-cron-jobs>
+            <web-cron-jobs
+              [projectId]="'' + p.id"
+              [projectName]="p.name"
+              [playbooks]="p.playbooks"
+            ></web-cron-jobs>
           }
         }
+      } @else if (failed()) {
+        <baht-error-state
+          [heading]="t('cron.loadError')"
+          [message]="t('cron.loadErrorHint')"
+          [retryLabel]="t('common.retry')"
+          (bahtRetry)="attempt.update((n) => n + 1)"
+        ></baht-error-state>
       } @else {
         <baht-skeleton variant="text"></baht-skeleton>
       }
@@ -77,9 +89,13 @@ export class CronComponent {
   /** `?project=<slug>`: the project whose jobs are shown. */
   readonly project = input<string>()
 
-  protected readonly projects = liveSignal(() =>
-    this.live.subscribe('GET', '/api/projects', { query: {} }),
-  )
+  /** Bumped by Try again: the subscription is taken anew. */
+  protected readonly attempt = signal(0)
+  protected readonly projects = liveSignal(() => {
+    this.attempt()
+    return this.live.subscribe('GET', '/api/projects', { query: {} })
+  })
+  protected readonly failed = computed(() => liveFailed(this.projects()))
   private readonly open = computed(() => (this.projects().data ?? []).filter((p) => !p.archived))
   protected readonly tabs = computed<TabItem[]>(() =>
     this.open().map((p) => ({ key: p.slug, label: p.name })),

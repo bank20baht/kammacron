@@ -6,15 +6,17 @@ import {
   input,
   resource,
   signal,
+  viewChild,
 } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { dialog } from '@20baht/ui/overlay'
-import type { BahtForm, Crumb, TabItem } from '@20baht/ui'
+import type { BahtForm, BahtTabs, Crumb, TabItem } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { IllustrationComponent } from '../../shared/illustration/illustration.component'
+import type { HasDraft } from '../../core/draft.guard'
 import { I18n } from '../../core/i18n/i18n.service'
 import { ago } from '../../shared/format'
 import { projectForm } from '../../shared/forms'
@@ -64,7 +66,7 @@ const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
   `,
   templateUrl: './project-settings.component.html',
 })
-export class ProjectSettingsComponent {
+export class ProjectSettingsComponent implements HasDraft {
   private readonly api = inject(Api).client.api
   readonly id = input.required<string>()
   /** `?section=permissions` opens that section (the run page links there). */
@@ -77,6 +79,10 @@ export class ProjectSettingsComponent {
   protected readonly picked = signal<string | null>(null)
   protected readonly current = computed(() => this.picked() ?? this.section() ?? 'general')
   protected readonly dirty = signal(false)
+  /** The playbook editor, there only while its tab is open: it keeps its own draft. */
+  private readonly editor = viewChild(PlaybookEditorComponent)
+  /** The question being asked, so a second click while it is open does not ask twice. */
+  private asking: Promise<boolean> | null = null
   protected readonly crumbs = computed<Crumb[]>(() => [
     { label: this.t('nav.settings') },
     { label: this.project.value()?.name ?? '…' },
@@ -116,6 +122,36 @@ export class ProjectSettingsComponent {
 
   protected due(at: string | Date): boolean {
     return new Date(at).getTime() <= Date.now()
+  }
+
+  /** The draft guard's question: a draft (the project's or the playbook's) asks first. */
+  canLeave(): boolean | Promise<boolean> {
+    return this.dirty() || this.editor()?.dirty() ? this.askToDiscard() : true
+  }
+
+  /**
+   * Another section. The project's form stays in the page across its sections, but the playbook
+   * editor goes with its tab, so a playbook draft asks first; staying puts the tab back.
+   */
+  protected async pick(value: string, tabs: BahtTabs): Promise<void> {
+    if (value === this.current()) return
+    if (this.current() === 'playbook' && this.editor()?.dirty() && !(await this.askToDiscard())) {
+      tabs.value = this.current()
+      return
+    }
+    this.picked.set(value)
+  }
+
+  private askToDiscard(): Promise<boolean> {
+    this.asking ??= dialog
+      .confirm(this.t('project.leave.message'), {
+        title: this.t('project.leave.title'),
+        tone: 'warning',
+        confirmText: this.t('project.leave.discard'),
+        cancelText: this.t('project.leave.stay'),
+      })
+      .finally(() => (this.asking = null))
+    return this.asking
   }
 
   protected go(url: string): void {

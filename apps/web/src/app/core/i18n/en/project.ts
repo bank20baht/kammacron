@@ -22,6 +22,12 @@ export const project = {
     run: 'Check the directory',
   },
   unsaved: 'Unsaved changes to this project',
+  leave: {
+    title: 'Leave without saving?',
+    message: 'The changes you have not saved will be lost.',
+    stay: 'Stay',
+    discard: 'Discard and leave',
+  },
   schedules: {
     heading: 'Cron jobs',
     subtitle:

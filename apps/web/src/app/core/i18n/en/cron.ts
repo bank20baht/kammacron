@@ -5,6 +5,7 @@ export const cron = {
     'Run Claude or Codex with your own prompt, a command, or a playbook, on a timer. Pick a project, then add a job below.',
   project: 'Project',
   listHeading: 'Jobs of this project',
+  listHeadingOf: 'Jobs of {name}',
   addHeading: 'Add a cron job',
   asAgent: 'as {agent}',
   on: 'On',
@@ -12,9 +13,19 @@ export const cron = {
   noProject: 'No project yet',
   noProjectHelp: 'A cron job runs in a project’s directory. Add a project first.',
   addProject: 'Add a project',
+  loadError: 'The projects did not load',
+  jobsLoadError: 'The cron jobs did not load',
+  loadErrorHint: 'The server could not be reached. Try again when it is back.',
   add: 'Add cron job',
+  edit: 'Edit',
+  editNamed: 'Edit {name}',
   wizard: {
     heading: 'New cron job',
+    editHeading: 'Edit cron job',
+    save: 'Save changes',
+    inProject: 'In {name}',
+    keepInterval: 'Now runs every {minutes} min. Leave this empty to keep that, or pick a time.',
+    saved: 'Cron job “{name}” saved',
     steps: { what: 'What', task: 'The task', when: 'When' },
     /** The first jobs the new-project wizard offers. */
     templates: {

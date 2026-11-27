@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router'
 
 import type { MessageKey } from './core/i18n/i18n.service'
+import { draftGuard } from './core/draft.guard'
 import { sessionGuard } from './core/session.guard'
 
 /** One lazy page per route; `title` is a message key (`I18nTitle` puts it in the tab). A new page also gets a line in `core/navigation/navigation.ts`. */
@@ -69,6 +70,7 @@ export const routes: Routes = [
       {
         path: 'settings/projects/:id',
         title: 'titles.project' satisfies MessageKey,
+        canDeactivate: [draftGuard],
         loadComponent: () =>
           import('./modules/settings/project-settings.component').then(
             (m) => m.ProjectSettingsComponent,

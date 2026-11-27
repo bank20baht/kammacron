@@ -9,6 +9,8 @@ import { firstValueFrom } from 'rxjs'
 import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
+import { liveFailed } from '../../shared/live-state'
+import type { CronJob } from '../../shared/cron-wizard'
 import { runsWhat } from '../../shared/schedule'
 import { CronWizardComponent } from './cron-wizard.component'
 
@@ -49,10 +51,25 @@ import { CronWizardComponent } from './cron-wizard.component'
         (bahtDismiss)="message.set(null)"
       ></baht-alert>
     }
-    <baht-card [heading]="t('cron.listHeading')" [subtitle]="t('project.schedules.subtitle')">
-      <baht-button data-slot="actions" variant="primary" icon="plus" (click)="adding.set(true)">{{
+    <baht-card
+      [heading]="
+        projectName() ? t('cron.listHeadingOf', { name: projectName() }) : t('cron.listHeading')
+      "
+      [subtitle]="t('project.schedules.subtitle')"
+    >
+      <baht-button data-slot="actions" variant="primary" icon="plus" (click)="add()">{{
         t('cron.add')
       }}</baht-button>
+      @if (schedulesFailed()) {
+        <baht-error-state
+          [heading]="t('cron.jobsLoadError')"
+          [message]="t('cron.loadErrorHint')"
+          [retryLabel]="t('common.retry')"
+          (bahtRetry)="attempt.update((n) => n + 1)"
+        ></baht-error-state>
+      } @else if (schedules().data === undefined) {
+        <baht-skeleton variant="text"></baht-skeleton>
+      }
       @for (s of schedules().data ?? []; track s.id) {
         <div class="row">
           <baht-badge
@@ -88,6 +105,14 @@ import { CronWizardComponent } from './cron-wizard.component'
               t('project.schedules.lastRun')
             }}</baht-button>
           }
+          <baht-button
+            size="sm"
+            variant="ghost"
+            icon="pencil"
+            [attr.aria-label]="t('cron.editNamed', { name: s.name })"
+            (click)="edit(s)"
+            >{{ t('cron.edit') }}</baht-button
+          >
           <baht-button size="sm" variant="ghost" (click)="toggle(s.id, !s.enabled)">{{
             s.enabled ? t('project.schedules.turnOff') : t('project.schedules.turnOn')
           }}</baht-button>
@@ -96,18 +121,24 @@ import { CronWizardComponent } from './cron-wizard.component'
           }}</baht-button>
         </div>
       } @empty {
-        <p class="muted">{{ t('project.schedules.empty') }}</p>
+        @if (schedules().data) {
+          <p class="muted">{{ t('project.schedules.empty') }}</p>
+        }
       }
     </baht-card>
 
     <web-cron-wizard
       fixed
-      [open]="adding()"
+      [open]="adding() || editing() !== null"
       [projects]="wizardProjects()"
       [project]="projectId()"
-      (closed)="adding.set(false)"
+      [job]="editing()"
+      (closed)="adding.set(false); editing.set(null)"
       (added)="
         message.set({ tone: 'success', text: t('cron.wizard.added', { name: $event.name }) })
+      "
+      (saved)="
+        message.set({ tone: 'success', text: t('cron.wizard.saved', { name: $event.name }) })
       "
     ></web-cron-wizard>
   `,
@@ -120,12 +151,18 @@ export class CronJobsComponent {
   readonly projectId = input.required<string>()
   /** The project's playbooks: what a playbook job can run. */
   readonly playbooks = input<readonly { name: string }[]>([])
+  /** The project's name: said in the heading and the wizard, so it is plain whose jobs these are. */
+  readonly projectName = input<string>('')
 
-  protected readonly schedules = liveSignal(() =>
-    this.live.subscribe('GET', '/api/projects/:id/schedules', {
+  /** Bumped by Try again: the subscription is taken anew. */
+  protected readonly attempt = signal(0)
+  protected readonly schedules = liveSignal(() => {
+    this.attempt()
+    return this.live.subscribe('GET', '/api/projects/:id/schedules', {
       params: { id: this.projectId() },
-    }),
-  )
+    })
+  })
+  protected readonly schedulesFailed = computed(() => liveFailed(this.schedules()))
   protected readonly message = signal<{ tone: 'success' | 'danger'; text: string } | null>(null)
   protected readonly busy = signal(false)
   protected readonly ago = ago
@@ -133,10 +170,22 @@ export class CronJobsComponent {
 
   /** The one project the wizard adds to (it does not ask which). */
   protected readonly wizardProjects = computed(() => [
-    { id: Number(this.projectId()), name: '', playbooks: this.playbooks() },
+    { id: Number(this.projectId()), name: this.projectName(), playbooks: this.playbooks() },
   ])
   /** The wizard that adds a job is open. */
   protected readonly adding = signal(false)
+  /** The job the wizard edits; null when it adds one or is shut. */
+  protected readonly editing = signal<CronJob | null>(null)
+
+  protected add(): void {
+    this.editing.set(null)
+    this.adding.set(true)
+  }
+
+  protected edit(job: CronJob): void {
+    this.adding.set(false)
+    this.editing.set(job)
+  }
 
   private async act(work: () => Promise<unknown>, done: string): Promise<void> {
     this.busy.set(true)

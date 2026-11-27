@@ -21,6 +21,8 @@ export const settings = {
     boardOnly: 'board only',
     notYet: 'not yet',
     wizard: {
+      systemError: 'Could not check this machine',
+      systemErrorHint: 'The wizard needs to know which agents are installed. Try again.',
       heading: 'New project',
       steps: { folder: 'Folder', access: 'What agents may do', start: 'First job' },
       folderHelp:
@@ -97,7 +99,14 @@ export const settings = {
     size: '{n} now · {size} on disk',
     due: '{n} would go at the next housekeeping',
     save: 'Save',
+    discard: 'Discard changes',
     clean: 'Clean now',
+    unsaved: 'Save or discard the changed lengths first: Clean now goes by the saved ones.',
+    confirmTitle: 'Clean now?',
+    confirmMessage: 'This lets go now of what the saved lengths have passed.',
+    confirmNothing: 'Nothing is past the saved lengths right now.',
+    willRemove: 'Removed for good:',
+    willArchive: 'Archived (can be brought back):',
     cleaned: 'Cleaned: {list}',
     nothing: 'Nothing was past its length',
   },

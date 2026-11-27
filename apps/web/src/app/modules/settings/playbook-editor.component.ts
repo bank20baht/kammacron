@@ -242,7 +242,8 @@ export class PlaybookEditorComponent {
   protected readonly tabs = computed<TabItem[]>(() =>
     this.books().map((b) => ({ key: String(b.key), label: b.name, badge: String(b.rows.length) })),
   )
-  protected readonly dirty = signal(false)
+  /** Unsaved changes: read by the settings page before its tab or the page goes. */
+  readonly dirty = signal(false)
   protected readonly busy = signal(false)
   protected readonly error = signal<string | null>(null)
   private nextKey = 0

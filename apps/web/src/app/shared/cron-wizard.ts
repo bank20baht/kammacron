@@ -57,6 +57,11 @@ export type CronWizardInput = {
   projects: readonly { id: number; name: string }[] | null
   options: AgentOptions | null
   playbooks: readonly string[]
+  /**
+   * Editing a job that runs every few minutes rather than at set times: When starts empty and may
+   * stay so (the interval is kept); a time picked makes it a timed job.
+   */
+  interval?: number | null
 }
 
 /** A Model field of one CLI: its default, its models, or another typed in. */
@@ -229,9 +234,11 @@ export const cronWizard = (t: Translate, c: CronWizardInput): WorkflowDefinition
       type: 'schedule',
       key: 'when',
       label: t('project.schedules.when'),
-      required: true,
       // a week read Monday first, as the board's people read it
       week_starts: 'mon',
+      ...(c.interval
+        ? { help: t('cron.wizard.keepInterval', { minutes: c.interval }) }
+        : { required: true }),
     },
   ]
 
@@ -386,4 +393,84 @@ export const cronJobBody = (data: Data) => {
       card_tags: Array.isArray(tags) ? (tags as string[]) : [],
     },
   }
+}
+
+/** A job as `GET /projects/:id/schedules` lists it, as far as editing it needs. */
+export type CronJob = {
+  id: number
+  project_id: number
+  name: string
+  command: string | null
+  playbook: string | null
+  agent: string | null
+  prompt: string | null
+  use_board: boolean
+  model: string | null
+  claude_agent: string | null
+  cron: string | null
+  interval_minutes: number
+  card_tags: string[]
+}
+
+/** What a job runs, from the column that says it. */
+const jobKind = (job: CronJob): ScheduleKind =>
+  job.agent ? kindOf(job.agent) : job.playbook ? 'playbook' : 'command'
+
+/** The Model fields for a job's model: a listed one picked, else "Other…" with it typed in. */
+const modelStart = (job: CronJob, options: AgentOptions | null) => {
+  const fields: Record<string, unknown> = {
+    model_claude: MODEL_DEFAULT,
+    model_codex: MODEL_DEFAULT,
+  }
+  const kind = job.agent === 'claude' || job.agent === 'codex' ? job.agent : null
+  if (!kind || !job.model) return fields
+  const listed = (options?.[kind]?.models ?? []).some((m) => m.id === job.model)
+  fields[`model_${kind}`] = listed ? job.model : MODEL_OTHER
+  if (!listed) fields['model_other'] = job.model
+  return fields
+}
+
+/** The data an edit starts from: the job as it is, each field where the wizard keeps it. */
+export const cronEditStart = (
+  job: CronJob,
+  options: AgentOptions | null,
+): Record<string, Record<string, unknown>> => {
+  const s = CRON_STEPS
+  return {
+    [s.what]: { project_id: String(job.project_id), name: job.name, runs: jobKind(job) },
+    [s.task]: {
+      prompt: job.prompt ?? '',
+      use_board: job.use_board,
+      // the folded options open when the job uses one, so what it has is in sight
+      more: job.model !== null || job.claude_agent !== null,
+      ...modelStart(job, options),
+      claude_agent: job.claude_agent ?? NO_AGENT,
+      command: job.command ?? '',
+      card_tags: job.card_tags,
+      playbook: job.playbook ?? '',
+    },
+    // an interval job has no time to show: empty keeps its interval
+    [s.when]: { when: job.cron ?? '' },
+  }
+}
+
+/** The fields that say what a job runs; a job runs one, so the others go when it changes. */
+const RUN_FIELDS = ['command', 'playbook', 'agent', 'prompt', 'model', 'claude_agent'] as const
+
+/**
+ * The change as `PATCH /schedules/:id` takes it: only what differs from where the edit started,
+ * so an untouched field (an interval, a model the form does not list) stays as it was. Another
+ * kind clears the fields of the old one. Empty when nothing changed.
+ */
+export const cronJobPatch = (start: Data, data: Data): Record<string, unknown> => {
+  const before: Record<string, unknown> = cronJobBody(start).body
+  const after: Record<string, unknown> = cronJobBody(data).body
+  // no time picked: the job keeps running as it did (every few minutes)
+  if (after['cron'] === '') delete after['cron']
+  const kindChanged =
+    kindOf(start[CRON_STEPS.what]?.['runs']) !== kindOf(data[CRON_STEPS.what]?.['runs'])
+  if (kindChanged) return { ...Object.fromEntries(RUN_FIELDS.map((k) => [k, null])), ...after }
+  return Object.fromEntries(
+    Object.entries(after).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(before[k])),
+  )
 }

@@ -8,7 +8,7 @@ import {
 } from '@angular/core'
 import { BAHT_UI } from '@20baht/angular'
 import type { ChartSeries, ColumnMap } from '@20baht/ui'
-import { Api } from '@kammacron/kit'
+import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { IllustratedCardComponent } from '../../shared/illustration/illustrated-card.component'
@@ -64,7 +64,16 @@ const columnsOf = (t: Translate): ColumnMap => ({
           (bahtChange)="weeks.set(Number($any($event).value))"
         ></baht-tabs>
       </div>
-      @if (stats.value(); as s) {
+      @if (stats.error(); as e) {
+        <baht-error-state
+          [heading]="t('stats.loadError')"
+          [message]="describeError(e)"
+          [retryLabel]="t('common.retry')"
+          (bahtRetry)="stats.reload()"
+        ></baht-error-state>
+      } @else if (stats.isLoading() || !stats.hasValue()) {
+        <baht-skeleton variant="text"></baht-skeleton>
+      } @else if (loaded(); as s) {
         <div class="stats">
           <app-illustrated-card [metric]="true" art="gear"
             ><baht-stat [label]="t('stats.runs')" [value]="s.total.runs"></baht-stat
@@ -95,7 +104,9 @@ const columnsOf = (t: Translate): ColumnMap => ({
             </p>
           </app-illustrated-card>
         </div>
-        @if (s.total.runs <= 1) {
+        @if (s.total.runs === 0) {
+          <baht-alert tone="info" [message]="t('stats.noRuns')"></baht-alert>
+        } @else if (s.total.runs === 1) {
           <baht-alert tone="info" [message]="t('stats.noTrend')"></baht-alert>
         }
         <div class="charts">
@@ -129,8 +140,6 @@ const columnsOf = (t: Translate): ColumnMap => ({
           [total]="weekRows().length"
           [emptyMessage]="t('stats.empty')"
         ></baht-table>
-      } @else {
-        <baht-skeleton variant="text"></baht-skeleton>
       }
     </div>
   `,
@@ -151,11 +160,13 @@ export class StatsComponent {
     params: () => this.weeks(),
     loader: ({ params }) => firstValueFrom(this.api.stats.get({ query: { weeks: params } })),
   })
-  protected readonly categories = computed(() =>
-    (this.stats.value()?.weeks ?? []).map((w) => w.week),
-  )
+  protected readonly describeError = describeError
+  /** The answer for the weeks picked now; `value()` throws while the request has failed. */
+  protected readonly loaded = computed(() => (this.stats.hasValue() ? this.stats.value() : null))
+  private readonly weeksOf = computed(() => this.loaded()?.weeks ?? [])
+  protected readonly categories = computed(() => this.weeksOf().map((w) => w.week))
   protected readonly series = computed<ChartSeries[]>(() => {
-    const weeks = this.stats.value()?.weeks ?? []
+    const weeks = this.weeksOf()
     return [
       { name: this.t('stats.series.shipped'), values: weeks.map((w) => w.done) },
       { name: this.t('stats.series.review'), values: weeks.map((w) => w.review) },
@@ -165,11 +176,11 @@ export class StatsComponent {
   protected readonly costSeries = computed<ChartSeries[]>(() => [
     {
       name: this.t('stats.series.cost'),
-      values: (this.stats.value()?.weeks ?? []).map((w) => w.cost),
+      values: this.weeksOf().map((w) => w.cost),
     },
   ])
   protected readonly weekRows = computed(() =>
-    (this.stats.value()?.weeks ?? []).map((w) => ({
+    this.weeksOf().map((w) => ({
       week: w.week,
       runs: w.runs,
       done: w.done,

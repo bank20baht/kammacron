@@ -11,6 +11,8 @@ export const stats = {
   cost: 'Cost (API equivalent)',
   costNote: 'An estimate Claude Code reports; a subscription token is not billed it.',
   noTrend: 'Only one run in this period: no trend yet.',
+  noRuns: 'No runs in this period yet: nothing to show.',
+  loadError: 'Stats did not load',
   outcomes: 'Weekly outcomes',
   runsPerWeek: 'Runs per week',
   weeklyCost: 'Weekly cost',

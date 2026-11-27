@@ -55,7 +55,14 @@ type Data = Record<string, Record<string, unknown> | undefined>
         @if (error(); as message) {
           <baht-alert tone="danger" [message]="message"></baht-alert>
         }
-        @if (system.value(); as _) {
+        @if (system.error()) {
+          <baht-error-state
+            [heading]="t('settings.projects.wizard.systemError')"
+            [message]="t('settings.projects.wizard.systemErrorHint')"
+            [retryLabel]="t('common.retry')"
+            (bahtRetry)="system.reload()"
+          ></baht-error-state>
+        } @else if (system.hasValue()) {
           <baht-workflow
             #wf
             show-steps
@@ -96,7 +103,9 @@ export class ProjectWizardComponent {
   protected readonly system = resource({ loader: () => firstValueFrom(this.api.system.get()) })
   private readonly agent = computed(() => {
     const found = (name: string) =>
-      (this.system.value()?.tools ?? []).some((tool) => tool.name === name && tool.path)
+      (this.system.hasValue() ? this.system.value().tools : []).some(
+        (tool) => tool.name === name && tool.path,
+      )
     return found('claude') ? 'claude' : found('codex') ? 'codex' : null
   })
   protected readonly definition = computed(() => projectWizard(this.t, this.agent() !== null))

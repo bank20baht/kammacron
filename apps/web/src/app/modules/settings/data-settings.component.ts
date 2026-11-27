@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { BAHT_UI } from '@20baht/angular'
 import type { FormDefinition } from '@20baht/ui'
 import { defineForm } from '@20baht/ui/engine'
+import { dialog } from '@20baht/ui/overlay'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
@@ -18,6 +19,8 @@ const KEYS = [
 type Key = (typeof KEYS)[number]
 type Retention = Record<Key, number | null>
 type Kind = { key: Key; total: number; due: number; bytes: number | null }
+/** The kinds that are archived, not removed, when their length has passed. */
+const ARCHIVES: ReadonlySet<Key> = new Set(['done_card_archive_days'])
 
 /** The lengths offered: days, or never. */
 const LENGTHS = ['7', '14', '30', '90', '180', '365', 'never'] as const
@@ -91,6 +94,11 @@ const dataForm = (t: Translate, kinds: readonly Kind[]): FormDefinition =>
       gap: var(--baht-space-2);
       margin-top: var(--baht-space-3);
     }
+    .hint {
+      margin: var(--baht-space-2) 0 0;
+      color: var(--baht-color-text-muted);
+      font-size: var(--baht-text-sm);
+    }
   `,
   template: `
     @if (message(); as m) {
@@ -109,13 +117,25 @@ const dataForm = (t: Translate, kinds: readonly Kind[]): FormDefinition =>
           (bahtChange)="changed($any($event).data)"
         ></baht-form>
         <div class="row">
-          <baht-button variant="primary" [disabled]="busy()" (click)="save()">{{
+          <baht-button variant="primary" [disabled]="busy() || !dirty()" (click)="save()">{{
             t('settings.data.save')
           }}</baht-button>
-          <baht-button variant="secondary" [disabled]="busy()" (click)="clean()">{{
-            t('settings.data.clean')
-          }}</baht-button>
+          @if (dirty()) {
+            <baht-button variant="ghost" [disabled]="busy()" (click)="discard()">{{
+              t('settings.data.discard')
+            }}</baht-button>
+          }
+          <baht-button
+            variant="secondary"
+            [disabled]="busy() || dirty()"
+            [attr.aria-describedby]="dirty() ? 'data-unsaved' : null"
+            (click)="clean()"
+            >{{ t('settings.data.clean') }}</baht-button
+          >
         </div>
+        @if (dirty()) {
+          <p id="data-unsaved" class="hint">{{ t('settings.data.unsaved') }}</p>
+        }
       } @else {
         <baht-skeleton variant="text"></baht-skeleton>
       }
@@ -135,6 +155,13 @@ export class DataSettingsComponent {
   private readonly chosen = signal<Record<Key, string> | null>(null)
 
   protected readonly form = computed(() => dataForm(this.t, this.kinds()))
+  /** A length is chosen that is not the saved one. */
+  protected readonly dirty = computed(() => {
+    const chosen = this.chosen()
+    const saved = this.saved()
+    if (!chosen) return false
+    return !saved || KEYS.some((k) => chosen[k] !== toChoice(saved[k]))
+  })
   /** The chosen lengths, else the saved: the form shows them again when its help text changes. */
   protected readonly value = computed(() => {
     const chosen = this.chosen()
@@ -169,17 +196,51 @@ export class DataSettingsComponent {
 
   protected async save(): Promise<void> {
     const chosen = this.chosen()
-    if (!chosen) return
+    if (!chosen || !this.dirty()) return
     const patch = Object.fromEntries(KEYS.map((k) => [k, toDays(chosen[k])])) as Retention
     await this.act(async () => {
+      // a failed save keeps `chosen`, so Clean now stays shut until it is saved or discarded
       await firstValueFrom(this.api.settings.patch(patch))
-      await this.read()
+      this.saved.set(patch)
       this.chosen.set(null)
+      await this.read()
       return this.t('settings.messages.saved')
     })
   }
 
+  /** Back to the saved lengths, and what they hold. */
+  protected discard(): void {
+    this.chosen.set(null)
+    this.message.set(null)
+    void this.read()
+  }
+
+  /**
+   * Clean now goes by the saved lengths (the server reads them), so it is shut while a change is
+   * unsaved, and it asks first with what those saved lengths let go: removed apart from archived.
+   */
   protected async clean(): Promise<void> {
+    if (this.dirty()) return
+    this.busy.set(true)
+    this.message.set(null)
+    let sure = false
+    try {
+      // fresh, and from the saved lengths: a preview still on its way must not be what is shown
+      const { kinds } = await firstValueFrom(this.api.data.get({ query: {} }))
+      this.kinds.set(kinds)
+      const detail = this.dueList(kinds)
+      sure = await dialog.confirm(this.confirmText(kinds), {
+        title: this.t('settings.data.confirmTitle'),
+        tone: 'warning',
+        confirmText: this.t('settings.data.clean'),
+        ...(detail ? { detail } : {}),
+      })
+    } catch (error) {
+      this.message.set({ tone: 'danger', text: describeError(error) })
+    } finally {
+      this.busy.set(false)
+    }
+    if (!sure) return
     await this.act(async () => {
       const done = (await firstValueFrom(this.api.data.clean.post())) as Record<Key, number>
       await this.read()
@@ -188,6 +249,32 @@ export class DataSettingsComponent {
         .join(', ')
       return list ? this.t('settings.data.cleaned', { list }) : this.t('settings.data.nothing')
     })
+  }
+
+  private confirmText(kinds: readonly Kind[]): string {
+    return kinds.some((k) => k.due > 0)
+      ? this.t('settings.data.confirmMessage')
+      : this.t('settings.data.confirmNothing')
+  }
+
+  /** "Removed for good: Run logs 12, Runs 3" and "Archived: …", a line each, empty when nothing. */
+  private dueList(kinds: readonly Kind[]): string {
+    const line = (heading: string, keys: readonly Key[]) => {
+      const items = keys
+        .map((key) => ({ key, due: kinds.find((k) => k.key === key)?.due ?? 0 }))
+        .filter((k) => k.due > 0)
+        .map((k) => `  ${this.t(`settings.data.kinds.${k.key}.label`)}: ${String(k.due)}`)
+      return items.length ? [heading, ...items].join('\n') : ''
+    }
+    return [
+      line(
+        this.t('settings.data.willRemove'),
+        KEYS.filter((k) => !ARCHIVES.has(k)),
+      ),
+      line(this.t('settings.data.willArchive'), [...ARCHIVES]),
+    ]
+      .filter(Boolean)
+      .join('\n\n')
   }
 
   private async act(work: () => Promise<string>): Promise<void> {

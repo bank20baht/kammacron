@@ -7,9 +7,9 @@ import { Steps, Aside } from '@astrojs/starlight/components'
 
 <Steps>
 
-1. **Project.** **Settings → Projects → Add project**, give it a slug and a name, and set its **directory** (any folder, say `~/ops`). Turn **Run this project on its schedule** on if you want the project's worker to take cards on its own; cron jobs run without it.
+1. **Project.** **Settings → Projects → Add project** (or **Add a project** on the welcome page) asks three things: the **directory** (any folder, say `~/ops`; the name is filled in from it), what agents may do there (watch or autopilot, the Bash commands they may run beyond editing and git, web tools), and, when Claude or Codex is on this machine, a first cron job from a template. Turn **Run this project on its schedule** on in its settings if you want the project's worker to take cards on its own; cron jobs run without it.
 
-2. **A cron job with a command.** Open **Cron jobs** in the navigator: pick **Runs: Command**, set **When** like an alarm clock (a time and the days, every N minutes, every hour, or a custom cron), and give it a name and a command.
+2. **A cron job with a command.** Open **Cron jobs** in the navigator and **Add cron job**: pick **Command** under **Who does it**, then the command, then **When** like an alarm clock (a time and the days, every N minutes, every hour, or a custom cron) and a name.
 
    ```sh
    curl -fsS --max-time 10 https://example.com/health
@@ -29,13 +29,13 @@ Run `claude` or `codex` once on this machine, as the user kammacron runs as, and
 
 1. **Cards for agents.** On the board, make cards with owner **Auto pilot** (it adds the `auto-pilot` tag): reversible work with a clear done condition.
 
-2. **A cron job with an agent.** On **Cron jobs**, pick **Runs: Codex** (or Claude), **When: Hourly**, and a prompt such as:
+2. **A cron job with an agent.** On **Cron jobs**, **Add cron job**: start from **Fix cards one at a time**, or pick **Codex** (or Claude) and write a prompt such as:
 
    ```text
    Take one auto-pilot card, do it, and write the result on the card.
    ```
 
-   Keep **Use the Kanban board** ticked: the prompt then comes with the open auto-pilot cards and how to take one. Each hour the agent takes a card through MCP, works in the project's directory, comments what it did, and moves the card to done, or to Review with the reason.
+   Keep **Use the Kanban board** ticked: the prompt then comes with the open auto-pilot cards and how to take one. Each time, the agent takes a card through MCP, works in the project's directory, comments what it did, and moves the card to done, or to Review with the reason.
 
 </Steps>
 

@@ -5,9 +5,15 @@ description: Claude or Codex with your own prompt, commands and playbooks on a t
 
 ## Cron jobs
 
-A cron job (a schedule) runs in the project's directory as it is, on its own time: the project's worker switch does not have to be on, only a directory set and the project not paused. Add one on the **Cron jobs** page (in the navigator, under Cron; with more than one project, pick it with the tabs at the top), or in a project's settings under **Schedules**. Pick what it **runs** and **when** on the cards at the top of the form, give it a name, and fill in the fields that appear.
+A cron job (a schedule) runs in the project's directory as it is, on its own time: the project's worker switch does not have to be on, only a directory set and the project not paused. Add one with **Add cron job** on the **Cron jobs** page (in the navigator, under Cron; with more than one project, pick it with the tabs at the top), with **New card ▾ → New cron job** on the board, or in a project's settings under **Schedules**. It takes three short steps:
 
-![How to add a cron job, in eight numbered steps: open Cron jobs, check the usage limits, pick what it runs, pick when, name it, pick the model, write the prompt, Add cron job](../../../assets/howto/2-cron.png)
+1. **What**: the project (asked only on the board's all-projects view), a template to start from, and **who does it**: Claude, Codex, a command or a playbook.
+2. **The task**: the prompt (with **Use the Kanban board**), the command, or the playbook. Claude's agent and the model are folded under **More options**; left folded, the agent's own defaults apply.
+3. **When**: the time, and a name, filled in from the template or the prompt's first line.
+
+The templates fill in a prompt and a time you can change on the next steps: **Find bugs every morning** (weekdays at 09:00, files a card for each bug and fixes nothing), **Fix cards one at a time** (every 30 minutes, takes one auto-pilot card), and **Update dependencies weekly** (Mondays at 10:00). **Start blank** leaves it to you.
+
+![How to add a cron job, in eight numbered steps: New card ▾ then New cron job, pick a template, pick who does it, check the prompt, the model under More options, pick when, the name, Add cron job](../../../assets/howto/2-cron.png)
 
 ### When
 
@@ -37,7 +43,7 @@ For example, tag cards `auto-pilot`, and add a cron job: **Codex**, **Hourly**, 
 
 The **Claude** and **Codex** cards show only when this machine has that CLI (on the worker's PATH, or `KAMMACRON_CLAUDE_BIN` / `KAMMACRON_CODEX_BIN`).
 
-**Agent** (Claude). When the project can call on Claude Code agents, pick one, and Claude runs as it: its instructions, its tools and its model, with your prompt as the task. kammacron finds them where Claude Code keeps them:
+**Agent** (Claude, under **More options**). When the project can call on Claude Code agents, pick one, and Claude runs as it: its instructions, its tools and its model, with your prompt as the task. kammacron finds them where Claude Code keeps them:
 
 | Where                                   | Shows as          |
 | --------------------------------------- | ----------------- |
@@ -47,7 +53,7 @@ The **Claude** and **Codex** cards show only when this machine has that CLI (on 
 
 A project's agent wins over one of yours with the same name. kammacron reads the agent's file each time and hands it to Claude (`--agents`, `--agent`), since Claude runs without the project's settings. An agent that names its `tools` keeps kammacron's MCP tools, so it can still reach the board. If the agent's file is gone when the job runs, the run fails and says so.
 
-**Model.** **Default** leaves it to the agent: Claude takes the agent's `model`, else the project's, else Claude Code's; Codex takes its own. Claude's list is the aliases for the newest of each family (Fable, Opus, Sonnet, Haiku); Codex's is what Codex lists for your account (read from `~/.codex/models_cache.json`, so it appears once Codex has run here). **Other…** takes any model's full name.
+**Model** (under **More options**). **Default** leaves it to the agent: Claude takes the agent's `model`, else the project's, else Claude Code's; Codex takes its own. Claude's list is the aliases for the newest of each family (Fable, Opus, Sonnet, Haiku); Codex's is what Codex lists for your account (read from `~/.codex/models_cache.json`, so it appears once Codex has run here). **Other…** takes any model's full name.
 
 **A command**, such as a health check (`curl -fsS --max-time 10 https://example.com/health`), tests or a backup. It passes on exit 0. When it fails, kammacron opens a card titled `<name> fails` with the output in a comment, and notifies you once (desktop or webhook; the output is not sent). While that card is open, later failures add a comment to it instead of opening another. The card is yours; to have agents work it, set the job's **Tags of that card** to `auto-pilot`. An agent reads the output as data, not as its task.
 

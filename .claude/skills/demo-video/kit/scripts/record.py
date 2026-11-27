@@ -137,40 +137,45 @@ def scroll_bottom(page):
 
 
 def schedule_scene(b, name, job, first):
-    """The Cron jobs page: Claude, the Cron tab, `* * * * *`, a name, a model, the prompt, Add."""
+    """The Cron jobs page: Add cron job, then the wizard's three steps (who, the task, when)."""
     s = Scene(b, name)
     s.go('/cron')
     s.mark('start')
+    s.wait(900)
+    s.click(s.page.get_by_role('button', name='Add cron job'), 900)
+    wizard = s.page.locator('web-cron-wizard')
+    # step 1, What: Claude does it (no template: the prompt is the job's own)
+    s.click(wizard.locator('label', has=s.page.locator('input[value="claude"]')).first, 600)
+    s.click(wizard.get_by_role('button', name='Next'), 700)
+    # step 2, The task: the prompt; Use the Kanban board is on; the model under More options
+    s.mark('prompt')
+    s.type(field(wizard, 'prompt'), job['prompt'], delay=14)
+    s.wait(400)
+    s.move_to(s.page.get_by_text('Use the Kanban board', exact=True))
     s.wait(700)
-    # the "Add a cron job" card in view (the page scrolls inside the shell)
-    s.page.evaluate("""() => {
-      const h = [...document.querySelectorAll('*')].find(e => e.textContent.trim() === 'Add a cron job' && !e.children.length)
-      h.scrollIntoView({ block: 'start', behavior: 'smooth' })
-    }""")
-    s.wait(1100)
+    s.click(wizard.get_by_text('More options: model and agent'), 600)
+    s.click(wizard.locator('label', has=s.page.locator('input[value="haiku"]')).first, 600)
+    s.click(wizard.get_by_role('button', name='Next'), 700)
+    # step 3, When
     if first:
-        # the alarm-clock way, once: Tuesday and Thursday on, Monday off ("Runs on Tue and Thu")
+        # the alarm-clock way, once: Days and time, Tuesday and Thursday ("Runs on Tue and Thu")
+        s.click(schedule_card(s.page, 'date'), 600)
         for day in (2, 4, 1):
             s.click(day_chip(s.page, day), 600)
         s.wait(700)
     # every minute, for the demo (every few minutes stops at 5): the Cron card, typed in
     s.click(schedule_card(s.page, 'cron'), 700)
-    form = s.page.locator('baht-form').last
     s.mark('cron')
     # the five boxes, as a one-time code: empty them, then type; a space moves to the next box
     boxes = s.page.locator('baht-schedule baht-cron input')
     for i in range(5):
         boxes.nth(i).fill('')
     s.type(boxes.first, '* * * * *', delay=90)
-    s.type(field(form, 'name'), job['name'], delay=25)
-    # the Model cards: Haiku
-    s.click(form.locator('label', has=s.page.locator('input[value="haiku"]')).first, 500)
-    s.mark('prompt')
-    s.type(field(form, 'prompt'), job['prompt'], delay=14)
-    s.wait(400)
-    s.move_to(s.page.get_by_text('Use the Kanban board', exact=True))
-    s.wait(900)
-    s.click(s.page.get_by_role('button', name='Add cron job'), 600)
+    # the name the wizard filled in from the prompt, replaced by the job's
+    field(wizard, 'name').fill('')
+    s.type(field(wizard, 'name'), job['name'], delay=25)
+    s.wait(500)
+    s.click(wizard.get_by_role('button', name='Add cron job'), 600)
     s.mark('added')
     s.wait(1800)
     s.done()

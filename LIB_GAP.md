@@ -1,10 +1,77 @@
 # Library gaps
 
 Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.38**, with
-`@20baht/element` **0.1.1**, on 2026-11-27. Two gaps are open (a field type of the app's own
-cannot be named through `@20baht/ui`, and draws its own label; short segmented-nav items squeezed
-by a long one); the eleven after them are resolved, four of them in 0.3.38 (a `schedule` field
+`@20baht/element` **0.1.1**, on 2026-11-27. Six gaps are open: four met building the cron-job and
+project wizards on `<baht-workflow>` (a step's label is its rule key, a new definition starts the
+run over, starting data without a field is dropped, an alert has no place for an action), a field
+type of the app's own cannot be named through `@20baht/ui` and draws its own label, and short
+segmented-nav items are squeezed by a long one. The eleven after them are resolved, four of them in 0.3.38 (a `schedule` field
 type, `baht-cron`, the app shell's fold button, `clock` and `bot` icons).
+
+## Open: a workflow step's label is also the key its rules and data use
+
+Affected: `WorkflowDefinition`, `<baht-workflow>` (`show-steps`); owner: `@20baht/engine` /
+`@20baht/ui`.
+
+**What happens.** A step shows its `form_name` in the steps strip, and the same `form_name` is
+what a rule's `field: 'Form.key'` and the run's data (`{ [form_name]: {…} }`) are keyed by. A
+translated step label ("What", "เลือกงาน") therefore becomes the key: every rule, every read of
+the data and every test changes with the locale.
+
+**Fix wanted.** A display label of its own on `WorkflowForm` (`label`, falling back to
+`form_name`), so `form_name` can stay a stable key such as `what`.
+
+**Workaround.** `apps/web/src/app/shared/cron-wizard.ts` and `project-wizard.ts` build the forms,
+the rules and the reads of the data from the same `cronSteps(t)` / `projectSteps(t)` names, so they
+always agree in one locale; the specs use the English names.
+
+## Open: a new workflow definition starts the run over
+
+Affected: `<baht-workflow>` (`workflow` property); owner: `@20baht/ui`.
+
+**What happens.** Setting `workflow` resets the run to its first step and its starting data. A
+wizard whose choices depend on an earlier answer has to change a field's options mid-run: the
+cron-job wizard's Model and Agent cards come from the project picked on step 1
+(`GET /projects/:id/agents`). There is no way to change one field's options without a new
+definition, and a new definition loses what was typed. Angular also hands the element a new
+definition whenever a live list sends a new array of the same projects.
+
+**Fix wanted.** Keep the run (data, step, history) when a new definition still has its current
+step, as `restore()` does; or let a field's options change on their own (as `options_from` does for
+a dropdown, for radio cards too).
+
+**Workaround.** `CronWizardComponent` keeps `getState()` before it reads the other project's
+options and calls `restore()` once the new definition is in (`afterRenderEffect`); its definition
+`computed` compares by content (`equal: JSON.stringify`), so a live list's new arrays do not start
+the run over.
+
+## Open: a workflow drops starting data that no field has
+
+Affected: `<baht-workflow>` (`value`, `getData()`, `baht-submit`); owner: `@20baht/ui`.
+
+**What happens.** Data given in `value` for a key that no field of the form has (the project a job
+is for, when there is only one and no Project field is shown) is not in `getData()` or in the
+submitted data. There is no `hidden` field type to carry it.
+
+**Fix wanted.** Keep such keys in the run's data, or a `hidden` field type (no control, its value
+kept and submitted).
+
+**Workaround.** The wizards keep that context themselves: `CronWizardComponent` falls back to the
+project it read the options for (`chosen`).
+
+## Open: an alert has no place for an action
+
+Affected: `<baht-alert>`; owner: `@20baht/ui`.
+
+**What happens.** "Cron job added" wants a "See cron jobs" button inside the success alert;
+`<baht-alert>` has `heading`, `message` and `dismissible` only, and a child with
+`data-slot="actions"` is drawn outside it.
+
+**Fix wanted.** An actions slot at the end of the alert (as `<baht-card>` has), and perhaps an
+`action-label` with a `baht-action` event for the one-button case.
+
+**Workaround.** The board puts the button beside the alert in its `.banner` row, as its "cards need
+review" alert already does.
 
 ## Open: a field type of the app's own cannot be named through `@20baht/ui`, and draws its own label
 

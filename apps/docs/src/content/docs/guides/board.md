@@ -5,13 +5,13 @@ description: Cards, owners, tags, priorities and what a card waits on.
 
 ![The board of one project](../../../assets/board.png)
 
-The board has four columns: **To do**, **Doing**, **Review** and **Done**. It shows one project, or all of them together, and updates live as the worker moves cards. Drag a card to move it, or focus it and use **Alt+arrow keys**. **New card** opens the full form; the line at the bottom of **To do** adds a card by its title and Enter.
+The board has four columns: **To do**, **Doing**, **Review** and **Done**. It shows one project, or all of them together, and updates live as the worker moves cards. Drag a card to move it, or focus it and use **Alt+arrow keys**. **New card** opens the full form (it asks for the project only on the all-projects view); its **▾** also adds a [cron job](/guides/schedules/). The line at the bottom of **To do** adds a card by its title and Enter.
 
 The four columns stay side by side, sharing the width (on a phone they stack). For more room, fold the navigator away with the **‹** button by the logo; the browser remembers it.
 
 ## Add a card, step by step
 
-![How to add a card, in six numbered steps: New card, the project, a title, the owner (Auto pilot or Human), the description, Create card](../../../assets/howto/1-task.png)
+![How to add a card, in five numbered steps: New card, a title, the owner (Auto pilot or Human), the description, Create card](../../../assets/howto/1-task.png)
 
 ## What a card carries
 

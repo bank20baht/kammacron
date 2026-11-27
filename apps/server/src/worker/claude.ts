@@ -135,7 +135,10 @@ export const classify = (
   if (stopped) return 'stopped'
   const r = lines.result
   const status = r?.api_error_status ?? null
-  const text = `${r?.result ?? ''} ${lines.errors.join(' ')}`.toLowerCase()
+  // The result's text is read only when the run failed: on a clean end it is Claude's own summary
+  // of the work, and a card about rate limiting or API keys would read as Claude's trouble.
+  const failed = r?.is_error === true || exitCode !== 0 || !r
+  const text = `${failed ? (r?.result ?? '') : ''} ${lines.errors.join(' ')}`.toLowerCase()
   if (
     status === 401 ||
     status === 403 ||

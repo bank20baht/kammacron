@@ -134,6 +134,18 @@ describe('stream-json', () => {
     expect(classify({ result: null, errors: [] }, 137, false)).toBe('crash')
   })
 
+  test("classify: a clean end's summary is the work, not Claude's trouble", () => {
+    const clean = (result: string) =>
+      classify({ result: { subtype: 'success', is_error: false, result }, errors: [] }, 0, false)
+    expect(clean('Added rate limiting to the login route; tests pass.')).toBeNull()
+    expect(clean('The disk quota check now handles zero.')).toBeNull()
+    expect(clean('The form now shows "Invalid API key" on a 401.')).toBeNull()
+    // the same words on a run that failed still say why
+    expect(
+      classify({ result: { is_error: true, result: 'Invalid API key' }, errors: [] }, 1, false),
+    ).toBe('auth')
+  })
+
   test('redact hides tokens wherever they appear', () => {
     expect(redact('Bearer abcdefgh1234 and abcdefgh1234', ['abcdefgh1234'])).toBe(
       'Bearer [redacted] and [redacted]',

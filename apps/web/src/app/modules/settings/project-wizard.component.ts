@@ -21,10 +21,10 @@ import { firstValueFrom } from 'rxjs'
 import { I18n } from '../../core/i18n/i18n.service'
 import { REGISTRY } from '../../shared/forms'
 import {
+  PROJECT_STEPS,
   firstJob,
   folderName,
   projectBody,
-  projectSteps,
   projectWizard,
 } from '../../shared/project-wizard'
 
@@ -115,7 +115,7 @@ export class ProjectWizardComponent {
   /** The name follows the folder until it is typed over. */
   protected changed(data: Data): void {
     const el = this.workflow()?.nativeElement
-    const s = projectSteps(this.t)
+    const s = PROJECT_STEPS
     const folder = data[s.folder]
     if (!el || !folder) return
     const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -128,7 +128,7 @@ export class ProjectWizardComponent {
   }
 
   protected async submit(data: Data): Promise<void> {
-    const { project, first } = projectBody(this.t, data)
+    const { project, first } = projectBody(data)
     this.busy.set(true)
     this.error.set(null)
     try {

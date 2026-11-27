@@ -64,10 +64,10 @@
       "name": "web",
       "version": "0.0.0",
       "dependencies": {
-        "@20baht/angular": "0.3.38",
+        "@20baht/angular": "0.3.41",
         "@20baht/formats": "^0.1.1",
         "@20baht/live": "^0.1.2",
-        "@20baht/ui": "0.3.38",
+        "@20baht/ui": "0.3.41",
         "@angular/common": "^22.2.0",
         "@angular/compiler": "^22.2.0",
         "@angular/core": "^22.2.0",
@@ -106,7 +106,7 @@
     },
   },
   "packages": {
-    "@20baht/angular": ["@20baht/angular@0.3.38", "", { "peerDependencies": { "@20baht/live": ">=0.1.0 <0.2.0", "@20baht/stickers": ">=0.1.0 <0.2.0", "@20baht/store": ">=0.3.38 <0.4.0", "@20baht/ui": ">=0.3.38 <0.4.0", "@angular/core": ">=20.0.0" }, "optionalPeers": ["@20baht/live", "@20baht/stickers", "@20baht/store"] }, "sha512-5O4pViT6H4TJ9ol5zP/svKWrYXYSQutW4W8ctYpquil6mso5wBNoK2vdi1D1n433Os/NcSzPXVZ4uezEMX8jkg=="],
+    "@20baht/angular": ["@20baht/angular@0.3.41", "", { "peerDependencies": { "@20baht/live": ">=0.1.0 <0.2.0", "@20baht/stickers": ">=0.1.0 <0.2.0", "@20baht/store": ">=0.3.41 <0.4.0", "@20baht/ui": ">=0.3.41 <0.4.0", "@angular/core": ">=20.0.0" }, "optionalPeers": ["@20baht/live", "@20baht/stickers", "@20baht/store"] }, "sha512-wxcp63jHFKxufofetb5mYsF961jEHJ2d9ifP6dvQRzefn6zBfKeTbrnORlExUByBGE5V62CeWbvcdkCKR5vDdw=="],
 
     "@20baht/dashboard": ["@20baht/dashboard@0.2.7", "", { "dependencies": { "@20baht/element": ">=0.1.0 <0.2.0", "@20baht/table-query": ">=0.4.0 <0.5.0", "lit": "^3.3.0" }, "peerDependencies": { "elysia": ">=1.4.0 <2.0.0" }, "optionalPeers": ["elysia"] }, "sha512-j3DFw6lC7q47qVt+R41aQuMWWRqXKP3QNr44Nv18V+pBdHiK3Ss934tIY1d8Zimz1xw1UwwNhyG3heXF5gbDGA=="],
 
@@ -120,7 +120,7 @@
 
     "@20baht/elysia-resource-server": ["@20baht/elysia-resource-server@0.1.0", "", { "dependencies": { "jose": "^6.0.0" }, "peerDependencies": { "elysia": "^1.4.0" }, "optionalPeers": ["elysia"] }, "sha512-bNLz4E5WD9kW8/IOXb4TNgeWfhyuh4gxY1TivYqyo8RxtreLhqDRXmnEr7AmO3WBC2FOjXV5gs9G4vDWOqYTPQ=="],
 
-    "@20baht/engine": ["@20baht/engine@0.3.38", "", {}, "sha512-bF49+GjwvZW9SSq5sB7/cxADsR9JlKhEwOIGKCICEmnm2xj4bWaZf3Jivkuztf2+arGtRLax1XqHuHuAVDIHWw=="],
+    "@20baht/engine": ["@20baht/engine@0.3.41", "", {}, "sha512-6d/V0244qdewnkl4UQafxuspE0JMo0WbQR16ONTNAt+veOwkEvsdQie/AEKIhQJGXUCMVyIEscJQ87KH/MNOjg=="],
 
     "@20baht/formats": ["@20baht/formats@0.1.1", "", {}, "sha512-qhRzf8QdWAb2Y6DAidlUKJ2tcKrLTg9hlgBc2KrRWgKQescTzJrs+N61+v1USfcR8YYideHT7Gk3fOA/fTLqxw=="],
 
@@ -134,7 +134,7 @@
 
     "@20baht/table-query": ["@20baht/table-query@0.4.2", "", { "peerDependencies": { "elysia": ">=1.4.0 <2.0.0" }, "optionalPeers": ["elysia"] }, "sha512-5m4FoWPeL3Z0URF19SSSoaWAYxTGEVIXKExHr0fbGMw3tvlBSYJkyMVogK4Mcg00ZMu/EoHrvf0FZd9JKFGwvg=="],
 
-    "@20baht/ui": ["@20baht/ui@0.3.38", "", { "dependencies": { "@20baht/dashboard": ">=0.2.7 <0.3.0", "@20baht/element": ">=0.1.1 <0.2.0", "@20baht/engine": ">=0.3.38 <0.4.0", "@lit-labs/ssr-client": "^1", "lit": "^3.3.0" }, "peerDependencies": { "@lit-labs/ssr": "^4", "dompurify": "^3", "flatpickr": "^4.6.13", "marked": ">=16", "react": ">=18" }, "optionalPeers": ["@lit-labs/ssr", "dompurify", "flatpickr", "marked", "react"] }, "sha512-GMn9tqW3wgYWSXa0ED+bdIQs2GLUhtlgZ5nfu2lj6tFIUaQNybaCBCs4EJIUxkrkPsMOzg5KcLKq8qX4KiH7IQ=="],
+    "@20baht/ui": ["@20baht/ui@0.3.41", "", { "dependencies": { "@20baht/dashboard": ">=0.2.7 <0.3.0", "@20baht/element": ">=0.1.1 <0.2.0", "@20baht/engine": ">=0.3.41 <0.4.0", "@lit-labs/ssr-client": "^1", "lit": "^3.3.0" }, "peerDependencies": { "@lit-labs/ssr": "^4", "dompurify": "^3", "flatpickr": "^4.6.13", "marked": ">=16", "react": ">=18" }, "optionalPeers": ["@lit-labs/ssr", "dompurify", "flatpickr", "marked", "react"] }, "sha512-EW6LVbfF+X8tSs+oVgGIRzJ+O/6lknak41y+cpTk9ignEoln1pEoKhUjGtcd/NtYMvHVBY7KfOo1/T2N00GSXQ=="],
 
     "@ampproject/remapping": ["@ampproject/remapping@2.3.0", "", { "dependencies": { "@jridgewell/gen-mapping": "^0.3.5", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="],
 

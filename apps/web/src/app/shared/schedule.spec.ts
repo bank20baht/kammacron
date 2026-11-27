@@ -36,8 +36,12 @@ describe('schedule', () => {
     const keys = (w: ReturnType<typeof wizard>, form: number) =>
       w.forms[form]?.fields.map((f) => f.key) ?? []
     const none = wizard([])
-    expect(none.forms.map((f) => f.form_name)).toEqual(['What', 'The task', 'When'])
-    expect(keys(none, 0)).toEqual(['name', 'runs'])
+    expect(none.forms.map((f) => [f.form_name, f.label])).toEqual([
+      ['what', 'What'],
+      ['task', 'The task'],
+      ['when', 'When'],
+    ])
+    expect(keys(none, 0)).toEqual(['project_id', 'name', 'runs'])
     expect(keys(none, 2)).toEqual(['when'])
     expect(keys(none, 1)).not.toContain('claude_agent')
     expect(keys(none, 1)).toContain('model_claude')
@@ -46,7 +50,7 @@ describe('schedule', () => {
     expect(keys(one, 1)).toContain('claude_agent')
     // folded until "More options" is on
     expect(one.rules.find((r) => r.id === 'agent')?.when).toMatchObject({
-      and: [{ field: 'The task.more', op: 'eq', value: true }, {}],
+      and: [{ field: 'task.more', op: 'eq', value: true }, {}],
     })
   })
 
@@ -65,16 +69,16 @@ describe('schedule', () => {
 
   it('turns the steps into the API body, with the model only when asked', () => {
     const data = {
-      What: { project_id: '2', name: 'Find bugs', runs: 'claude' },
-      'The task': {
+      what: { project_id: '2', name: 'Find bugs', runs: 'claude' },
+      task: {
         prompt: 'Find bugs\nthen file cards',
         use_board: true,
         more: false,
         model_claude: 'haiku',
       },
-      When: { when: '0 9 * * 1-5' },
+      when: { when: '0 9 * * 1-5' },
     }
-    expect(cronJobBody(t, data, null)).toEqual({
+    expect(cronJobBody(data)).toEqual({
       project: '2',
       body: {
         name: 'Find bugs',
@@ -86,7 +90,7 @@ describe('schedule', () => {
         claude_agent: null,
       },
     })
-    const more = { ...data, 'The task': { ...data['The task'], more: true } }
-    expect(cronJobBody(t, more, '7')).toMatchObject({ project: '7', body: { model: 'haiku' } })
+    const more = { ...data, task: { ...data.task, more: true } }
+    expect(cronJobBody(more)).toMatchObject({ project: '2', body: { model: 'haiku' } })
   })
 })

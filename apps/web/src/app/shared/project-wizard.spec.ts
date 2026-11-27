@@ -9,21 +9,21 @@ describe('project wizard', () => {
   })
 
   it('offers a first job only when an agent is there', () => {
-    expect(projectWizard(t, true).forms.map((f) => f.form_name)).toEqual([
-      'Folder',
-      'What agents may do',
-      'First job',
+    expect(projectWizard(t, true).forms.map((f) => [f.form_name, f.label])).toEqual([
+      ['folder', 'Folder'],
+      ['access', 'What agents may do'],
+      ['start', 'First job'],
     ])
     expect(projectWizard(t, false).forms).toHaveLength(2)
   })
 
   it('turns the steps into the project, and the job a template makes', () => {
     const data = {
-      Folder: { repo_path: '/code/shop', name: '' },
-      'What agents may do': { mode: 'autopilot', allowed_bash: ['Bash(bun test:*)'] },
-      'First job': { first: 'bugs' },
+      folder: { repo_path: '/code/shop', name: '' },
+      access: { mode: 'autopilot', allowed_bash: ['Bash(bun test:*)'] },
+      start: { first: 'bugs' },
     }
-    expect(projectBody(t, data)).toEqual({
+    expect(projectBody(data)).toEqual({
       project: {
         slug: 'shop',
         name: 'shop',
@@ -34,7 +34,7 @@ describe('project wizard', () => {
       },
       first: 'bugs',
     })
-    expect(projectBody(t, { ...data, 'First job': { first: NOT_NOW } }).first).toBeNull()
+    expect(projectBody({ ...data, start: { first: NOT_NOW } }).first).toBeNull()
     expect(firstJob(t, 'bugs', 'codex')).toMatchObject({ agent: 'codex', cron: '0 9 * * 1-5' })
   })
 })

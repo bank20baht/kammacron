@@ -1,8 +1,6 @@
-import type { ElementRef } from '@angular/core'
 import {
   ChangeDetectionStrategy,
   Component,
-  afterRenderEffect,
   booleanAttribute,
   computed,
   effect,
@@ -11,15 +9,13 @@ import {
   output,
   signal,
   untracked,
-  viewChild,
 } from '@angular/core'
 import { BAHT_UI } from '@20baht/angular'
-import type { BahtWorkflow } from '@20baht/ui'
 import { Api, describeError } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../../core/i18n/i18n.service'
-import { cronJobBody, cronStart, cronSteps, cronWizard } from '../../shared/cron-wizard'
+import { CRON_STEPS, cronJobBody, cronStart, cronWizard } from '../../shared/cron-wizard'
 import { REGISTRY, type AgentOptions } from '../../shared/forms'
 
 type Project = { id: number; name: string; playbooks: readonly { name: string }[] }
@@ -53,7 +49,6 @@ type Data = Record<string, Record<string, unknown> | undefined>
         }
         @if (definition(); as def) {
           <baht-workflow
-            #wf
             show-steps
             submit-on-enter
             [workflow]="def"
@@ -86,7 +81,6 @@ export class CronWizardComponent {
   /** A job was added: its name and project. */
   readonly added = output<{ name: string; project: string }>()
 
-  private readonly workflow = viewChild<ElementRef<BahtWorkflow>>('wf')
   protected readonly busy = signal(false)
   protected readonly error = signal<string | null>(null)
   /** The project whose agents and models the steps offer. */
@@ -94,24 +88,17 @@ export class CronWizardComponent {
   /** What the chosen project's machine can run; null while it is read. */
   private readonly options = signal<AgentOptions | null>(null)
   private readonly loaded = signal(false)
-  /** The run so far, put back once the steps are rebuilt for another project. */
-  private pending: unknown = null
-
-  private readonly steps = computed(() => cronSteps(this.t))
-  protected readonly definition = computed(
-    () => {
-      if (!this.loaded()) return null
-      const id = this.chosen()
-      const list = this.projects()
-      return cronWizard(this.t, {
-        projects: this.fixed() ? null : list,
-        options: this.options(),
-        playbooks: (list.find((p) => String(p.id) === id)?.playbooks ?? []).map((p) => p.name),
-      })
-      // a live list sends new arrays of the same projects: a new definition would start the run over
-    },
-    { equal: (a, b) => JSON.stringify(a) === JSON.stringify(b) },
-  )
+  /** The steps for the chosen project: a new one keeps the run (the same `workflow_id`). */
+  protected readonly definition = computed(() => {
+    if (!this.loaded()) return null
+    const id = this.chosen()
+    const list = this.projects()
+    return cronWizard(this.t, {
+      projects: this.fixed() ? null : list,
+      options: this.options(),
+      playbooks: (list.find((p) => String(p.id) === id)?.playbooks ?? []).map((p) => p.name),
+    })
+  })
   /** Where a run starts: given once when the modal opens, not on each change. */
   protected readonly start = signal<Record<string, Record<string, unknown>>>({})
 
@@ -122,18 +109,9 @@ export class CronWizardComponent {
       const id = untracked(() => this.project() ?? String(this.projects()[0]?.id ?? '')) || null
       untracked(() => {
         this.error.set(null)
-        this.pending = null
         this.loaded.set(false)
         void this.load(id, true)
       })
-    })
-    // the steps rebuilt for another project: the run goes on where it was
-    afterRenderEffect(() => {
-      this.definition()
-      const el = this.workflow()?.nativeElement
-      if (!el || this.pending === null) return
-      el.restore(this.pending)
-      this.pending = null
     })
   }
 
@@ -149,28 +127,19 @@ export class CronWizardComponent {
       }
     if (this.chosen() !== id) return
     this.options.set(options)
-    if (fresh) this.start.set(cronStart(this.t, options, id))
+    if (fresh) this.start.set(cronStart(options, id))
     this.loaded.set(true)
   }
 
   /** Another project picked: its agents and models, the run kept. */
   protected changed(data: Data): void {
-    const el = this.workflow()?.nativeElement
-    if (!el) return
-    const s = this.steps()
-    const what = data[s.what] ?? {}
-
-    const project = typeof what['project_id'] === 'string' ? what['project_id'] : null
-    if (!this.fixed() && project && project !== this.chosen()) {
-      this.pending = el.getState()
+    const project = data[CRON_STEPS.what]?.['project_id']
+    if (!this.fixed() && typeof project === 'string' && project && project !== this.chosen())
       void this.load(project, false)
-    }
   }
 
   protected async submit(data: Data): Promise<void> {
-    // no project field (one project, or a fixed one): the project the steps were read for
-    const { project, body } = cronJobBody(this.t, data, this.fixed() ? this.project() : null)
-    const target = project ?? this.chosen()
+    const { project: target, body } = cronJobBody(data)
     if (!target) {
       this.error.set(this.t('cron.noProjectHelp'))
       return

@@ -1,117 +1,79 @@
 # Library gaps
 
-Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.38**, with
-`@20baht/element` **0.1.1**, on 2026-11-27. Six gaps are open: four met building the cron-job and
-project wizards on `<baht-workflow>` (a step's label is its rule key, a new definition starts the
-run over, starting data without a field is dropped, an alert has no place for an action), a field
-type of the app's own cannot be named through `@20baht/ui` and draws its own label, and short
-segmented-nav items are squeezed by a long one. The eleven after them are resolved, four of them in 0.3.38 (a `schedule` field
-type, `baht-cron`, the app shell's fold button, `clock` and `bot` icons).
+Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.41**, with
+`@20baht/element` **0.1.1**, on 2026-11-27. No gap is open. The seventeen below are resolved, six
+of them in 0.3.41 (a workflow step's own label, a new definition that keeps the run, hidden fields,
+an alert's actions, an app's field type named and framed through `@20baht/ui`, segmented-nav items
+that keep their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold
+button, `clock` and `bot` icons).
 
-## Open: a workflow step's label is also the key its rules and data use
+## Resolved: a workflow step's label is also the key its rules and data use
 
-Affected: `WorkflowDefinition`, `<baht-workflow>` (`show-steps`); owner: `@20baht/engine` /
-`@20baht/ui`.
+Affected: `WorkflowDefinition`, `<baht-workflow>`; owner: `@20baht/engine` / `@20baht/ui`.
 
-**What happens.** A step shows its `form_name` in the steps strip, and the same `form_name` is
-what a rule's `field: 'Form.key'` and the run's data (`{ [form_name]: {…} }`) are keyed by. A
-translated step label ("What", "เลือกงาน") therefore becomes the key: every rule, every read of
-the data and every test changes with the locale.
+**Was.** A step showed its `form_name`, and rules and the run's data were keyed by the same name:
+a translated step label became the key, so the cron-job and project wizards built every rule and
+read of the data from translated names.
 
-**Fix wanted.** A display label of its own on `WorkflowForm` (`label`, falling back to
-`form_name`), so `form_name` can stay a stable key such as `what`.
+**Published fix.** 0.3.41: `WorkflowForm.label`, what the steps strip shows; `form_name` stays the
+key. kammacron's steps are now `what` / `task` / `when` and `folder` / `access` / `start`
+(`CRON_STEPS`, `PROJECT_STEPS`), with their translated `label`.
 
-**Workaround.** `apps/web/src/app/shared/cron-wizard.ts` and `project-wizard.ts` build the forms,
-the rules and the reads of the data from the same `cronSteps(t)` / `projectSteps(t)` names, so they
-always agree in one locale; the specs use the English names.
+## Resolved: a new workflow definition starts the run over
 
-## Open: a new workflow definition starts the run over
+Affected: `<baht-workflow>` (`workflow`); owner: `@20baht/ui`.
 
-Affected: `<baht-workflow>` (`workflow` property); owner: `@20baht/ui`.
+**Was.** Setting `workflow` reset the run, so the cron-job wizard kept `getState()` before reading
+another project's models and agents and called `restore()` after (`afterRenderEffect`), and compared
+its definition by content so a live list's new arrays would not start the run over.
 
-**What happens.** Setting `workflow` resets the run to its first step and its starting data. A
-wizard whose choices depend on an earlier answer has to change a field's options mid-run: the
-cron-job wizard's Model and Agent cards come from the project picked on step 1
-(`GET /projects/:id/agents`). There is no way to change one field's options without a new
-definition, and a new definition loses what was typed. Angular also hands the element a new
-definition whenever a live list sends a new array of the same projects.
+**Published fix.** 0.3.41: a new definition with the same `workflow_id` keeps the run (data, step,
+Back history). Both workarounds are gone from `CronWizardComponent`.
 
-**Fix wanted.** Keep the run (data, step, history) when a new definition still has its current
-step, as `restore()` does; or let a field's options change on their own (as `options_from` does for
-a dropdown, for radio cards too).
+## Resolved: a workflow drops starting data that no field has
 
-**Workaround.** `CronWizardComponent` keeps `getState()` before it reads the other project's
-options and calls `restore()` once the new definition is in (`afterRenderEffect`); its definition
-`computed` compares by content (`equal: JSON.stringify`), so a live list's new arrays do not start
-the run over.
+Affected: `<baht-workflow>`, the form engine; owner: `@20baht/engine` / `@20baht/ui`.
 
-## Open: a workflow drops starting data that no field has
+**Was.** Starting data for a key no field has (the job's project, when it is not asked) was not in
+the submitted data, and there was no hidden field to carry it: the wizard fell back to the project
+it had read the options for.
 
-Affected: `<baht-workflow>` (`value`, `getData()`, `baht-submit`); owner: `@20baht/ui`.
+**Published fix.** 0.3.41: a field with `hidden: true` is never shown and still sent. The cron-job
+wizard carries `project_id` that way when it does not ask, and the fallback is gone.
 
-**What happens.** Data given in `value` for a key that no field of the form has (the project a job
-is for, when there is only one and no Project field is shown) is not in `getData()` or in the
-submitted data. There is no `hidden` field type to carry it.
-
-**Fix wanted.** Keep such keys in the run's data, or a `hidden` field type (no control, its value
-kept and submitted).
-
-**Workaround.** The wizards keep that context themselves: `CronWizardComponent` falls back to the
-project it read the options for (`chosen`).
-
-## Open: an alert has no place for an action
+## Resolved: an alert has no place for an action
 
 Affected: `<baht-alert>`; owner: `@20baht/ui`.
 
-**What happens.** "Cron job added" wants a "See cron jobs" button inside the success alert;
-`<baht-alert>` has `heading`, `message` and `dismissible` only, and a child with
-`data-slot="actions"` is drawn outside it.
+**Was.** "Cron job added" wanted "See cron jobs" inside the alert; the board put the button beside
+it in its `.banner` row.
 
-**Fix wanted.** An actions slot at the end of the alert (as `<baht-card>` has), and perhaps an
-`action-label` with a `baht-action` event for the one-button case.
+**Published fix.** 0.3.41: a child with `data-slot="actions"` goes in a row at the end of the
+alert. The button is inside it again.
 
-**Workaround.** The board puts the button beside the alert in its `.banner` row, as its "cards need
-review" alert already does.
-
-## Open: a field type of the app's own cannot be named through `@20baht/ui`, and draws its own label
+## Resolved: a field type of the app's own cannot be named through `@20baht/ui`, and draws its own label
 
 Affected: `CustomFieldTypes` / `CustomFieldValues`, `<baht-form>`; owner: `@20baht/ui`,
 `@20baht/engine`.
 
-**What happens.** `@20baht/ui/engine` is `export * from '@20baht/engine'`, so an app that installs
-only `@20baht/ui` (as `20baht create` makes it) cannot write
-`declare module '@20baht/engine' { interface CustomFieldTypes { … } }`: TypeScript says the module
-cannot be found (TS2664), and augmenting `@20baht/ui/engine` does not merge into the interface.
-Second, `<baht-form>` renders no label for a field of such a type: the control must draw the
-label and the required mark itself (with `.baht-label` and `.baht-required-mark`).
+**Was.** An app with only `@20baht/ui` could not augment `@20baht/engine`'s `CustomFieldTypes`
+(TS2664), and `<baht-form>` drew no label around an app's control.
 
-**Fix wanted.** Re-export the two interfaces from a module the app has, or document adding
-`@20baht/engine` at the same version; and have `<baht-form>` render the label (and help) around
-any control, its own or the app's, so an app's control is only the control.
+**Published fix.** 0.3.41: the global `BahtFieldTypes` / `BahtFieldValues` (which the engine's
+interfaces extend) take an app's types with `declare global` (checked: a form with an app's type
+compiles with only `@20baht/ui`), and a type that asks for `frame` gets its label, help and error
+drawn by `<baht-form>`. kammacron has no field type of its own now; nothing to remove.
 
-**Workaround.** None needed now: since the library's `schedule` type (0.3.38) kammacron has no
-field type of its own, and `@20baht/engine` is out of `apps/web/package.json` again. Still open
-for the next app that needs one.
+## Resolved: short segmented-nav items are squeezed to nothing by a long one
 
-## Open: short segmented-nav items are squeezed to nothing by a long one
+Affected: `baht-segmented-nav`; owner: `@20baht/ui`.
 
-Affected component: `baht-segmented-nav`; owner: `@20baht/ui`.
+**Was.** Every item was `flex: 1 1 auto` with `min-width: 0`: beside a 120-character project name
+at 360px, "All" and the other short names shrank to a letter or two.
 
-**What happens.** Since 0.3.36 a label that does not fit ends in an ellipsis instead of drawing
-over its neighbours, which fixed the overlap. But every item is `flex: 1 1 auto` with
-`min-width: 0`, so items shrink in proportion to their width: at 360px, beside a 120-character
-project name, "All", "Backlog" and "J" shrink to "A", "B." and "." while the long name keeps most
-of the room.
-
-**Reproduce.** `<baht-segmented-nav>` with items "All", "Backlog", "J" and
-"ระบบจัดการคำสั่งซื้อและสต็อกสินค้าสำหรับร้านค้าออนไลน์หลายสาขา (Northwind Industries Holdings)" in a
-320px container.
-
-**Fix wanted.** Let short labels keep their width and take the shrinking from the long ones: for
-example `flex: 0 1 auto` with `min-width: min(max-content, 4rem)` on an item (or `flex-shrink`
-weighted by label length), or a horizontally scrolling nav once the items reach their minimum.
-
-**Workaround.** None in the app.
+**Published fix.** 0.3.41: items no longer grow and shrink in proportion. Checked on the board at
+360px with that name: "All" and "Baan Kanom" keep their width and the long name ends in an
+ellipsis.
 
 ## Resolved: a `schedule` field type — when something repeats, set like an alarm clock
 

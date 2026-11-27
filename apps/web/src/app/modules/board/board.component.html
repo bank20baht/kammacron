@@ -101,21 +101,16 @@
       ></baht-alert>
     }
     @if (notice(); as n) {
-      <!-- the alert has no place for an action (LIB_GAP.md): a button beside it, as Review's -->
-      <div class="banner">
-        <baht-alert
-          tone="success"
-          [message]="n.text"
-          dismissible
-          (bahtDismiss)="notice.set(null)"
-        ></baht-alert>
+      <baht-alert tone="success" [message]="n.text" dismissible (bahtDismiss)="notice.set(null)">
         <baht-button
+          data-slot="actions"
           variant="secondary"
+          size="sm"
           icon="arrow-right"
           (click)="go('/cron?project=' + n.slug)"
           >{{ t('cron.wizard.seeJobs') }}</baht-button
         >
-      </div>
+      </baht-alert>
     }
 
     @if ((projects().data ?? []).length === 0 && projects().data) {

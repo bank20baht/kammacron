@@ -21,18 +21,15 @@ const TEMPLATE_CRON: Record<TemplateKey, string> = {
 /** The first job's own "nothing": no cron job yet. */
 export const NOT_NOW = 'none'
 
-export const projectSteps = (t: Translate) => ({
-  folder: t('settings.projects.wizard.steps.folder'),
-  access: t('settings.projects.wizard.steps.access'),
-  start: t('settings.projects.wizard.steps.start'),
-})
+/** The steps' names: the keys the data uses (each step's `label` is what shows). */
+export const PROJECT_STEPS = { folder: 'folder', access: 'access', start: 'start' } as const
 
 export const projectWizard = (
   t: Translate,
   /** Claude or Codex is on this machine: a first job can be offered. */
   agents: boolean,
 ): WorkflowDefinition => {
-  const s = projectSteps(t)
+  const s = PROJECT_STEPS
   const folder: FieldDescriptor[] = [
     {
       order: 1,
@@ -111,11 +108,31 @@ export const projectWizard = (
   return {
     workflow_id: 'new-project',
     forms: [
-      { form_id: 'project-folder', form_name: s.folder, order: 1, fields: folder },
-      { form_id: 'project-access', form_name: s.access, order: 2, fields: access },
+      {
+        form_id: 'project-folder',
+        form_name: s.folder,
+        label: t('settings.projects.wizard.steps.folder'),
+        order: 1,
+        fields: folder,
+      },
+      {
+        form_id: 'project-access',
+        form_name: s.access,
+        label: t('settings.projects.wizard.steps.access'),
+        order: 2,
+        fields: access,
+      },
       // without an agent there is no job to offer: the last step goes
       ...(agents
-        ? [{ form_id: 'project-start', form_name: s.start, order: 3, fields: start }]
+        ? [
+            {
+              form_id: 'project-start',
+              form_name: s.start,
+              label: t('settings.projects.wizard.steps.start'),
+              order: 3,
+              fields: start,
+            },
+          ]
         : []),
     ],
     rules: [],
@@ -139,8 +156,8 @@ type Data = Record<string, Record<string, unknown> | undefined>
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
 /** The project as `POST /projects` takes it, and the first job's template, if one was picked. */
-export const projectBody = (t: Translate, data: Data) => {
-  const s = projectSteps(t)
+export const projectBody = (data: Data) => {
+  const s = PROJECT_STEPS
   const folder = data[s.folder] ?? {}
   const access = data[s.access] ?? {}
   const first = data[s.start]?.['first']

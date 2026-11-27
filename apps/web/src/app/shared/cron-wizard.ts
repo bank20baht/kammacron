@@ -49,12 +49,8 @@ const choice = (
 /** A new job's time until one is picked: weekdays at 09:00. */
 const FIRST_WHEN = '0 9 * * 1-5'
 
-/** The step names: the form names the rules and the data are keyed by. */
-export const cronSteps = (t: Translate) => ({
-  what: t('cron.wizard.steps.what'),
-  task: t('cron.wizard.steps.task'),
-  when: t('cron.wizard.steps.when'),
-})
+/** The steps' names: the keys the rules and the data use (each step's `label` is what shows). */
+export const CRON_STEPS = { what: 'what', task: 'task', when: 'when' } as const
 
 export type CronWizardInput = {
   /** The projects to pick from; null when the job's project is already known. */
@@ -96,7 +92,7 @@ const showWhen = (id: string, when: Condition, form: string, fields: string[]): 
 })
 
 export const cronWizard = (t: Translate, c: CronWizardInput): WorkflowDefinition => {
-  const s = cronSteps(t)
+  const s = CRON_STEPS
   const kinds = scheduleKinds(c.options)
   const agents = c.options?.claude?.agents ?? []
   const claudeModels = c.options?.claude?.models ?? []
@@ -114,7 +110,8 @@ export const cronWizard = (t: Translate, c: CronWizardInput): WorkflowDefinition
             options: c.projects.map((p) => ({ key: String(p.id), label: p.name })),
           },
         ]
-      : []),
+      : // the project is known: kept in the run, not asked
+        [{ order: 1, type: 'text' as const, key: 'project_id', label: '', hidden: true }]),
     {
       order: 2,
       type: 'text',
@@ -290,9 +287,27 @@ export const cronWizard = (t: Translate, c: CronWizardInput): WorkflowDefinition
   return {
     workflow_id: 'cron-job',
     forms: [
-      { form_id: 'cron-what', form_name: s.what, order: 1, fields: what },
-      { form_id: 'cron-task', form_name: s.task, order: 2, fields: task },
-      { form_id: 'cron-when', form_name: s.when, order: 3, fields: when },
+      {
+        form_id: 'cron-what',
+        form_name: s.what,
+        label: t('cron.wizard.steps.what'),
+        order: 1,
+        fields: what,
+      },
+      {
+        form_id: 'cron-task',
+        form_name: s.task,
+        label: t('cron.wizard.steps.task'),
+        order: 2,
+        fields: task,
+      },
+      {
+        form_id: 'cron-when',
+        form_name: s.when,
+        label: t('cron.wizard.steps.when'),
+        order: 3,
+        fields: when,
+      },
     ],
     rules,
   }
@@ -308,11 +323,10 @@ const firstKind = (options: AgentOptions | null): ScheduleKind =>
 
 /** The data a new run starts from. */
 export const cronStart = (
-  t: Translate,
   options: AgentOptions | null,
   projectId: string | null,
 ): Record<string, Record<string, unknown>> => {
-  const s = cronSteps(t)
+  const s = CRON_STEPS
   return {
     [s.what]: { project_id: projectId, runs: firstKind(options) },
     [s.task]: {
@@ -340,13 +354,13 @@ const modelOf = (task: Record<string, unknown>, kind: 'claude' | 'codex'): strin
 }
 
 /** The new job as `POST /projects/:id/schedules` takes it, and the project it goes to. */
-export const cronJobBody = (t: Translate, data: Data, fixedProject: string | null) => {
-  const s = cronSteps(t)
+export const cronJobBody = (data: Data) => {
+  const s = CRON_STEPS
   const what = data[s.what] ?? {}
   const task = data[s.task] ?? {}
   const when = data[s.when] ?? {}
   const kind = kindOf(what['runs'])
-  const project = fixedProject ?? text(what['project_id'])
+  const project = text(what['project_id'])
   const base = { name: text(what['name']) ?? '', cron: text(when['when']) ?? '' }
   if (kind === 'claude' || kind === 'codex') {
     const agent = task['more'] === true && kind === 'claude' ? text(task['claude_agent']) : null

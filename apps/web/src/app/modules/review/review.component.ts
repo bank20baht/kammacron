@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   ElementRef,
   inject,
   Injector,
@@ -241,6 +242,23 @@ export class ReviewComponent {
   )
   /** The option the keyboard is on; the queue is one Tab stop, the arrows go between its cards. */
   protected readonly active = signal<number | null>(null)
+  constructor() {
+    // a decision took the card away and the next one came in: its control went with it, so the
+    // keyboard starts again near the new card rather than at the top of the page
+    let last: number | null = null
+    effect(() => {
+      const shown = this.selected()
+      const moved = last !== null && shown !== null && shown !== last
+      last = shown
+      if (!moved) return
+      // one column: the way back; side by side: the card in the queue, so the arrows go on from it
+      this.focusLater(
+        this.showingCard() ? '.detail baht-button.back' : `.queue [data-card="${String(shown)}"]`,
+        true,
+      )
+    })
+  }
+
   protected readonly tabStop = computed(() => {
     const ids = (this.cards().data ?? []).map((c) => c.id)
     const active = this.active()
@@ -310,9 +328,12 @@ export class ReviewComponent {
   private readonly injector = inject(Injector)
 
   /** Focus what `selector` finds once it is drawn: a `<baht-*>` element, the control inside it. */
-  private focusLater(selector: string): void {
+  /** `ifLost`: only when nothing has focus once drawn (the control that had it went away). */
+  private focusLater(selector: string, ifLost = false): void {
     afterNextRender(
       () => {
+        const active = document.activeElement
+        if (ifLost && active !== null && active !== document.body) return
         void this.focus(selector)
       },
       { injector: this.injector },

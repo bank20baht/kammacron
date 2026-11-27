@@ -5,8 +5,11 @@ import {
   effect,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
+  untracked,
+  viewChild,
 } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
@@ -72,7 +75,13 @@ export class CardDialogComponent {
   protected readonly busy = signal(false)
   protected readonly dirty = signal(false)
   protected readonly error = signal<string | null>(null)
-  protected readonly decision = signal<Decision>('send-back')
+  /** The decision picked: back to Send back for each card, never carried over from the last one. */
+  protected readonly decision = linkedSignal<number, Decision>({
+    source: this.cardId,
+    computation: () => 'send-back',
+  })
+  /** The Send back note: emptied when another card comes in, so a note is never sent to the wrong card. */
+  private readonly backForm = viewChild<{ element: BahtForm }>('back')
   /** The form's starting data: taken once per card, so live frames never wipe an edit. */
   protected readonly start = signal<Record<string, unknown> | null>(null)
   private loadedFor: number | null = null
@@ -120,6 +129,12 @@ export class CardDialogComponent {
       if (!card || this.loadedFor === card.id) return
       this.loadedFor = card.id
       this.start.set(this.valueOf(card))
+      // the same dialog shows another card (Review moves on): nothing of the last one stays
+      untracked(() => {
+        this.dirty.set(false)
+        this.error.set(null)
+        this.backForm()?.element.reset()
+      })
     })
   }
 

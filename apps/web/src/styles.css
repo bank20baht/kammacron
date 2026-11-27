@@ -27,6 +27,12 @@ html:not([data-baht-theme='dark']) {
   --baht-color-divider: #e3e3df;
   --baht-color-text: #1c1c1e;
   --baht-color-text-muted: #5f5f63;
+  /* a step lighter than muted, still 4.5:1 on the sunken grey (the library's #737373 was 3.6) */
+  --baht-color-text-subtle: #636367;
+  /* links in the primary, not a second near-cobalt */
+  --baht-color-link: var(--baht-primary);
+  /* the library's #c8202f is 4.3:1 on the sunken grey; one step darker passes on every layer */
+  --baht-color-danger: #b91c1c;
 }
 
 html[data-baht-theme='dark'] {
@@ -43,6 +49,33 @@ html[data-baht-theme='dark'] {
   --baht-color-border-strong: #4c4c51;
   --baht-color-divider: #2f2f33;
   --baht-color-text-muted: #a3a3a8;
+  /* 4.5:1 or better on every dark layer, cards and raised surfaces included */
+  --baht-color-text-subtle: #9a9aa0;
+  --baht-color-danger: #ff6b74;
+  --baht-color-link: var(--baht-primary);
+}
+
+/*
+ * Noto Sans Thai (self-hosted, @fontsource-variable): one family for Thai and Latin, every weight
+ * in one variable file, the Thai file fetched only for a page with Thai on it. Code stays mono;
+ * Thai inside it falls through to Noto Sans Thai.
+ */
+html:is([data-baht-theme], :not([data-baht-theme])) {
+  --baht-font-family:
+    'Noto Sans Thai Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --baht-font-display: var(--baht-font-family);
+  --baht-font-mono: ui-monospace, SFMono-Regular, Menlo, 'Noto Sans Thai Variable', monospace;
+}
+
+/*
+ * A chart of outcomes speaks the app's status colours: done green, review gold, failed red, in
+ * both themes (checked with the dataviz palette validator: CVD ΔE 12.5, normal 21.4). Set on the
+ * chart's own series tokens, since `ChartSeries.color` only reaches the first series (LIB_GAP).
+ */
+baht-bar-chart.app-outcomes {
+  --baht-chart-1: #1f7a4d;
+  --baht-chart-2: #c98a00;
+  --baht-chart-3: #c8202f;
 }
 
 /* The shell: a header band on the surface colour, with a hairline under it; the current link

@@ -112,6 +112,7 @@ const columnsOf = (t: Translate): ColumnMap => ({
         <div class="charts">
           <baht-card [heading]="t('stats.outcomes')">
             <baht-bar-chart
+              class="app-outcomes"
               [label]="t('stats.runsPerWeek')"
               stacked
               [categories]="categories()"

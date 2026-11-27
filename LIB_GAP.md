@@ -1,8 +1,9 @@
 # Library gaps
 
 Verified against the published `@20baht/ui` and `@20baht/angular` **0.3.41**, with
-`@20baht/element` **0.1.1**, on 2026-11-27. One gap is open (a theme switch fades through both
-themes), with a workaround in the app. The seventeen below it are resolved, six
+`@20baht/element` **0.1.1**, on 2026-11-27. Two gaps are open (a theme switch fades through both
+themes; a chart series' own colour reaches only the first series), each with a workaround in the
+app. The seventeen below it are resolved, six
 of them in 0.3.41 (a workflow step's own label, a new definition that keeps the run, hidden fields,
 an alert's actions, an app's field type named and framed through `@20baht/ui`, segmented-nav items
 that keep their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold
@@ -26,6 +27,26 @@ not a motion with a purpose; it should not animate.
 **Workaround in kammacron.** `core/theme-switch.ts` watches `data-baht-theme` on `<html>` and puts
 `.app-theme-switching` there for two frames; `styles.css` sets `transition: none !important` under
 it. Public API only (the attribute the toggle documents); remove it when the library does the same.
+
+## Open: a chart series' own colour reaches only the first series
+
+Affected: `<baht-bar-chart>`, `<baht-line-chart>` (`ChartSeries.color`); owner: `@20baht/dashboard`
+(re-exported by `@20baht/ui`).
+
+**What happens.** `ChartSeries` documents `color?: string`, and the charts pass it on as
+`chartColor(seriesIndex, s.color)`, but `chartColor(i, override)` returns the override only when
+`i === 0`. In a chart of several series, every series after the first keeps the categorical
+`--baht-chart-N` whatever its `color` says. Verified in 0.3.41 (`@20baht/dashboard` 0.2.7,
+`chart-math.js`).
+
+**Why it matters here.** Stats draws run outcomes (done, review, failed). They should wear the
+app's status colours, not the categorical order, which made "review" the success green.
+
+**Wanted.** A series' `color` wins for every series, as the type says.
+
+**Workaround in kammacron.** The outcomes chart has the class `app-outcomes`, and `styles.css`
+sets its own `--baht-chart-1..3` (public tokens) to the status colours. Remove it, and pass
+`color` on each series, when the library honours it.
 
 ## Resolved: a workflow step's label is also the key its rules and data use
 

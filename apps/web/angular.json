@@ -19,7 +19,11 @@
             "browser": "src/main.ts",
             "assets": [{ "glob": "**/*", "input": "public" }],
             "tsConfig": "tsconfig.app.json",
-            "styles": ["node_modules/@20baht/ui/dist/tokens.css", "src/styles.css"]
+            "styles": [
+              "node_modules/@20baht/ui/dist/tokens.css",
+              "node_modules/@fontsource-variable/noto-sans-thai/index.css",
+              "src/styles.css"
+            ]
           },
           "configurations": {
             "production": {

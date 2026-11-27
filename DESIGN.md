@@ -28,13 +28,34 @@ No replacement controls, new UI library, fonts, spacing scales or grain on funct
 
 ## Ink and paper
 
-`apps/web/src/styles.css` follows konmek's cobalt `#2449C4` and pure white paper surfaces,
-with orange `#FF7417`, light-blue dividers and deep ink `#142B49` mapped into the library's public
-tokens. Page, header and table heads use theme surfaces rather than large blue background bands.
-Orange uses deep ink
-foreground. Dark mode uses lighter cobalt and orange against the existing layered blue-black
-surfaces, with deep ink on primary buttons. Success, warning, danger and info tokens are preserved.
-The library theme toggle continues to manage `data-baht-theme` and system preference.
+`apps/web/src/styles.css` maps the palette into the library's public tokens.
+
+| Role                                                     | Light                             | Dark                              |
+| -------------------------------------------------------- | --------------------------------- | --------------------------------- |
+| Page / sunken (board columns) / surface (cards)          | `#EBEBE8` / `#E1E1DD` / `#FFFFFF` | `#18181A` / `#202022` / `#2A2A2D` |
+| Text / muted / subtle                                    | `#1C1C1E` / `#5F5F63` / `#636367` | `#FAFAFA` / `#A3A3A8` / `#9A9AA0` |
+| Primary: actions, links, the current page, a chosen item | cobalt `#2449C4`                  | `#8DB8FF`                         |
+| Success / warning / danger (as text)                     | `#1F7A4D` / `#8A5D00` / `#B91C1C` | `#4ADE80` / `#FBBF24` / `#FF6B74` |
+
+Greys are neutral: no blue or silver cast. Dark is charcoal, each layer a step apart. Every text
+colour meets 4.5:1 on every layer it sits on (subtle included, on the sunken grey). Links use the
+primary, so there is one blue. The orange accent `#FF7417` is left to the library's gold badge;
+the app does not use it for state.
+
+**Status colours mean one thing everywhere.** Green is done or idle, gold is review (a person
+decides), red is failed: in badges, the board's column edges, the calendar, and the Stats outcomes
+chart (`#1F7A4D` / `#C98A00` / `#C8202F` in both themes, checked with the dataviz palette
+validator). A chosen item (a queue card, a board tile, a choice) is the primary, never a status
+colour. The library theme toggle continues to manage `data-baht-theme` and system preference; a
+switch lands in one frame (`core/theme-switch.ts`).
+
+## Type
+
+Noto Sans Thai (self-hosted variable font, `@fontsource-variable/noto-sans-thai`) for both Thai
+and Latin: the UI is English, the cards, prompts and comments people write are often Thai, and
+one family keeps the two scripts matched. All weights come from one file per script; the Thai
+file loads only on a page with Thai text. Headings and labels use the same family. Code stays in
+the system monospace, with Thai inside it falling through to Noto Sans Thai.
 
 Illustration pigments live in the assets; they do not define functional UI colors. Transparent
 WebP artwork sits on either theme's surfaces without filters, blend modes, or opaque white boxes.

@@ -97,9 +97,10 @@ const ONE_COLUMN = '(width < 900px)'
         transform: none;
       }
     }
+    /* chosen: the primary, as the navigator's current page and a chosen tile show it */
     .item.selected {
-      border-color: var(--baht-color-accent);
-      background: var(--baht-color-bg-sunken);
+      border-color: var(--baht-color-primary);
+      background: var(--baht-color-primary-tint);
     }
     .item {
       min-width: 0;

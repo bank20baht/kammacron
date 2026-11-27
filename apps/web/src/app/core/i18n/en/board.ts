@@ -5,6 +5,8 @@ export const board = {
   allProjects: 'All projects',
   runNow: 'Run now',
   newCard: 'New card',
+  newMenu: 'More things to add',
+  newCronJob: 'New cron job',
   createCard: 'Create card',
   workerPaused: 'Worker: paused',
   workerBoardOnly: 'Worker: board only',

@@ -2,7 +2,7 @@ import type { Registry } from '@20baht/ui'
 import { defineForm } from '@20baht/ui/engine'
 
 import type { Translate } from '../core/i18n/i18n.service'
-import { SCHEDULE_KINDS, type ScheduleKind } from './schedule'
+import { SCHEDULE_KINDS } from './schedule'
 import { uploadImage } from './upload'
 
 /*
@@ -237,31 +237,6 @@ export const accessForm = (t: Translate) =>
     ],
   })
 
-export const newProjectForm = (t: Translate) =>
-  defineForm({
-    form_id: 'new-project',
-    form_name: t('forms.newProject.name'),
-    fields: [
-      {
-        order: 1,
-        type: 'text',
-        key: 'slug',
-        label: t('forms.newProject.slug'),
-        placeholder: 'my-app',
-        required: true,
-        width: '1/2',
-      },
-      {
-        order: 2,
-        type: 'text',
-        key: 'name',
-        label: t('forms.newProject.projectName'),
-        required: true,
-        width: '1/2',
-      },
-    ],
-  })
-
 export const projectForm = (t: Translate) =>
   defineForm({
     form_id: 'project',
@@ -375,17 +350,6 @@ export const projectForm = (t: Translate) =>
     ],
   })
 
-/**
- * A schedule: its name, what it runs (only the fields of `kind`) and when (only the fields of
- * `timing`). The page picks kind and timing with tabs above the form.
- */
-/** The icons of what a job runs, from the library's curated set (it has no robot: LIB_GAP.md). */
-const KIND_ICONS: Record<ScheduleKind, string> = {
-  claude: 'sparkles',
-  codex: 'code',
-  command: 'terminal',
-  playbook: 'layers',
-}
 /** A model one of the CLIs offers (`list_agent_options`). */
 type ModelOption = { id: string; label: string; description: string }
 
@@ -412,207 +376,6 @@ export const scheduleKinds = (options: AgentOptions | null) =>
   SCHEDULE_KINDS.filter(
     (k) => (k !== 'claude' && k !== 'codex') || (options !== null && options[k] !== null),
   )
-
-const AGENT_ICONS = { project: 'folder', user: 'users', plugin: 'layers' } as const
-
-/** Radio cards while they fit a row or two; past that, a dropdown. */
-const CARD_LIMIT = 6
-
-/** What the Runs and When fields leave to the kind: an agent's model, its agent, its prompt. */
-type ScheduleChoices = {
-  kind: ScheduleKind
-  playbooks: readonly string[]
-  options: AgentOptions | null
-  /** Model is "Other…": a text field takes the model's name. */
-  otherModel: boolean
-}
-
-export const scheduleForm = (t: Translate, c: ScheduleChoices) =>
-  defineForm({
-    form_id: 'schedule',
-    form_name: t('forms.schedule.name'),
-    fields: [
-      {
-        order: 1,
-        type: 'radio',
-        variant: 'card',
-        key: 'runs',
-        label: t('project.schedules.runs'),
-        required: true,
-        options: scheduleKinds(c.options).map((key) => ({
-          key,
-          label: t(`project.schedules.kind.${key}`),
-          description: t(`forms.schedule.kindHelp.${key}`),
-          icon: KIND_ICONS[key],
-        })),
-      },
-      {
-        order: 2,
-        type: 'schedule',
-        key: 'when',
-        label: t('project.schedules.when'),
-        required: true,
-        // a week read Monday first, as the board's people read it
-        week_starts: 'mon',
-      },
-      {
-        order: 3,
-        type: 'text',
-        key: 'name',
-        label: t('forms.schedule.scheduleName'),
-        placeholder: t(`forms.schedule.namePlaceholder.${c.kind}`),
-        required: true,
-        width: '1/2',
-      },
-      ...runsFields(t, c),
-    ],
-  })
-
-/** Choices as radio cards, or as a dropdown when there are too many for cards. */
-const choice = (
-  base: { order: number; key: string; label: string; help?: string; required?: boolean },
-  options: { key: string; label: string; description?: string; icon?: string }[],
-) =>
-  options.length <= CARD_LIMIT
-    ? { ...base, type: 'radio' as const, variant: 'card' as const, options }
-    : {
-        ...base,
-        type: 'dropdown' as const,
-        options: options.map(({ key, label, description }) => ({
-          key,
-          label: description ? `${label}: ${description}` : label,
-        })),
-      }
-
-/** Claude's agent: itself, or one of the Claude Code agents found; nothing when none is found. */
-const agentField = (t: Translate, c: ScheduleChoices) => {
-  const agents = c.kind === 'claude' ? (c.options?.claude?.agents ?? []) : []
-  if (!agents.length) return []
-  return [
-    choice(
-      {
-        order: 4,
-        key: 'claude_agent',
-        label: t('forms.schedule.agent'),
-        help: t('forms.schedule.agentHelp'),
-      },
-      [
-        {
-          key: NO_AGENT,
-          label: t('forms.schedule.noAgent'),
-          description: t('forms.schedule.noAgentHelp'),
-          icon: 'sparkles',
-        },
-        ...agents.map((a) => ({
-          key: a.name,
-          label: a.name,
-          description: a.description || t(`forms.schedule.agentSource.${a.source}`),
-          icon: AGENT_ICONS[a.source],
-        })),
-      ],
-    ),
-  ]
-}
-
-/** The model: the CLI's own default, its models, or another typed in; a text field without a list. */
-const modelFields = (t: Translate, c: ScheduleChoices) => {
-  const kind = c.kind === 'codex' ? 'codex' : 'claude'
-  const models = c.options?.[kind]?.models ?? []
-  const other = {
-    order: 6,
-    type: 'text' as const,
-    key: 'model_other',
-    label: t('forms.schedule.modelOther'),
-    placeholder: kind === 'claude' ? 'claude-sonnet-5-5' : 'gpt-6.2-sol',
-    required: true,
-    width: '1/2' as const,
-  }
-  if (!models.length)
-    return [
-      {
-        ...other,
-        key: 'model_other',
-        label: t('forms.schedule.model'),
-        required: false,
-        help: t('forms.schedule.modelHelp'),
-      },
-    ]
-  return [
-    choice({ order: 5, key: 'model', label: t('forms.schedule.model') }, [
-      {
-        key: MODEL_DEFAULT,
-        label: t('forms.schedule.modelDefault'),
-        description: t(`forms.schedule.modelDefaultHelp.${kind}`),
-      },
-      ...models.map((m) => ({ key: m.id, label: m.label, description: m.description })),
-      {
-        key: MODEL_OTHER,
-        label: t('forms.schedule.modelOtherCard'),
-        description: t('forms.schedule.modelOtherHelp'),
-      },
-    ]),
-    ...(c.otherModel ? [other] : []),
-  ]
-}
-
-const runsFields = (t: Translate, c: ScheduleChoices) => {
-  switch (c.kind) {
-    case 'claude':
-    case 'codex':
-      return [
-        ...agentField(t, c),
-        ...modelFields(t, c),
-        {
-          order: 7,
-          type: 'textarea',
-          key: 'prompt',
-          label: t('forms.schedule.prompt'),
-          placeholder: t('forms.schedule.promptPlaceholder'),
-          help: t('forms.schedule.promptHelp'),
-          required: true,
-        },
-        {
-          order: 8,
-          type: 'checkbox',
-          key: 'use_board',
-          label: t('forms.schedule.useBoard'),
-          help: t('forms.schedule.useBoardHelp'),
-        },
-      ] as const
-    case 'playbook':
-      return [
-        {
-          order: 4,
-          type: 'dropdown',
-          key: 'playbook',
-          label: t('forms.schedule.playbook'),
-          help: t('forms.schedule.playbookHelp'),
-          required: true,
-          width: '1/2',
-          options: c.playbooks.map((name) => ({ key: name, label: name })),
-        },
-      ] as const
-    case 'command':
-      return [
-        {
-          order: 4,
-          type: 'text',
-          key: 'command',
-          label: t('forms.schedule.command'),
-          placeholder: 'curl -fsS --max-time 10 https://example.com/health',
-          help: t('forms.schedule.commandHelp'),
-          required: true,
-        },
-        {
-          order: 5,
-          type: 'tags',
-          key: 'card_tags',
-          label: t('forms.schedule.cardTags'),
-          help: t('forms.schedule.cardTagsHelp'),
-        },
-      ] as const
-  }
-}
 
 /** The name of a new playbook: what the tag `playbook:<name>` says. */
 export const playbookNameForm = (t: Translate) =>

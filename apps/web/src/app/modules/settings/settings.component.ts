@@ -18,7 +18,8 @@ import { IllustrationComponent } from '../../shared/illustration/illustration.co
 import { I18n, type AppLocale, type Translate } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { ago } from '../../shared/format'
-import { accessForm, newProjectForm, workerForm } from '../../shared/forms'
+import { accessForm, workerForm } from '../../shared/forms'
+import { ProjectWizardComponent } from './project-wizard.component'
 
 const projectColumns = (t: Translate): ColumnMap => ({
   name: t('settings.projects.columns.name'),
@@ -56,7 +57,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 /** The install: MCP, pause, hosts, notifications, the tools found; and the projects. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IllustrationComponent, BAHT_UI],
+  imports: [IllustrationComponent, BAHT_UI, ProjectWizardComponent],
   selector: 'web-settings',
   styleUrl: './settings.component.css',
   templateUrl: './settings.component.html',
@@ -100,7 +101,6 @@ export class SettingsComponent {
   protected readonly forms = computed(() => ({
     worker: workerForm(this.t),
     access: accessForm(this.t),
-    newProject: newProjectForm(this.t),
     language: languageForm(this.t, this.i18n.locales),
   }))
   protected readonly languageValue = computed(() => ({ locale: this.i18n.locale() }))
@@ -180,22 +180,8 @@ export class SettingsComponent {
     }, this.t('settings.messages.rotated'))
   }
 
-  protected async addProject(form: BahtForm): Promise<void> {
-    if (!form.validate().valid) return
-    const d = form.getData()
-    this.busy.set(true)
-    try {
-      const created = await firstValueFrom(
-        this.api.projects.post({ slug: text(d['slug']), name: text(d['name']) }),
-      )
-      form.reset()
-      void this.router.navigate(['/settings/projects', created.id])
-    } catch (error) {
-      this.message.set({ tone: 'danger', text: describeError(error) })
-    } finally {
-      this.busy.set(false)
-    }
-  }
+  /** The new-project wizard is open. */
+  protected readonly addingProject = signal(false)
 
   protected setLocale(value: unknown): void {
     const next = this.i18n.locales.find((l) => l === value)

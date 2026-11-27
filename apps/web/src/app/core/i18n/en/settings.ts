@@ -19,6 +19,22 @@ export const settings = {
     paused: 'paused',
     boardOnly: 'board only',
     notYet: 'not yet',
+    wizard: {
+      heading: 'New project',
+      steps: { folder: 'Folder', access: 'What agents may do', start: 'First job' },
+      folderHelp:
+        'The repository on this machine. Runs happen there, as it is: kammacron does not branch, reset or push it',
+      nameHelp: 'Filled in from the folder; change it if you like',
+      bashHelp:
+        'Reading and editing files here and git (add, commit, push…) are always allowed. Add the commands its work needs, such as the tests',
+      first: 'Start with a cron job',
+      firstHelp:
+        'It runs Claude (or Codex) on a timer; change or turn it off on the Cron jobs page',
+      notNow: 'Not now',
+      notNowHelp: 'Add one later',
+      create: 'Create project',
+      created: 'Project “{name}” created',
+    },
   },
   mcp: {
     connect: 'Connect Claude Code',

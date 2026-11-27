@@ -1,15 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, inject, resource } from '@angular/core'
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  resource,
+  signal,
+} from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { Api } from '@kammacron/kit'
 import { firstValueFrom } from 'rxjs'
 
 import { I18n } from '../../core/i18n/i18n.service'
+import { ProjectWizardComponent } from '../settings/project-wizard.component'
 
 /** First start: the tools on the PATH, and a first project. */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI],
+  imports: [BAHT_UI, ProjectWizardComponent],
   selector: 'web-welcome',
   styles: `
     .stack {
@@ -72,9 +80,15 @@ import { I18n } from '../../core/i18n/i18n.service'
               [tone]="hasRepo() ? 'success' : 'warning'"
               [label]="hasRepo() ? t('welcome.project.linked') : t('welcome.project.noneYet')"
             ></baht-badge>
-            <baht-button variant="secondary" (click)="go('/settings')">{{
-              hasRepo() ? t('welcome.project.edit') : t('welcome.project.add')
-            }}</baht-button>
+            @if (hasRepo()) {
+              <baht-button variant="secondary" (click)="go('/settings')">{{
+                t('welcome.project.edit')
+              }}</baht-button>
+            } @else {
+              <baht-button variant="primary" icon="plus" (click)="adding.set(true)">{{
+                t('welcome.project.add')
+              }}</baht-button>
+            }
           </div>
         </baht-card>
         <div class="row">
@@ -83,6 +97,7 @@ import { I18n } from '../../core/i18n/i18n.service'
           }}</baht-button>
         </div>
       </div>
+      <web-project-wizard [open]="adding()" (closed)="adding.set(false)"></web-project-wizard>
     </div>
   `,
 })
@@ -100,6 +115,9 @@ export class WelcomeComponent {
   protected readonly hasRepo = computed(() =>
     (this.projects.value() ?? []).some((p) => p.repo_path !== null),
   )
+
+  /** The new-project wizard is open. */
+  protected readonly adding = signal(false)
 
   protected go(url: string): void {
     void this.router.navigateByUrl(url)

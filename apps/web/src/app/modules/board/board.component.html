@@ -6,9 +6,13 @@
         <baht-button variant="secondary" icon="play" [disabled]="!p.repo_path" (click)="runNow()">{{
           t('board.runNow')
         }}</baht-button>
-        <baht-button variant="primary" icon="plus" (click)="startNew()">{{
-          t('board.newCard')
-        }}</baht-button>
+        <baht-split-button
+          [label]="t('board.newCard')"
+          [menuLabel]="t('board.newMenu')"
+          [items]="newItems()"
+          (bahtClick)="startNew()"
+          (bahtSelect)="addCronJob()"
+        ></baht-split-button>
       </baht-page-header>
       <div class="meta">
         <baht-badge
@@ -60,9 +64,13 @@
       }
     } @else {
       <baht-page-header [heading]="t('board.heading')" [description]="t('board.allProjects')">
-        <baht-button variant="primary" icon="plus" (click)="startNew()">{{
-          t('board.newCard')
-        }}</baht-button>
+        <baht-split-button
+          [label]="t('board.newCard')"
+          [menuLabel]="t('board.newMenu')"
+          [items]="newItems()"
+          (bahtClick)="startNew()"
+          (bahtSelect)="addCronJob()"
+        ></baht-split-button>
       </baht-page-header>
     }
 
@@ -91,6 +99,23 @@
         dismissible
         (bahtDismiss)="error.set(null)"
       ></baht-alert>
+    }
+    @if (notice(); as n) {
+      <!-- the alert has no place for an action (LIB_GAP.md): a button beside it, as Review's -->
+      <div class="banner">
+        <baht-alert
+          tone="success"
+          [message]="n.text"
+          dismissible
+          (bahtDismiss)="notice.set(null)"
+        ></baht-alert>
+        <baht-button
+          variant="secondary"
+          icon="arrow-right"
+          (click)="go('/cron?project=' + n.slug)"
+          >{{ t('cron.wizard.seeJobs') }}</baht-button
+        >
+      </div>
     }
 
     @if ((projects().data ?? []).length === 0 && projects().data) {
@@ -187,6 +212,14 @@
     }
   </baht-modal>
 </div>
+
+<web-cron-wizard
+  [open]="addingJob()"
+  [projects]="openProjects()"
+  [project]="jobProject()"
+  (closed)="addingJob.set(false)"
+  (added)="jobAdded($event)"
+></web-cron-wizard>
 
 @for (n of [formNumber()]; track n) {
   <baht-form-modal

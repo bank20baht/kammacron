@@ -28,6 +28,7 @@ import {
   type KanbanColumn,
   type KanbanMove,
 } from '../../shared/kanban/kanban.component'
+import { CronWizardComponent } from '../cron/cron-wizard.component'
 import { CardDialogComponent } from './card-dialog.component'
 
 const COLUMNS: CardStatus[] = ['todo', 'doing', 'review', 'done']
@@ -50,6 +51,7 @@ const isStatus = (value: string): value is CardStatus => COLUMNS.some((c) => c =
     IllustrationComponent,
     BAHT_UI,
     CardDialogComponent,
+    CronWizardComponent,
     RouterLink,
     KanbanComponent,
     KanbanTileDirective,
@@ -172,21 +174,53 @@ export class BoardComponent {
   protected readonly newValue = signal<Record<string, unknown>>({})
   protected readonly newForm = computed<FormDefinition>(() => {
     const form = newCardForm(this.t)
+    // the board shows one project, or there is only one: the card goes there, nothing to ask
+    const known = this.project() !== null || (this.projects().data ?? []).length <= 1
     return {
       ...form,
-      fields: form.fields.map((f) =>
-        f.key === 'project_id'
-          ? {
-              ...f,
-              options: (this.projects().data ?? []).map((p) => ({
-                key: String(p.id),
-                label: p.name,
-              })),
-            }
-          : f,
-      ),
+      fields: form.fields
+        .filter((f) => !(known && f.key === 'project_id'))
+        .map((f) =>
+          f.key === 'project_id'
+            ? {
+                ...f,
+                options: (this.projects().data ?? []).map((p) => ({
+                  key: String(p.id),
+                  label: p.name,
+                })),
+              }
+            : f,
+        ),
     }
   })
+
+  // a new cron job, from New ▾
+  protected readonly newItems = computed(() => [
+    { value: 'cron', label: this.t('board.newCronJob') },
+  ])
+  protected readonly addingJob = signal(false)
+  /** What was just added, with a way to it. */
+  protected readonly notice = signal<{ text: string; slug: string } | null>(null)
+  protected readonly openProjects = computed(() =>
+    (this.projects().data ?? [])
+      .filter((p) => !p.archived)
+      .map((p) => ({ id: p.id, name: p.name, playbooks: p.playbooks })),
+  )
+  /** The job goes to the project on screen, else the first. */
+  protected readonly jobProject = computed(() => {
+    const p = this.project() ?? this.openProjects()[0]
+    return p ? String(p.id) : null
+  })
+
+  protected addCronJob(): void {
+    this.notice.set(null)
+    this.addingJob.set(true)
+  }
+
+  protected jobAdded(job: { name: string; project: string }): void {
+    const slug = (this.projects().data ?? []).find((p) => String(p.id) === job.project)?.slug ?? ''
+    this.notice.set({ text: this.t('cron.wizard.added', { name: job.name }), slug })
+  }
 
   protected navigate(event: Event): void {
     const { href } = (event as CustomEvent<{ href?: string }>).detail
@@ -242,7 +276,8 @@ export class BoardComponent {
   protected async create(data: Record<string, unknown>): Promise<void> {
     try {
       const card = await this.createOne({
-        project_id: Number(data['project_id']),
+        // no project field when the board knows it: the one the form started with
+        project_id: Number(data['project_id'] ?? this.newValue()['project_id']),
         title: typeof data['title'] === 'string' ? data['title'].trim() : '',
         body: typeof data['body'] === 'string' ? data['body'] : '',
         owner: typeof data['owner'] === 'string' ? data['owner'] : 'autopilot',

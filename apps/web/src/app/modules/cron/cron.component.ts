@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core'
 import { Router } from '@angular/router'
 import { BAHT_UI } from '@20baht/angular'
 import { liveSignal } from '@20baht/angular/live'
@@ -8,6 +8,7 @@ import { I18n } from '../../core/i18n/i18n.service'
 import { LiveService } from '../../services/live.service'
 import { IllustrationComponent } from '../../shared/illustration/illustration.component'
 import { CronJobsComponent } from './cron-jobs.component'
+import { ProjectWizardComponent } from '../settings/project-wizard.component'
 import { UsageLimitsComponent } from './limits.component'
 
 /**
@@ -16,7 +17,13 @@ import { UsageLimitsComponent } from './limits.component'
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BAHT_UI, CronJobsComponent, IllustrationComponent, UsageLimitsComponent],
+  imports: [
+    BAHT_UI,
+    CronJobsComponent,
+    IllustrationComponent,
+    ProjectWizardComponent,
+    UsageLimitsComponent,
+  ],
   selector: 'web-cron',
   styles: `
     .projects {
@@ -36,9 +43,10 @@ import { UsageLimitsComponent } from './limits.component'
             <app-illustration data-slot="art" art="clock" />
           </baht-empty-state>
           <div>
-            <baht-button variant="primary" (click)="go('/settings')">{{
+            <baht-button variant="primary" icon="plus" (click)="adding.set(true)">{{
               t('cron.addProject')
             }}</baht-button>
+            <web-project-wizard [open]="adding()" (closed)="adding.set(false)"></web-project-wizard>
           </div>
         } @else {
           @if (list.length > 1) {
@@ -85,7 +93,6 @@ export class CronComponent {
     void this.router.navigate([], { queryParams: { project: slug }, replaceUrl: true })
   }
 
-  protected go(url: string): void {
-    void this.router.navigateByUrl(url)
-  }
+  /** The new-project wizard is open. */
+  protected readonly adding = signal(false)
 }

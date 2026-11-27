@@ -12,6 +12,40 @@ export const cron = {
   noProject: 'No project yet',
   noProjectHelp: 'A cron job runs in a project’s directory. Add a project first.',
   addProject: 'Add a project',
+  add: 'Add cron job',
+  wizard: {
+    heading: 'New cron job',
+    steps: { what: 'What', task: 'The task', when: 'When' },
+    template: 'Start from',
+    templateHelp: 'A job ready to use; change anything on the next steps',
+    templates: {
+      bugs: {
+        label: 'Find bugs every morning',
+        description: 'Files a card for each bug; fixes nothing',
+        prompt:
+          'Read the code of this project and look for bugs. For each one, file an auto-pilot card: the file and line, what goes wrong and how to see it. Do not fix anything, and do not file a bug that already has a card.',
+      },
+      fix: {
+        label: 'Fix cards one at a time',
+        description: 'Takes one auto-pilot card each time and does it',
+        prompt:
+          'Take one auto-pilot card, do it, and commit. Write on the card what you did. If it needs a person, move it to Review and say why.',
+      },
+      deps: {
+        label: 'Update dependencies weekly',
+        description: 'Updates, tests, commits when the tests pass',
+        prompt:
+          'Update the dependencies of this project to their newest compatible versions and run the tests. Commit when they pass; when they fail, put things back and file an auto-pilot card with what broke.',
+      },
+    },
+    blank: 'Start blank',
+    blankHelp: 'Write it yourself',
+    runs: 'Who does it',
+    more: 'More options: model and agent',
+    nameHelp: 'Shown in the list and on the calendar',
+    added: 'Cron job “{name}” added',
+    seeJobs: 'See cron jobs',
+  },
   limits: {
     claude: 'Claude',
     codex: 'Codex',

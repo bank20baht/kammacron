@@ -27,14 +27,15 @@
           [emptyMessage]="t('settings.projects.empty')"
           (bahtRowClick)="openProject($any($event).row.id)"
         ></baht-table>
-        <baht-card [heading]="t('settings.projects.add')">
-          <baht-form #np="bahtForm" [form]="forms().newProject"></baht-form>
-          <div class="row">
-            <baht-button variant="primary" [disabled]="busy()" (click)="addProject(np.element)">{{
-              t('settings.projects.add')
-            }}</baht-button>
-          </div>
-        </baht-card>
+        <div class="row">
+          <baht-button variant="primary" icon="plus" (click)="addingProject.set(true)">{{
+            t('settings.projects.add')
+          }}</baht-button>
+        </div>
+        <web-project-wizard
+          [open]="addingProject()"
+          (closed)="addingProject.set(false)"
+        ></web-project-wizard>
       </div>
 
       <div data-tab="mcp" class="stack">

@@ -2,9 +2,6 @@
 export const SCHEDULE_KINDS = ['claude', 'codex', 'command', 'playbook'] as const
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
 
-/** A new cron job's time until one is picked: Mondays at 09:00. */
-export const DEFAULT_CRON = '0 9 * * 1'
-
 /** A schedule as `GET /projects/:id/schedules` lists it, as far as its line needs. */
 type ScheduleLike = {
   command: string | null

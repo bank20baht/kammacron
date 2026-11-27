@@ -1,14 +1,14 @@
 # Library gaps
 
 Verified against the published `@20baht/ui`, `@20baht/angular`, `@20baht/engine` and
-`@20baht/strict` **0.3.46** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
-2026-11-28. One gap is open, in a fix of the day before: `bahtui/registered-element`'s
-`perComponent` passes a component that imports a type from `@20baht/ui` (fixed in the library's
-repo, not yet released). The thirty-two below it are resolved: two in 0.3.46 (a form loads four
-field elements only when it has such a field; elements checked page by page), one in 0.3.45 (a
-directive of the Angular adapter is a module of its own), six in 0.3.44 (the per-element
-stylesheets, and five in the types the Angular adapter and the engine give, found by taking every
-`$any($event)` out of the templates and reading each form's data as `FormValues`).
+`@20baht/strict` **0.3.47** (with `@20baht/dashboard` **0.2.8**), `@20baht/element` **0.1.1**, on
+2026-11-28. No gap is open. The thirty-three below are resolved: one in 0.3.47
+(`registered-element`'s `perComponent` no longer passes a component that imports a type of the
+library), two in 0.3.46 (a form loads four field elements only when it has such a field; elements
+checked page by page), one in 0.3.45 (a directive of the Angular adapter is a module of its own),
+six in 0.3.44 (the per-element stylesheets, and five in the types the Angular adapter and the
+engine give, found by taking every `$any($event)` out of the templates and reading each form's
+data as `FormValues`).
 Four were resolved in 0.3.43, all found while registering only the elements the app draws
 (`<baht-form>` brings `schedule` and `cron`; `@20baht/strict` flags the whole library imported,
 reads its field elements from the engine, and fails on a drawn element nothing registers), two in
@@ -18,20 +18,18 @@ actions, an app's field type named and framed through `@20baht/ui`, segmented-na
 their width), four in 0.3.38 (a `schedule` field type, `baht-cron`, the app shell's fold button,
 `clock` and `bot` icons).
 
-## Open (`@20baht/strict`): `perComponent` passes a component that imports a type of the library
+## Resolved (`@20baht/strict`): `perComponent` passes a component that imports a type of the library
 
 Affected: `bahtui/registered-element` with `perComponent` (0.3.46); owner: `@20baht/strict`.
 
-**What happens.** The rule reads a component's `import type { BahtForm } from '@20baht/ui'` as
-importing the whole library, which registers every element, and stops looking: 14 of kammacron's
-22 components that draw elements passed whatever they drew. Found the day `perComponent` was
-adopted here, because the first lint named 28 missing imports where 112 were due.
+**Was.** The rule read a component's `import type { BahtForm } from '@20baht/ui'` as importing the
+whole library, which registers every element, and stopped looking: 14 of kammacron's 22
+components that draw elements passed whatever they drew. Found the day `perComponent` was adopted
+here, because the first lint named 28 missing imports where 112 were due.
 
-**Wanted.** Type-only imports skipped when a file's imports are read.
-
-**Fixed in the library's repo** (commit `d496dfd`, with a test), not released yet. kammacron's
-imports were written with that rule and are complete; until the release, lint here does not
-check a component that imports a type from `@20baht/ui`.
+**Published fix.** 0.3.47: type-only imports are skipped when a file's imports are read. Checked
+here by taking the table's import out of `runs.component.ts`, which names the library's types:
+lint reports `<baht-table>` and the line to add.
 
 ## Resolved (`@20baht/ui`): `<baht-form>` brings the element of every field type
 
@@ -61,7 +59,8 @@ the shell's six elements, every component imports the ones its template draws, a
 and a page brings its own: the runs list 104 KB, the calendar 127 KB, stats 154 KB, the board
 235 KB (it needs the form), where every page used to wait for 322 KB and then fetch 100 KB more.
 `scripts/element-styles.ts` reads the imports of every file under `src/` for the one stylesheet.
-See the open gap above for what 0.3.46's rule misses.
+Checked in Chromium: each of the thirteen pages loaded on its own, the card dialog, the new-card
+modal and the cron wizard draw no element left undefined, and nothing is logged.
 
 ## Resolved (`@20baht/angular`): one directive imported brings all 98
 

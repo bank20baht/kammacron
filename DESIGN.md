@@ -55,19 +55,24 @@ switch lands in one frame (the toggle holds transitions while it draws the new t
 both themes) add life where a page has none of its own, and nowhere else. The illustrated objects
 above stay the page headers' art; a sticker never sits beside one.
 
-| Where                       | Sticker                              | Why there                                           |
-| --------------------------- | ------------------------------------ | --------------------------------------------------- |
-| Sign-in                     | `key`                                | The first screen; nothing else on it                |
-| Welcome, the two step cards | `terminal`, `kanban`                 | Seen once; a small sticker in each card's corner    |
-| Not found                   | `street-sign`                        | In place of the generic error art                   |
-| A project with no cron job  | `cron`                               | The one moving thing on an empty list               |
-| Docs, each guide's title    | one a guide (frontmatter `sticker:`) | Reference pages and Playbooks (its graph) have none |
+| Where                       | Sticker                                                           | Why there                                           |
+| --------------------------- | ----------------------------------------------------------------- | --------------------------------------------------- |
+| Sign-in                     | a scene: `key`, `shield`, `password`, `potted-plant`              | The first screen; nothing else on it                |
+| Welcome, the two step cards | `terminal`, `kanban`                                              | Seen once; a small sticker in each card's corner    |
+| Not found                   | a scene: `street-sign`, `tuk-tuk`, `power-pole`, `motorbike-taxi` | A soi that goes nowhere; nothing else on the page   |
+| A project with no cron job  | `cron`                                                            | The one moving thing on an empty list               |
+| Docs, each guide's title    | one a guide (frontmatter `sticker:`)                              | Reference pages and Playbooks (its graph) have none |
 
 Each pops in once a beat after the page shows, rests on its still frame, and replays on hover;
 under reduced motion it is the still frame from the start. They are decorative (`aria-hidden`):
 the words beside them say everything. No sticker that paints in the danger red (`hot`) goes beside
-a neutral message, since red means failed. Four or five in the app is the ceiling: a sticker on a
-page people open many times a day stops being delight and starts being noise.
+a neutral message, since red means failed.
+
+Sign-in and Not found are the two pages with a scene (`web-sticker-scene`): one large sticker and
+three small ones on a sunken, dotted stage inside a wider card, sized in percent of the
+stage so the scene scales with the screen. Both pages have only a few lines of text, and a lone
+small sticker left them looking empty. Everywhere else, one sticker per place, and the places stay
+few: a sticker on a page people open many times a day stops being delight and starts being noise.
 
 ## Type
 

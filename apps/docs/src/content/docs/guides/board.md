@@ -9,6 +9,10 @@ The board has four columns: **To do**, **Doing**, **Review** and **Done**. It sh
 
 The four columns stay side by side, sharing the width (on a phone they stack). For more room, fold the navigator away with the **‹** button by the logo; the browser remembers it.
 
+## Add a card, step by step
+
+![How to add a card, in six numbered steps: New card, the project, a title, the owner (Auto pilot or Human), the description, Create card](../../../assets/howto/1-task.png)
+
 ## What a card carries
 
 | Field       | What it does                                                                                                                     |

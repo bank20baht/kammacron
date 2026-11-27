@@ -16,6 +16,10 @@ This is the worker's own loop, one card at a time with the project's playbook. T
 
 ![A run whose Migrate step failed: its steps, the command and the end of its output](../../../assets/run.png)
 
+Every run, the worker's and a cron job's, is on the **Runs** page. A run's **Timeline** shows each event as a card on a rail: what the agent said, each tool it called (a Bash command, an edit with its lines added and removed), and each result, marked **Success**, **Error** or **Denied** when the allowlist refused it, with how long the call took. Filter it to tools, messages or errors, and open a row to see all of it.
+
+![How to see what an agent did, in seven numbered steps: open Runs, filter by status, pick a run, the Timeline tab, filter the events, open a row, Open all](../../../assets/howto/5-runs.png)
+
 ## Modes
 
 - **autopilot** (default): Claude decides reversible things itself and records each decision in its final comment.

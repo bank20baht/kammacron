@@ -7,6 +7,8 @@ description: Claude or Codex with your own prompt, commands and playbooks on a t
 
 A cron job (a schedule) runs in the project's directory as it is, on its own time: the project's worker switch does not have to be on, only a directory set and the project not paused. Add one on the **Cron jobs** page (in the navigator, under Cron; with more than one project, pick it with the tabs at the top), or in a project's settings under **Schedules**. Pick what it **runs** and **when** on the cards at the top of the form, give it a name, and fill in the fields that appear.
 
+![How to add a cron job, in eight numbered steps: open Cron jobs, check the usage limits, pick what it runs, pick when, name it, pick the model, write the prompt, Add cron job](../../../assets/howto/2-cron.png)
+
 ### When
 
 Set it the way an alarm clock is set, with one of four cards:
@@ -68,6 +70,8 @@ Neither agent documents these numbers; when a new version writes them otherwise,
 
 - each project's **worker round**, its **cron jobs**, and the daily **housekeeping**, ahead, as dashed marks (a job that runs more often than every two hours shows as one line a day);
 - the **runs** that happened, as solid blocks coloured by how they ended.
+
+![How to read the calendar, in six numbered steps: open Calendar, pick what it shows, move between days, switch Day, Week or Month, open a run from its block, and the list of jobs below](../../../assets/howto/3-calendar.png)
 
 Day, week and month views; filter by layer or project. A click opens the run, the board or the project's schedules. Below, a table lists every job with its interval or cron expression, next and last run, last result, and why it is off when it is (`schedule off`, `paused: …`, `all work paused`).
 

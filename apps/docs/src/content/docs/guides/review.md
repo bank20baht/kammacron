@@ -12,6 +12,8 @@ A card goes to **Review** when a person should decide:
 
 ![A card waiting in Review, with its reason](../../../assets/review.png)
 
+![How to review a card, in six numbered steps: open Review, pick the card, read why the agent sent it, choose Send back, Approve or I'll take it, say what to change, confirm](../../../assets/howto/4-review.png)
+
 The **Review** page lists every such card with its reason and the latest run.
 
 - **Send back**: Claude tries again with your note, which it reads on the next run (with the earlier runs' summaries).

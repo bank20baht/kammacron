@@ -131,7 +131,12 @@ switch (command) {
     const stop = () => {
       // exit however stopping ends, and within 10 s even if something hangs
       setTimeout(() => process.exit(1), 10_000).unref()
-      void handle.stop().finally(() => process.exit(0))
+      void handle
+        .stop()
+        .catch((error: unknown) => {
+          console.error('kammacron: stopping failed:', error)
+        })
+        .finally(() => process.exit(0))
     }
     process.on('SIGTERM', stop)
     process.on('SIGINT', stop)

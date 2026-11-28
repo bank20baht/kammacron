@@ -94,6 +94,10 @@ describe('stream-json', () => {
     ])
   })
 
+  test('the thinking ticks (system thinking_tokens) are no events', () => {
+    expect(eventsOf({ type: 'system', subtype: 'thinking_tokens', session_id: 's1' })).toEqual([])
+  })
+
   test('data past 8 KB is cut, and summaries stay short', () => {
     const [event] = eventsOf({
       type: 'assistant',

@@ -79,6 +79,8 @@ const resultText = (content: unknown) =>
 export const eventsOf = (line: StreamLine): RunEvent[] => {
   switch (line.type) {
     case 'system':
+      // a tick while Claude thinks, about once a second: a run's timeline would be mostly these
+      if (line.subtype === 'thinking_tokens') return []
       return [
         {
           type: 'system',

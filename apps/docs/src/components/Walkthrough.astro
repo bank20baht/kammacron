@@ -1,0 +1,243 @@
+---
+/**
+ * A walkthrough you scroll: the steps (<Scene>s) on the left, and on a wide screen one window
+ * pinned on the right that shows the step at the middle of the screen, changing as you scroll.
+ * The window crossfades (opacity only under reduced motion). Without the script, or on a narrow
+ * screen, each step keeps its own window under its words.
+ */
+---
+
+<div class="walk" data-walk>
+  <div class="walk-steps"><slot /></div>
+  <div class="walk-stage not-content" aria-hidden="true">
+    <p class="walk-count">Step <span data-now>1</span> of <span data-of>1</span></p>
+    <div class="walk-frames"></div>
+  </div>
+</div>
+
+<script>
+  const wide = matchMedia('(min-width: 72rem)')
+
+  for (const walk of document.querySelectorAll<HTMLElement>('[data-walk]')) {
+    const scenes = [...walk.querySelectorAll<HTMLElement>('[data-scene]')]
+    const frames = walk.querySelector<HTMLElement>('.walk-frames')
+    const now = walk.querySelector<HTMLElement>('[data-now]')
+    const of = walk.querySelector<HTMLElement>('[data-of]')
+    if (!frames || !now || !of || scenes.length === 0) continue
+
+    // the stage holds a copy of every step's window; the step's own stays for narrow screens
+    for (const [i, scene] of scenes.entries()) {
+      scene.style.setProperty('--n', `'${String(i + 1)}'`)
+      const media = scene.querySelector('[data-media]')
+      if (!media) continue
+      const copy = media.cloneNode(true) as HTMLElement
+      copy.removeAttribute('data-media')
+      copy.dataset['frame'] = String(i)
+      // the copy is pictures only; the words were read in the step already
+      for (const img of copy.querySelectorAll('img')) img.alt = ''
+      frames.append(copy)
+    }
+    of.textContent = String(scenes.length)
+
+    let active = -1
+    const show = (i: number) => {
+      if (i === active) return
+      active = i
+      now.textContent = String(i + 1)
+      for (const [j, scene] of scenes.entries()) scene.toggleAttribute('data-active', j === i)
+      for (const frame of frames.children)
+        frame.toggleAttribute('data-active', (frame as HTMLElement).dataset['frame'] === String(i))
+    }
+
+    // the step crossing a line a little above the middle of the screen is the one shown
+    const seen = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          if (entry.isIntersecting) show(scenes.indexOf(entry.target as HTMLElement))
+      },
+      { rootMargin: '-40% 0px -55% 0px' },
+    )
+    for (const scene of scenes) seen.observe(scene)
+
+    const stage = () => walk.toggleAttribute('data-staged', wide.matches)
+    wide.addEventListener('change', stage)
+    stage()
+    show(0)
+  }
+</script>
+
+<style is:global>
+  /* the walkthrough's page uses the whole width (it turns the table of contents off) */
+  :root:has(.walk) {
+    --sl-content-width: 76rem;
+  }
+
+  .walk {
+    --walk-ease: cubic-bezier(0.23, 1, 0.32, 1);
+    margin-top: 2rem;
+  }
+
+  /* one step: its number, its words, and (until staged) its window */
+  .scene + .scene {
+    margin-top: 3rem;
+  }
+  .scene-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+  .scene-n::before {
+    content: var(--n, '');
+    display: inline-grid;
+    place-items: center;
+    min-width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+    font-size: var(--sl-text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+  .scene-media {
+    margin: 1.25rem 0 0;
+  }
+
+  /* a window: a bar with three dots and where it is, then the picture or the terminal */
+  .walk .window {
+    overflow: hidden;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem;
+    background: var(--sl-color-gray-6);
+    box-shadow: 0 1.25rem 2.5rem -1.5rem rgb(0 0 0 / 0.45);
+  }
+  .walk .bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    font-family: var(--sl-font-mono);
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+  }
+  .walk .dots {
+    flex: none;
+    width: 2.6rem;
+    height: 0.6rem;
+    background:
+      radial-gradient(circle at 0.3rem 50%, #e5534b 0.28rem, transparent 0.3rem),
+      radial-gradient(circle at 1.3rem 50%, #e0a93b 0.28rem, transparent 0.3rem),
+      radial-gradient(circle at 2.3rem 50%, #3fb37f 0.28rem, transparent 0.3rem);
+  }
+  .walk .where {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .walk .window img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 0;
+    border-radius: 0;
+  }
+  .walk .shots.pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .walk .terminal {
+    background: #0d1017;
+  }
+  .walk .terminal pre {
+    margin: 0;
+    padding: 1rem 1.1rem 1.2rem;
+    overflow-x: auto;
+    border: 0;
+    background: transparent;
+    color: #c4ccd8;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .walk .terminal .typed {
+    color: #ffffff;
+  }
+  .walk .terminal .prompt {
+    color: #ff944f;
+    user-select: none;
+  }
+  .walk .terminal .out {
+    color: #9aa6bb;
+  }
+
+  .walk-stage {
+    display: none;
+  }
+
+  /* wide: words on the left, one pinned window on the right */
+  @media (min-width: 72rem) {
+    .walk[data-staged] {
+      display: grid;
+      grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+      gap: 3rem;
+      align-items: start;
+    }
+    .walk[data-staged] .walk-steps .scene-media {
+      display: none;
+    }
+    .walk[data-staged] .scene {
+      min-height: 62vh;
+      margin-top: 0;
+      opacity: 0.4;
+      transition: opacity 300ms var(--walk-ease);
+    }
+    .walk[data-staged] .scene:last-child {
+      min-height: 85vh;
+    }
+    .walk[data-staged] .scene[data-active] {
+      opacity: 1;
+    }
+    .walk[data-staged] .walk-stage {
+      display: block;
+      position: sticky;
+      top: calc(var(--sl-nav-height, 4rem) + 2rem);
+    }
+    .walk-frames {
+      display: grid;
+    }
+    .walk-frames > * {
+      grid-area: 1 / 1;
+      margin: 0;
+      align-self: start;
+      opacity: 0;
+      transform: translateY(0.75rem) scale(0.985);
+      transition:
+        opacity 300ms var(--walk-ease),
+        transform 400ms var(--walk-ease);
+      pointer-events: none;
+    }
+    .walk-frames > [data-active] {
+      opacity: 1;
+      transform: none;
+    }
+    .walk-count {
+      margin: 0 0 0.6rem;
+      font-family: var(--sl-font-mono);
+      font-size: var(--sl-text-xs);
+      color: var(--sl-color-gray-3);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .walk-frames > *,
+    .walk[data-staged] .scene {
+      transform: none;
+      transition-property: opacity;
+      transition-duration: 150ms;
+    }
+  }
+</style>

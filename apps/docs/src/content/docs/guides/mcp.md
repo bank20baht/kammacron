@@ -18,6 +18,18 @@ prints the command to run, with your API token:
 claude mcp add --transport http kammacron http://127.0.0.1:7420/mcp --header "Authorization: Bearer …"
 ```
 
+### For one project, in its repository
+
+`--scope project` writes the server into the repository's `.mcp.json`, so everyone who opens the project gets it. Keep the token out of that file: Claude Code reads `${KAMMACRON_TOKEN}` from the environment.
+
+```sh
+export KAMMACRON_TOKEN=$(jq -r .api_token ~/.kammacron/secrets.json)   # in your shell's profile
+claude mcp add --scope project --transport http kammacron http://127.0.0.1:7420/mcp \
+  --header 'Authorization: Bearer ${KAMMACRON_TOKEN}'
+```
+
+The next `claude` in that folder asks once whether to use the project's server. A whole project set up this way: [a real project, start to finish](/start/walkthrough/).
+
 ## Claude Desktop and claude.ai
 
 They connect over OAuth, which needs an `https://` address: put a tunnel in front, set **Public URL** in Settings and restart. See [reaching it from elsewhere](/guides/remote/). `/mcp` then answers with where to sign in, and the consent page asks for your session.

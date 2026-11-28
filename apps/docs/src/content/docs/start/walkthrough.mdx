@@ -1,0 +1,310 @@
+---
+title: A real project, start to finish
+description: kammacron from bunx to a board that fills itself, on a real repository - MCP for the project, a skill that writes cards, a CLAUDE.md that keeps Claude on the board, a cron job that finds bugs and one that fixes them.
+sticker: ai-agent
+tableOfContents: false
+---
+
+import Walkthrough from '../../../components/Walkthrough.astro'
+import Scene from '../../../components/Scene.astro'
+
+import welcome from '../../../assets/walkthrough/welcome.png'
+import projectFolder from '../../../assets/walkthrough/project-folder.png'
+import projectAgents from '../../../assets/walkthrough/project-agents.png'
+import projectFirstJob from '../../../assets/walkthrough/project-first-job.png'
+import boardFirstCard from '../../../assets/walkthrough/board-first-card.png'
+import huntWhat from '../../../assets/walkthrough/hunt-what.png'
+import huntTask from '../../../assets/walkthrough/hunt-task.png'
+import huntWhen from '../../../assets/walkthrough/hunt-when.png'
+import huntRun from '../../../assets/walkthrough/hunt-run.png'
+import boardBugs from '../../../assets/walkthrough/board-bugs.png'
+import fixTask from '../../../assets/walkthrough/fix-task.png'
+import fixWhen from '../../../assets/walkthrough/fix-when.png'
+import cronList from '../../../assets/walkthrough/cron-list.png'
+import watchBoard from '../../../assets/walkthrough/watch-board.png'
+import watchDev from '../../../assets/walkthrough/watch-dev.png'
+import cardDone from '../../../assets/walkthrough/card-done.png'
+
+Everything on this page was done for real, on 28 November 2026, with kammacron 0.0.1 from npm and
+[ocr-openthai-web-demo](https://github.com/bank20baht/ocr-openthai-web-demo): an Angular app that
+reads Thai documents in the browser. The cards, runs and commits in the pictures are what Claude
+did then. Scroll: the window on the right follows the step you are reading.
+
+<Walkthrough>
+
+<Scene title="Start kammacron with bunx" bar="~" alt="A terminal: bunx kammacron start prints the address and a sign-in link" terminal={`
+$ bunx kammacron start
+Resolving dependencies
+Resolved, downloaded and extracted [34]
+Saved lockfile
+kammacron 0.0.1 on http://127.0.0.1:7420 (data: ~/.kammacron)
+open (signs you in, once, within 10 minutes): http://127.0.0.1:7420/login#code=…
+`}>
+
+Nothing to install first but [Bun](https://bun.sh) 1.3+, and Claude Code signed in for the agent
+jobs. `bunx` fetches kammacron and starts it in the foreground; the data goes to `~/.kammacron`.
+
+Click the `open` link: it signs this browser in, once. Later, `bunx kammacron open` does the same.
+To keep it running after you close the terminal, see [install](/start/install/#keep-it-running).
+
+</Scene>
+
+<Scene title="Connect the project to the board (MCP)" bar="~/code/ocr-openthai-web-demo" alt="A terminal: kammacron token, then claude mcp add with project scope" terminal={`
+$ cd ~/code/ocr-openthai-web-demo
+$ bunx kammacron token
+claude mcp add --transport http kammacron http://127.0.0.1:7420/mcp --header "Authorization: Bearer …"
+$ export KAMMACRON_TOKEN=$(jq -r .api_token ~/.kammacron/secrets.json)
+$ claude mcp add --scope project --transport http kammacron \\
+    http://127.0.0.1:7420/mcp --header 'Authorization: Bearer \${KAMMACRON_TOKEN}'
+Added HTTP MCP server kammacron with URL: http://127.0.0.1:7420/mcp to project config
+Headers: {
+  "Authorization": "[REDACTED]"
+}
+File modified: ~/code/ocr-openthai-web-demo/.mcp.json
+`}>
+
+`kammacron token` prints the `claude mcp add` line with your API token in it. For a **project**
+scope server (it lives in the repository's `.mcp.json`, so anyone who opens the project gets it),
+keep the token out of the file: Claude Code reads `${KAMMACRON_TOKEN}` from your environment.
+Put the `export` in your shell's profile.
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "kammacron": {
+      "type": "http",
+      "url": "http://127.0.0.1:7420/mcp",
+      "headers": { "Authorization": "Bearer ${KAMMACRON_TOKEN}" }
+    }
+  }
+}
+```
+
+The next `claude` in the folder asks once whether to use this project's server: say yes.
+`/mcp` then lists `kammacron` with its tools. kammacron's own cron jobs do not need this file:
+each of their runs gets a token of its own.
+
+</Scene>
+
+<Scene title="A skill that turns an idea into cards" bar="~/code/ocr-openthai-web-demo" alt="A terminal: the add-card skill files card #2" terminal={`
+$ claude -p '/add-card อยากให้มีปุ่ม "ล้างทั้งหมด" สำหรับเอาไฟล์ที่เลือกไว้ออกทุกไฟล์ในครั้งเดียว (ตอบคำถามเองด้วยคำตอบที่แนะนำ แล้วสร้างการ์ดได้เลย)'
+สร้างการ์ดแล้ว 1 ใบ คือ #2 เพิ่มปุ่ม "ล้างทั้งหมด" ในหน้าสแกน
+(tag auto-pilot, สถานะ todo, ไม่ต้องรอการ์ดอื่น) ยังไม่ได้เริ่มทำและไม่ได้แก้โค้ด
+
+| คำถาม | คำตอบที่ใช้ |
+| ต้องมีกล่องยืนยันก่อนล้างไหม | ไม่ต้อง |
+| กดระหว่างกำลังอ่านได้ไหม | ได้ และยกเลิกงานที่กำลังทำ |
+| ต้องลบทีละไฟล์ได้ด้วยไหม | ไม่รวมในการ์ดนี้ |
+| ล้างค่าที่ตั้งไว้ด้วยไหม | ไม่ล้างค่าตัวเลข และไม่โหลดโมเดลใหม่ |
+`}>
+
+Put a skill in the repository, `.claude/skills/add-card/SKILL.md`, so Claude asks the questions
+that matter and then writes the cards with the board's MCP tools. In short, it says:
+
+1. `list_projects`, and take the project whose directory is this repository.
+2. Ask one question at a time, with the answer you would pick; read the code before asking what it
+   can answer; `list_cards` first, so nothing is filed twice.
+3. Propose the cards: `auto-pilot` for reversible work with a clear done condition, `human: true`
+   for security, data, deploys or product decisions.
+4. After the go-ahead, one `create_cards` call. Do not start the work.
+
+In a session you just type `/add-card` and your idea, and answer its questions. For the picture we
+ran it once with `claude -p` and told it to answer its own questions with the answers it would
+pick: that is the Thai reply on the right, card #2 and the choices it made.
+
+Give it a name of its own: a skill in `~/.claude/skills` with the same name wins over the
+project's (ours was first called `add-task`, and a personal `add-task` took the call).
+
+</Scene>
+
+<Scene title="CLAUDE.md: work only from the board" bar="~/code/ocr-openthai-web-demo" alt="The repository's CLAUDE.md, saying the board is the only list of work" terminal={`
+$ sed -n '6,$p' CLAUDE.md
+# Work comes from the kammacron board
+
+This repository's work lives on its kammacron board (project \`ocr-openthai-web-demo\`, MCP server
+\`kammacron\`). The board is the only list of what to do.
+
+- **Only work a card.** Before changing code, find its card (\`list_cards\`, \`get_card\`). Asked for
+  something that has no card? Make one first (the \`add-card\` skill), then work it.
+- **Take it, then do it.** \`move_card\` to \`doing\` when you start. Work only on what the card says;
+  anything else you notice becomes a new card, not part of this change.
+- **Write the result on the card.** \`add_comment\` with what changed, the files, and how you checked
+  it (\`bun run test\`, \`bun run typecheck\`). Then \`move_card\` to \`done\`.
+- **Stuck or unsure?** \`move_card\` to \`review\` with the reason and the question. Never guess on
+  security, data, deploys or a product decision; never skip a test to pass.
+- **One card, one commit**: \`fix(web): <what> (#<card>)\`, on the branch you were started on. Do not
+  push, and do not create or switch branches.
+- A card tagged \`human\` is a person's: do not take it.
+  `}>
+
+Claude reads `CLAUDE.md` in every session in this folder, yours and kammacron's runs alike. Say
+there that the board is the one list of work, how a card is taken and finished, and what an agent
+must leave to a person. kammacron's runs work the directory as it is (it does not branch, reset or
+push), so say in `CLAUDE.md` how to commit, and whether to push.
+
+</Scene>
+
+<Scene title="Add the project in kammacron" bar="127.0.0.1:7420/welcome" image={welcome} alt="kammacron's welcome page: the tools it found (claude, codex, git, bun) and Add a project">
+
+The welcome page shows the tools it found on the worker's `PATH`. **Add a project** opens a
+three-step form.
+
+</Scene>
+
+<Scene title="Its folder" bar="127.0.0.1:7420/welcome" image={projectFolder} alt="New project, step 1: the directory and the name">
+
+**Directory**: the repository on this machine. Runs happen there, as it is. The name is filled in
+from the folder.
+
+kammacron does not branch, so give agents a place of their own if you like: we used a worktree on a
+branch of its own (`git worktree add ../ocr-openthai-web-demo-kammacron -b try-kammacron`), and
+nothing they did touched `main`.
+
+</Scene>
+
+<Scene title="What agents may do there" bar="127.0.0.1:7420/welcome" image={projectAgents} alt="New project, step 2: Autopilot mode and the allowed Bash commands">
+
+**Autopilot** decides reversible things itself; **Watch** asks you when unsure. Reading, editing and
+git are always allowed: add the commands its work needs, here `Bash(bun run:*)` for the tests and
+the type check, and `Bash(bunx tsc:*)`.
+
+</Scene>
+
+<Scene title="No first job yet" bar="127.0.0.1:7420/welcome" image={projectFirstJob} alt="New project, step 3: four cron job templates, Not now picked">
+
+The templates are the two jobs this page makes, and a weekly dependency update. We make ours by hand
+on the next steps, so **Not now**, then **Create project**.
+
+</Scene>
+
+<Scene title="The board, with the skill's card" bar="127.0.0.1:7420/board/ocr-openthai-web-demo" image={boardFirstCard} alt="The project's board: card #2 from the add-card skill in To do, tagged Auto pilot">
+
+The project's board shows the repository's branch and whether it has uncommitted changes. Card #2
+is the one `/add-card` wrote, tagged **Auto pilot**: an agent may take it.
+
+</Scene>
+
+<Scene title="Cron job 1: find bugs" bar="127.0.0.1:7420/cron" image={huntWhat} alt="New cron job, step 1: the name Find bugs, Claude does it">
+
+**Cron jobs** → **Add cron job**. Name it, and pick **Claude** under **Who does it**.
+
+</Scene>
+
+<Scene title="Its prompt" bar="127.0.0.1:7420/cron" image={huntTask} alt="New cron job, step 2: the bug-hunting prompt, Use the Kanban board unticked, Sonnet picked">
+
+```text
+Look for real bugs in apps/web/src: wrong behaviour, an error nobody
+handles, an edge case that breaks. Read the code; do not change any file.
+
+For each bug you are sure of, file one card on the kammacron board
+(create_cards, this project): the title says what goes wrong, the body has
+the file and line, how to see it, and "Done when". Tag it "bug" and
+"auto-pilot" when the fix is small and a test can prove it; otherwise set
+human=true.
+
+First list_cards with the tag "bug": never file one twice. At most 3 cards
+a run. Nothing found? Say so and file nothing.
+```
+
+Untick **Use the Kanban board**: that hands the job cards to _take_, and this one only files them.
+**More options** picks the model.
+
+</Scene>
+
+<Scene title="When it runs" bar="127.0.0.1:7420/cron" image={huntWhen} alt="New cron job, step 3: weekdays at 09:00">
+
+Like an alarm clock: weekdays at 09:00 (`0 9 * * 1-5`). To see it work now, set **Cron** to
+`* * * * *`, wait for the first run to start (the next whole minute, plus up to 30 seconds), then put
+the time back.
+
+</Scene>
+
+<Scene title="It runs" bar="127.0.0.1:7420/runs/1" image={huntRun} alt="Run 1: succeeded, 1 minute 4 seconds, 26 turns, $0.50; the timeline of its tool calls">
+
+**Runs** shows each one live: every tool call and its result. This one read the scan page and the OCR
+service and finished in a minute, for $0.50 in API terms (a Claude subscription pays no such bill).
+
+</Scene>
+
+<Scene title="Three bugs on the board" bar="127.0.0.1:7420/board/ocr-openthai-web-demo" image={boardBugs} alt="The board: four cards in To do, three of them bugs; one is tagged Human">
+
+It filed three real bugs, each with the file and line, how to see it and when it is done:
+
+- **#3** editing the text while digits are shown in Thai turns every digit on the page, for good:
+  marked **Human**, because what it should do is a product decision;
+- **#4** after the OCR worker fails to load, _retry_ hangs forever: `auto-pilot`;
+- **#5** one unreadable image in a batch stops every page after it: `auto-pilot`.
+
+</Scene>
+
+<Scene title="Cron job 2: fix them, one card a time" bar="127.0.0.1:7420/cron" image={fixTask} alt="New cron job Fix bugs: the prompt, Use the Kanban board ticked">
+
+```text
+Take one auto-pilot card, do it, and write the result on the card.
+Follow CLAUDE.md: run the tests, one commit for the card.
+```
+
+This time keep **Use the Kanban board** ticked: each run gets the open `auto-pilot` cards and how to
+take one. A card tagged `human` is never handed out.
+
+</Scene>
+
+<Scene title="Every five minutes" bar="127.0.0.1:7420/cron" image={fixWhen} alt="New cron job, step 3: every 5 minutes">
+
+**Every few minutes** → 5. Each run takes one card; a run that finds none ends at once. Every hour, or
+every night, suits a real project better: you read the results in the morning.
+
+</Scene>
+
+<Scene title="Two jobs, one project" bar="127.0.0.1:7420/cron" image={cronList} alt="The project's cron jobs: Find bugs (weekdays 09:00) and Fix bugs (every 5 minutes, with the board), both on">
+
+**Turn off** stops a job and keeps it; **Edit** changes it. The **Calendar** shows when each one runs
+next.
+
+</Scene>
+
+<Scene title="Watch: the board and the app" bar="127.0.0.1:7420/board | localhost:4200" images={[watchBoard, watchDev]} alt="Left, the board: #5 in Doing, #4 and #2 in Done; right, the app with a picked page and the new clear-all button">
+
+Keep the board on one side and the dev server (`bun run dev`) on the other. Each run moves its card
+to **Doing**, then to **Done** with a comment, or to **Review** with a question; the dev server
+reloads with the fix. Here #4 is done, #5 is being worked, and the app already has the
+**ล้างทั้งหมด** (clear all) button that card #2 asked for.
+
+</Scene>
+
+<Scene title="What it wrote on the card" bar="127.0.0.1:7420/board/ocr-openthai-web-demo" image={cardDone} alt="Card #2 done: the agent's comment with what changed, what it decided, and the tests it ran">
+
+Open a card for what was done. On #2 the agent wrote the commit, the files it changed, what it
+decided on its own (and why), and what it ran: `bun run test` 89/89, typecheck, lint, format. A card in **Review** waits
+for you in **Review**, with the reason: approve it, or send it back with a note for the next run.
+
+</Scene>
+
+<Scene title="The commits" bar="~/code/ocr-openthai-web-demo" alt="git log: one commit for each card" terminal={`
+$ git log --oneline -6
+ec79d8d fix(web): keep reading the other pages when one fails (#5)
+7fe8782 fix(web): add a clear-all button to the scan page (#2)
+0a871cc fix(web): start a new OCR worker after one fails, so retry works (#4)
+5f56f89 chore: name the skill add-card, clear of the global add-task
+3a41f7f chore: work from the kammacron board (MCP, add-task skill, CLAUDE.md)
+9f9f285 docs: update README screenshot to the multi-page scan page
+$ git diff --stat 9f9f285 -- apps
+ apps/web/src/app/core/ocr/ocr.service.spec.ts   |  97 +++++++++
+ apps/web/src/app/core/ocr/ocr.service.ts        |   4 +
+ apps/web/src/app/modules/scan/scan.page.html    |   9 +-
+ apps/web/src/app/modules/scan/scan.page.spec.ts | 271 ++++++++++++++++++++++++
+ apps/web/src/app/modules/scan/scan.page.ts      |  60 ++++--
+ 5 files changed, 427 insertions(+), 14 deletions(-)
+`}>
+
+One commit a card, on the branch you were on, unpushed, as `CLAUDE.md` asked, each with its tests.
+Read them, then push.
+
+The whole afternoon: one hunting run and three fixing runs, 15 minutes from the first hunt to the
+last fix, $2.10 in API terms. Card #3 waits for a person, as it should; the fixer also filed #6 and
+#7, two things it noticed and left alone, untagged, for you to look at. When you have seen enough,
+**Turn off** the jobs, or set them to a pace you like.
+
+</Scene>
+
+</Walkthrough>

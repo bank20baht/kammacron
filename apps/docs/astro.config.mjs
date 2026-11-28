@@ -31,6 +31,7 @@ export default defineConfig({
           items: [
             { slug: 'start/install', label: 'Install' },
             { slug: 'start/first-steps', label: 'First steps' },
+            { slug: 'start/walkthrough', label: 'A real project, start to finish' },
           ],
         },
         {
